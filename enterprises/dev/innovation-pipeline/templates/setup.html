@@ -1,0 +1,144 @@
+<!-- ─────────────────────────────────────────────────────────────
+     setup.html — the sign-up screen (markup only)
+     Served at /apps/signup, hydrated by auth.js → Entry.mount('setup', …).
+     The Back button is hidden on first run (no organizations exist yet).
+
+     ONE SIGN-UP FOR ALL TWELVE PROGRAMS. Sign-IN still belongs to a program —
+     /apps/leaders/judgment-critical-thinking/login wears that program's name
+     and colours —
+     but creating an account does not: it decides which of the two audiences
+     you belong to, and that answer then governs every program in that space.
+     So the question is asked here, on the form, rather than inferred from
+     whichever door the visitor happened to arrive at. The twelve old
+     /apps/{role}/{program}/signup addresses 301 here (index.php), and the
+     choice below is what they used to answer silently.
+
+     WHAT EACH ROLE IS ASKED. An Enterprise account is a team, so it names the
+     organization — the label every screen gives the shared workspace. Nobody
+     types it to sign in: that screen takes a username and a password, and the
+     username is unique installation-wide. A Leader account is one person: it
+     has no organization to name, so the field is not shown and the server
+     derives the workspace's name from theirs. Everything else is the same for
+     both, and auth.js shows or hides that one cell as the choice changes.
+
+     WHAT EACH ROLE GETS. Its whole role space — all six programs — either way.
+     An Enterprise organization holds them as a pool for its administrator to
+     assign; a Leader simply holds all six. Nothing here picks programs, because
+     with a shared sign-up there is no address to pick them from and a list of
+     twelve checkboxes is a worse first question than the one above.
+     SetupController::entitlementFor is the authority and ignores anything sent.
+     ───────────────────────────────────────────────────────────── -->
+<div class="login-screen entry-wide">
+  <div class="login-card entry-card-wide">
+    <button type="button" class="entry-back" data-go="launchpad" data-back>&larr; All programs</button>
+    <div class="login-eyebrow" data-slot="module-name">90-Day Programs</div>
+    <h1 class="login-title" data-slot="title">Create your <em>account</em></h1>
+    <p class="login-sub" data-slot="sub">Choose the kind of account you need, then create your workspace. The same
+      sign-up covers every program.</p>
+
+    <form class="entry-form" data-auth="setup" novalidate autocomplete="off">
+      <div class="entry-err" data-err="_general" role="alert" hidden></div>
+
+      <!-- Directive 2 Oct 2026, Part 5.9: the setup code, above every other field. The
+           server verifies it; a placeholder until the voucher and registration system. -->
+      <div class="entry-setup-code">
+        <label class="entry-flabel" for="setupCode">Setup code</label>
+        <input id="setupCode" class="entry-text-input" type="text" autocomplete="off"
+          placeholder="The code you were given" data-field="setup_code" />
+        <div class="entry-field-err" data-err="setup_code" role="alert"></div>
+      </div>
+
+      <!-- The one question the address used to answer. Neither option is
+           pre-selected: an account created in the wrong space cannot be moved
+           into the other one, and a default that nobody looked at is exactly
+           how that happens. auth.js reveals the Organization field, rewrites
+           the title and fills the note below as this changes. -->
+      <fieldset class="entry-roles entry-roles-row" data-slot="role-picker">
+        <legend class="entry-flabel">What are you signing up for?</legend>
+
+        <label class="entry-role">
+          <input type="radio" name="setupAccountType" value="enterprise" data-field="account_type" />
+          <span>
+            <span class="entry-role-name">Enterprise</span>
+            <span class="entry-role-sub">A team runs the programs together, in one shared workspace you
+              administer.</span>
+          </span>
+        </label>
+
+        <label class="entry-role">
+          <input type="radio" name="setupAccountType" value="leader" data-field="account_type" />
+          <span>
+            <span class="entry-role-name">Leaders</span>
+            <span class="entry-role-sub">One person, one workspace. Everything you do in it is yours alone.</span>
+          </span>
+        </label>
+
+        <div class="entry-field-err" data-err="account_type" role="alert"></div>
+      </fieldset>
+
+      <!-- Two columns. Each field keeps label → input → error slot together in
+           one cell so a message never pushes the neighbouring column around. -->
+      <div class="entry-grid">
+        <!-- Enterprise only — hidden (and not sent) for a Leader account, and
+             hidden until the choice above is made. -->
+        <div class="entry-cell" data-slot="org-field">
+          <label class="entry-flabel" for="setupOrg">Organization name</label>
+          <input id="setupOrg" class="entry-text-input" type="text" autocomplete="organization"
+            placeholder="e.g. Acme Manufacturing" data-field="organization_name" />
+          <div class="entry-field-err" data-err="organization_name" role="alert"></div>
+        </div>
+
+        <div class="entry-cell">
+          <label class="entry-flabel" for="setupName">Your name</label>
+          <input id="setupName" class="entry-text-input" type="text" autocomplete="name" placeholder="e.g. Maria Torres"
+            data-field="name" />
+          <div class="entry-field-err" data-err="name" role="alert"></div>
+        </div>
+
+        <div class="entry-cell">
+          <label class="entry-flabel" for="setupEmail">Email</label>
+          <input id="setupEmail" class="entry-text-input" type="email" autocomplete="email"
+            placeholder="e.g. maria@acme.com" data-field="email" />
+          <div class="entry-field-err" data-err="email" role="alert"></div>
+        </div>
+
+        <div class="entry-cell">
+          <label class="entry-flabel" for="setupUser">Username</label>
+          <input id="setupUser" class="entry-text-input" type="text" autocomplete="username" placeholder="e.g. maria"
+            data-field="username" />
+          <div class="entry-field-err" data-err="username" role="alert"></div>
+        </div>
+
+        <!-- Directive 2 Oct 2026, Part 5.9: the first person's own password, typed twice
+             (the setup code is the first field of the form, above). -->
+        <div class="entry-cell">
+          <label class="entry-flabel" for="setupPassword">Password</label>
+          <input id="setupPassword" class="entry-text-input" type="password"
+            autocomplete="new-password" placeholder="Choose a password" data-field="password" />
+          <div class="entry-field-err" data-err="password" role="alert"></div>
+          <div class="pw-rule">At least 8 characters, including a number and a special character such as ! or #.</div>
+        </div>
+
+        <div class="entry-cell">
+          <label class="entry-flabel" for="setupConfirm">Confirm password</label>
+          <input id="setupConfirm" class="entry-text-input" type="password"
+            autocomplete="new-password" placeholder="Type it again" data-field="confirm" />
+          <div class="entry-field-err" data-err="confirm" role="alert"></div>
+        </div>
+
+        <div class="entry-cell entry-cell-end">
+          <label class="entry-remember">
+            <input type="checkbox" id="setupRemember" /> <span>Remember me on this device</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Which programs this account starts with, stated rather than asked:
+           the whole of whichever space was chosen above. Filled in by auth.js
+           once there is a choice to describe. -->
+      <p class="entry-note" data-slot="program-note" hidden></p>
+
+      <button type="submit" class="btn-gold login-btn" data-submit>Create &amp; Continue &rarr;</button>
+    </form>
+  </div>
+</div>

@@ -1,0 +1,161 @@
+/* ============================================================
+   Executive Readiness — module stylesheet
+   ============================================================
+   Loaded after assets/css/styles.css, and only when this module is
+   the active one (js/modules/registry.js → styles).
+
+   The shared stylesheet already carries almost everything this
+   program needs: the two were built from the same design system and
+   agree on 975 of 989 class names, including every generated
+   utility. What is left is what the Executive Readiness screens use
+   and the Pipeline's do not — the leadership org board, the
+   individual/collective step tags, and a few print helpers.
+
+   Nothing here overrides a shared rule; it only adds. Anything that
+   belongs to every module belongs in styles.css instead.
+   ============================================================ */
+
+/* ── Cards that act as links (Home, Learn) ────────────────── */
+.card-link {
+  cursor: pointer
+}
+
+.card-link:hover {
+  background: rgba(var(--gold-rgb), .07);
+  border-color: rgba(var(--gold-rgb), .4);
+  transform: translateY(-2px)
+}
+
+.card-arrow {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: .18em;
+  color: var(--gold);
+  text-transform: uppercase;
+  transition: letter-spacing .2s
+}
+
+.card-link:hover .card-arrow {
+  letter-spacing: .28em
+}
+
+.section-body {
+  font-size: 16px;
+  line-height: 1.75;
+  color: var(--stone);
+  max-width: 580px
+}
+
+/* ── Step tags: whose work a step is ──────────────────────────
+   Individual-track steps are completed per leader and never count
+   towards the organization-wide progress a phase reports. */
+.tag-individual {
+  border-color: rgba(45, 90, 142, .4);
+  color: var(--ph2);
+  background: rgba(45, 90, 142, .08)
+}
+
+.tag-collective {
+  border-color: rgba(27, 107, 90, .4);
+  color: var(--ph1);
+  background: rgba(27, 107, 90, .08)
+}
+
+/* ── Leadership org board (Phase 2 / the Lead dashboard) ─────
+   The board breaks out of the content column to use the full width
+   between the sidebar and the window edge, so a deep hierarchy is
+   readable without zooming out. */
+.org-board {
+  position: relative;
+  width: calc(100vw - var(--sbw) - 48px);
+  margin-left: calc(-1*max(0px, 50vw - var(--sbw) - 450px) - 24px);
+  transition: margin-left .25s cubic-bezier(.16, 1, .3, 1), width .25s cubic-bezier(.16, 1, .3, 1);
+  border: 1px solid rgba(30, 37, 48, .2);
+  background-color: var(--ink);
+  background-image: linear-gradient(to bottom, rgba(255, 255, 255, .45), rgba(255, 255, 255, 0) 260px),
+    radial-gradient(rgba(30, 37, 48, .08) 1.05px, transparent 1.05px);
+  background-size: auto, 26px 26px;
+  padding: 24px;
+  box-sizing: border-box
+}
+
+[data-theme="dark"] .org-board {
+  background-color: var(--ink);
+  background-image: radial-gradient(ellipse at 50% 46%, rgba(0, 0, 0, 0) 62%, rgba(0, 0, 0, .22) 100%),
+    radial-gradient(rgba(245, 242, 236, .06) 1.05px, transparent 1.05px);
+  background-size: auto, 26px 26px;
+  border-color: rgba(245, 242, 236, .15)
+}
+
+.org-board-canvas {
+  overflow: auto;
+  position: relative;
+  cursor: grab
+}
+
+.org-board-canvas.is-panning {
+  cursor: grabbing;
+  user-select: none
+}
+
+.org-board-legend {
+  position: absolute;
+  top: 24px;
+  left: 28px;
+  z-index: 2;
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  pointer-events: none
+}
+
+/* A board page centres its own column, then lets the board bleed out of it. */
+.main-content .content-inner.board-page {
+  margin-left: max(0px, calc(50vw - var(--sbw)/2 - 450px))
+}
+
+/* 16 Sep 2026 (Paul's ruling): the Report Manager's 1350px block centres
+   on the page when the sidebar is closed; the shared formula above is
+   written for the 900px column. Section 5 of the 16 Sep directive. */
+.content-inner.rc-page {
+  max-width: 1350px;
+  margin-left: max(0px, calc(50vw - var(--sbw) - 675px))
+}
+
+.board-page .org-board {
+  margin-left: calc(-1*max(0px, 50vw - var(--sbw)/2 - 450px) - 24px)
+}
+
+/* ── Print helpers ────────────────────────────────────────── */
+.print-only {
+  display: none
+}
+
+@media print {
+  .print-only {
+    display: block !important
+  }
+
+  /* Must stay INSIDE the print query. Hoisted out, it hides the screen copy of
+     every .screen-only block on screen as well — which is how the Competency
+     Heat Map came to render as an empty card on the Competency Framework page,
+     its print twin already hidden by .print-only above. */
+  .screen-only {
+    display: none !important
+  }
+}
+
+/* Selects rendered on dark card backgrounds need their own colours:
+   the native control ignores the inherited one in several browsers. */
+.assign-sel {
+  color: var(--paper) !important
+}
+
+.assign-sel option {
+  background: var(--ink);
+  color: var(--paper)
+}
+
+.vp-slide-body2 {
+  margin-top: -6px
+}

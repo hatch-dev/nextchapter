@@ -1,0 +1,829 @@
+/* ============================================================
+   themes.css — one palette per program, in both modes
+   ============================================================
+   The suite runs twelve 90-day programs on ONE shell. Every one of
+   them uses the same design system — the spacing, the type scale, the
+   cards, the buttons, the sidebar, the modals all come from
+   assets/css/styles.css and none of it is duplicated here. What differs
+   between programs is colour, and colour alone. This file is that
+   difference, and it is the ONLY place any program's colour is decided.
+
+   ── Where each palette comes from ────────────────────────────
+   FOUR programs have a standalone reference build under
+   enterprises/dev/ or leaders/dev/, and for those the reference is the
+   authority — the values below are copied out of it, not chosen:
+
+       exec-readiness   Exec-Readiness-styles.css  heather plum #665A7E
+                        …including its ground shift; see that block
+       pipeline         the innovation build       orange   #E8621A
+       ai-governance    Governance-styles.css      teal     #0E7462
+                        …including its ground shift; see that block
+       ethics-engine    ee-styles.css (--mod)      green    #2E7D46
+
+   A fifth build exists — leaders/dev/judgment-critical-thinking — but carries no
+   identity of its own; see that program's block for what was used
+   instead. The remaining seven programs have no build yet, so their
+   palettes are chosen here, spaced across the wheel and graded by
+   tools/theme-contrast.js. When a build lands for one of them, its
+   values replace what is below — which is exactly what happened to
+   ai-governance's chosen crimson on 2026-09-01.
+
+   Two teals now sit close together: ai-governance #0E7462, taken from
+   its build, and ai-culture #12736A, still a chosen placeholder. When
+   AI-Ready Culture's build lands its own values replace that one; until
+   then the pair is only visible side by side on the launchpad grid.
+
+   Read a reference's values with getComputedStyle, never by grepping:
+   Exec-Readiness-styles.css contains two identity revisions at equal
+   specificity, and the file order — not the first match — decides.
+
+   ── How it attaches ──────────────────────────────────────────
+   The front controller stamps the active program onto the root element:
+
+       <html data-app="decision-lab" data-theme="dark">
+
+   `data-theme` was already there (light | dark). `data-app` is new, and
+   the two are independent: 12 programs × 2 modes = 24 schemes, from one
+   attribute pair and no extra stylesheet per program.
+
+       no data-app          the SUITE palette — the launchpad, sign-in,
+                            sign-up and the admin console, which belong
+                            to no single program and must not wear one's
+                            colours (see index.php: it stamps data-app
+                            only when a program is actually open).
+
+   ── The five tokens a palette states ─────────────────────────
+   Everything downstream is derived from these, so a new program is five
+   values and nothing else:
+
+       --accent          the brand hue. THEME-INVARIANT: the same colour
+                         in light and dark, because it is the program's
+                         identity, not a shade of the background. This
+                         is what fills a button and draws a focus ring.
+       --accent-rgb      the same colour as channels, for alpha washes.
+                         Required: the shared sheet's tints are written
+                         rgba(var(--accent-rgb), .06) and cannot read a hex.
+       --accent-light    a lift of the accent, for hover and gradients.
+       --accent-strong   the accent made READABLE ON THE LIGHT GROUND.
+       --accent-soft     the accent made READABLE ON THE DARK GROUND.
+       --on-accent       the label colour INSIDE a filled accent button.
+
+   The last three exist because one hue cannot do all three jobs. An
+   accent bright enough to read on #242E3C is too pale to read on
+   #EAEEF4, and vice versa — so the text colour swaps with the mode
+   while the fill stays put. `node tools/theme-contrast.js` grades all
+   24 schemes against the real grounds; every pair below is ≥ 4.5:1.
+
+   ── A palette MAY also move the ground ───────────────────────
+   Exactly one does — Executive Readiness, because its reference build
+   does. The five tokens above stay the normal case and eleven programs
+   use nothing else; a ground shift is for an accent that cannot sit on
+   blue-slate at all, and it is restating tokens styles.css already owns
+   (--ink, --bg-rgb, --bg-sidebar, --bg-elev, --menu-bg, --rule-rgb, the
+   two shadows) inside that program's selector. theme-contrast.js reads
+   them, so such a program is graded against the ground it actually
+   paints on rather than the suite's.
+
+   ── Why --gold is still called gold ──────────────────────────
+   The shared stylesheet has ~60 var(--gold) references and the ported
+   programs have hundreds more. `--gold` is the design system's name for
+   "the accent", and was literal only while there was exactly one
+   program. Renaming it would touch thousands of lines across generated
+   files for no behavioural gain, so the alias is drawn here instead:
+   --gold and friends resolve to the active program's accent. The name
+   is historical; the meaning is "this program's accent".
+
+   ── Adding a program ─────────────────────────────────────────
+   Add one [data-app="<id>"] block and its [data-theme="dark"] twin
+   below, using the module's `id` from config/catalogue.json (the
+   storage key, not the URL slug). Then run tools/theme-contrast.js.
+   Nothing else needs editing — index.php stamps whatever the catalogue
+   resolves, so the attribute appears on its own.
+   ============================================================ */
+
+
+/* ── The alias layer ─────────────────────────────────────────
+   Written once, inherited by every program. The palettes below restate
+   only the five source tokens; these derived names follow automatically,
+   which is what keeps a palette to five lines instead of fifteen.
+
+   :root rather than a bare selector so this outranks the shared sheet's
+   own :root definitions of the same names (equal specificity, later
+   file wins — themes.css loads after styles.css in shell.html).
+
+   ── data-app BELONGS ON THE ROOT, and nowhere else ──
+   These aliases are resolved on the element that carries them. Put
+   data-app on a descendant and --gold is still computed HERE, against
+   the SUITE's --accent, and inherits down already resolved: the child
+   gets the right --accent and the wrong --gold, which looks like the
+   theme half-working rather than like a mistake. Making it work at any
+   depth would mean repeating all nine alias lines inside each of the
+   twelve palettes — the duplication this layer exists to avoid. So the
+   contract is one line long: index.php stamps <html data-app="…">, and
+   js/modules/boot.js does the same where there is no front controller.
+   Nothing else should ever set it. */
+:root {
+  --gold: var(--accent);
+  --gold-rgb: var(--accent-rgb);
+  --gold-light: var(--accent-light);
+  --gold-text: var(--accent-strong);
+  --gold-pale: var(--accent-pale);
+  --on-gold: var(--on-accent);
+
+  /* The ported Leaders programs call the accent --mod (see
+     assets/css/modules/ethics-engine.css). Same colour, older name:
+     aliased here so those files retheme with everything else rather
+     than staying green in a program that is not The Ethics Engine. */
+  --mod: var(--accent);
+  --mod-light: var(--accent-light);
+  --mod-text: var(--accent-strong);
+
+  /* The italic emphasis colour: the second word of the wordmark, and the
+     <em> inside every hero headline, section title and step title. It
+     was a fixed blue in every program — the last hue shared across all
+     twelve, and the most visible one, since it is half the logo.
+
+     The Ethics Engine's reference build already re-pointed it at that
+     program's own accent (--head-blue: #2E7D46 in ee-styles.css), which
+     is the precedent: this is an accent role, not a neutral. Following
+     the program is what makes "The Decision *Lab*" gold and "The Ethics
+     *Engine*" green rather than both blue.
+
+     ── DELIBERATE DELTA #1 from the reference builds ──
+     Diff the live app against enterprises/dev/* and this shows up: they
+     hold --head-blue at #076D9E light / #38B5EF dark. Restoring that
+     would put a blue wordmark on the plum program and undo the whole
+     point of a per-program palette, so it is not a drift to correct.
+
+     ── DELIBERATE DELTA #2 ──
+     accent-STRONG, not the raw accent — which is where this also parts
+     company with ee-styles.css, whose light --head-blue is the raw
+     #2E7D46. That measures 4.36:1 on the light ground: the reference's
+     own value fails AA in the reference's own program. Raw accents are
+     worse elsewhere (Decision Lab 2.71:1, Pipeline 2.91:1), so the rule
+     has to be the darkened one. The dark half already agrees with the
+     reference exactly. */
+  --head-blue: var(--accent-strong);
+  --ref-accent: var(--accent-strong);
+
+  /* Hover wash on a card. Was a literal rgba(232, 98, 26, .04) — the
+     Pipeline's orange, hard-coded into every program's card. */
+  --bg-card-hover: rgba(var(--accent-rgb), .04);
+}
+
+/* ── Dark mode ───────────────────────────────────────────────
+   Only the colours that carry TEXT swap. The fill, its channels and the
+   hover lift are the program's identity and do not move between modes.
+
+   ── Why @media screen, here and on every dark block below ──
+   PAPER IS ALWAYS THE LIGHT THEME. styles.css does that by re-declaring
+   the light values inside @media print at a specificity above
+   [data-theme="dark"] — which works while there is one palette, and
+   cannot work here: a per-program dark override is
+   [data-theme="dark"][data-app="x"], and no print rule written once for
+   all twelve can outrank twelve two-attribute selectors. Restoring them
+   would take a print block per program, i.e. a third copy of every
+   palette that has to be kept in step by hand.
+
+   Scoping the dark side to SCREEN inverts the problem into nothing:
+   print never sees the override, so the light [data-app="x"] value
+   applies on paper by itself. No specificity contest, no third copy,
+   and a program added later gets correct printing without knowing this
+   paragraph exists. */
+@media screen {
+  [data-theme="dark"] {
+    --gold-text: var(--accent-soft);
+    --mod-text: var(--accent-soft);
+    /* DELIBERATE DELTA #3: the reference builds keep --gold-pale at its
+       light-ground tint in dark mode too. Its one consumer is the sidebar
+       Home label (.sidebar-home in styles.css), i.e. TEXT — and a tint
+       mixed to sit on #EAEEF4 is a near-white on a dark ground, which
+       reads as a heading rather than as the accent. accent-soft is the
+       token that exists for accent-as-text on dark. Both pass AA; this
+       one keeps the label recognisably the program's colour. */
+    --gold-pale: var(--accent-soft);
+    --head-blue: var(--accent-soft);
+    --ref-accent: var(--accent-soft);
+  }
+}
+
+
+/* ════════════════════════════════════════════════════════════
+   THE SUITE  ·  no program open
+   Launchpad, sign-in, sign-up, the admin console. Deliberately the
+   Pipeline's orange: it is the suite's founding colour, it is what the
+   marketing site and every existing screenshot show, and the entry
+   screens have worn it since before there was a second program.
+   ════════════════════════════════════════════════════════════ */
+:root {
+  --accent: #E8621A;
+  --accent-rgb: 232, 98, 26;
+  --accent-light: #F07A37;
+  --accent-strong: #B34208;
+  --accent-soft: #F07A37;
+  --accent-pale: #FDE8D8;
+  /* NOT white. White on this orange is 3.39:1 — under the 4.5 floor, and a
+     failure the reference build shipped with. A warm near-black reads 5.09:1.
+     This is also what DARK mode already showed, because .btn-gold took its
+     label from --ink (the page ground, which is dark there): light mode was
+     the odd one out. Fixing it makes the two modes agree. */
+  --on-accent: #2A1608;
+}
+
+
+/* ════════════════════════════════════════════════════════════
+   ENTERPRISE  ·  an organization and its team
+   Six programs, cool-to-warm across the wheel so no two read alike in
+   the switcher or on the launchpad grid.
+   ════════════════════════════════════════════════════════════ */
+
+/* I · Executive Readiness — heather plum. AI fluency & judgment.
+   TAKEN VERBATIM from its reference build,
+   enterprises/dev/executive-readiness/Exec-Readiness-styles.css.
+
+   That file carries TWO identity revisions — "July 15, steel blue"
+   (#4E7FA6) and "July 27, heather plum" (#665A7E) — at equal specificity,
+   so the browser resolves the later one and the build renders plum. An
+   earlier reading of that file took the first block and shipped a steel
+   blue nobody had signed off; these are the values the reference actually
+   computes, read back out of it with getComputedStyle rather than by eye.
+
+   --on-accent is the one departure and it is the same departure the
+   Pipeline's block records below: the reference paints the button label
+   with var(--ink), which is the PAGE GROUND, so it flips to near-black in
+   dark mode and reads 2.0:1 on this fill. The reference's own note grades
+   only the light half ("btn text (ink) on #665A7E 5.3:1"). White is
+   6.31:1 in both modes and does not depend on the mode at all. */
+[data-app="exec-readiness"] {
+  --accent: #665A7E;
+  --accent-rgb: 102, 90, 126;
+  --accent-light: #8B7FA8;
+  --accent-strong: #524669;
+  --accent-soft: #B9ADD3;
+  --accent-pale: #E8E5EF;
+  --on-accent: #FFFFFF;
+
+  /* ── The ground shift ──────────────────────────────────────
+     The ONLY program that moves the page out from under itself, and it
+     is the reference's decision, not an embellishment: "accent and
+     grounds shifted a few quiet degrees toward violet-gray". Plum on the
+     shared blue-slate reads as a colour that lost an argument with its
+     background; on this ground it reads as the program.
+
+     Everything here is a token the shared sheet already owns, restated —
+     no new names, and nothing outside this selector is touched, so no
+     other program can see it. Specificity: [data-app] is (0,1,0), the
+     same as the `:root` these override, and themes.css loads second. */
+  --ink: #EDEBF2;
+  --bg-rgb: 237, 235, 242;
+  --bg-sidebar: #E4E1EB;
+  --rule-rgb: 60, 48, 88;
+  --shadow-card: 0 4px 24px rgba(42, 36, 56, .08);
+  --shadow-elev: 0 8px 40px rgba(42, 36, 56, .16);
+}
+
+@media screen {
+  [data-theme="dark"][data-app="exec-readiness"] {
+    /* No --accent-light here: the reference holds #8B7FA8 in BOTH modes.
+       The other eleven lift theirs for the dark ground; this one was
+       chosen against a dark ground that is itself lighter than the
+       suite's, and lifting it again would break the pairing. */
+    --ink: #322E3B;
+    --bg-rgb: 50, 46, 59;
+    --bg-elev: #3E3947;
+    --menu-bg: #504A5E;
+    --bg-sidebar: #363240;
+    --rule-rgb: 168, 158, 190;
+  }
+}
+
+/* II · AI Innovation Pipeline — orange. The flagship, and the colour
+   the whole design system was built around.
+   VERBATIM from enterprises/dev/innovation-pipeline (--gold #E8621A,
+   --gold-light #F07A37, --gold-pale #FDE8D8, --gold-text #B34208 light /
+   #F07A37 dark). --accent-soft was #F08A4B — a lift invented here rather
+   than taken from the build; the reference's own dark accent-as-text is
+   the same #F07A37 as its --gold-light, reads 4.93:1 on the dark ground,
+   and being the shipped value is the one to keep. */
+[data-app="pipeline"] {
+  --accent: #E8621A;
+  --accent-rgb: 232, 98, 26;
+  --accent-light: #F07A37;
+  --accent-strong: #B34208;
+  --accent-soft: #F07A37;
+  --accent-pale: #FDE8D8;
+  /* NOT white. White on this orange is 3.39:1 — under the 4.5 floor, and a
+     failure the reference build shipped with. A warm near-black reads 5.09:1.
+     This is also what DARK mode already showed, because .btn-gold took its
+     label from --ink (the page ground, which is dark there): light mode was
+     the odd one out. Fixing it makes the two modes agree. */
+  --on-accent: #2A1608;
+}
+
+/* III · Responsible AI Governance — governance teal.
+   TAKEN VERBATIM from its reference build,
+   enterprises/dev/responsible-ai-governance/Governance-styles.css, whose
+   "GOVERNANCE VISUAL IDENTITY (July 14)" block states it: "sibling palette to
+   the innovation app: same slate architecture, accent shifted orange →
+   governance teal, grounds tinted a few degrees toward teal".
+
+   This block used to hold a crimson chosen here, while the program was still
+   catalogued as planned. The file's own rule for that case — "when a build
+   lands for one of them, its values replace what is below" — is what happened
+   on 2026-09-01, when the build was ported to live. Nothing about the crimson
+   survives; it was a placeholder for a program that had no build yet.
+
+   --on-accent is the one departure, and it is the departure every ported
+   palette records: the reference paints the button label with var(--ink),
+   the PAGE GROUND, so it flips to near-black in dark mode and reads 3.69:1 on
+   this fill. White is 5.69:1 and does not depend on the mode. */
+[data-app="ai-governance"] {
+  --accent: #0E7462;
+  --accent-rgb: 14, 116, 98;
+  --accent-light: #27A088;
+  --accent-strong: #0A6B5B;
+  --accent-soft: #3EC9AF;
+  --accent-pale: #D8F0E9;
+  --on-accent: #FFFFFF;
+
+  /* ── The blue accent set stays the donor's ────────────────
+     THE ONE PROGRAM THAT OPTS OUT OF DELTA #1 above, and it opts out because
+     its reference build says so in as many words. Governance-styles.css, R-18,
+     25 Aug 2026, ruled by Paul:
+
+       "the --head-blue override REMOVED: the blue accent set — nav-logo
+        accent, section labels, hero eyebrow, title italics — is cross-module
+        family branding and stays the donor blue in every module"
+
+     That is a later ruling than the alias layer's, and it is about this token
+     specifically, so here it wins: the second word of the wordmark, every hero
+     <em> and every section label render #076D9E, exactly as they do in the
+     build. The accent above still fills every button, rule and wash.
+
+     Restated inside this selector and nowhere else, so the other eleven
+     programs keep the accent-coloured wordmark Delta #1 gives them. */
+  --head-blue: #076D9E;
+  --ref-accent: #0A7FB5;
+
+  /* ── The ground shift ──────────────────────────────────────
+     The second program to move the page out from under itself (Executive
+     Readiness is the first), and as there it is the reference's decision:
+     "grounds tinted a few degrees toward teal". Every name here is one the
+     shared sheet already owns, restated — nothing new, and nothing outside
+     this selector, so no other program can see it. Specificity: [data-app] is
+     (0,1,0), the same as the :root these override, and themes.css loads
+     second. */
+  --ink: #E9F1EE;
+  --bg-rgb: 233, 241, 238;
+  --bg-sidebar: #DBE7E3;
+  --rule-rgb: 13, 60, 58;
+  --shadow-card: 0 4px 24px rgba(24, 42, 40, .08);
+  --shadow-elev: 0 8px 40px rgba(24, 42, 40, .16);
+}
+
+@media screen {
+  [data-theme="dark"][data-app="ai-governance"] {
+    /* No --accent-light: the reference holds #27A088 in BOTH modes. */
+    --head-blue: #38B5EF;
+    --ref-accent: #38B5EF;
+    --ink: #23343B;
+    --bg-rgb: 35, 52, 59;
+    --bg-elev: #2B3F47;
+    --menu-bg: #3A525C;
+    --bg-sidebar: #27383F;
+    --rule-rgb: 125, 180, 172;
+  }
+}
+
+/* IV · AI-Ready Architecture — slate. The technical foundation.
+
+   This block used to hold an indigo chosen here while the program was still
+   catalogued as planned. On 21 Oct 2026 its build arrived (enterprises/dev/
+   architecture-prototype/Architecture-styles.css) and, by this file's own rule,
+   its values replace the placeholder: --gold #5A7D8A, --gold-light #7A9DAA,
+   --gold-text #4C6A75, on grounds cooled toward blue-grey. The build states
+   ONE identity (a single --gold, no later revision), so reading it off the
+   :root was safe here — still checked with getComputedStyle.
+
+   --accent-strong is the build's own --gold-text (4.97:1 on the light ground);
+   --accent-soft its dark-mode tone-done (6.76:1 on the dark ground).
+
+   One departure: the FILL is #587B88, two steps under the build's #5A7D8A,
+   because white on #5A7D8A is 4.43:1 and fails AA on every button label; on
+   #587B88 it is 4.56:1. The difference is not visible beside the original.
+
+   No ground shift: the build's grounds (#EAEEF4 / #242E3C, sidebar, rules,
+   menus, shadows) are already the suite's, value for value. */
+[data-app="ai-architecture"] {
+  --accent: #587B88;
+  --accent-rgb: 88, 123, 136;
+  --accent-light: #7A9DAA;
+  --accent-strong: #4C6A75;
+  --accent-soft: #9DBBC6;
+  --accent-pale: #DCE7EB;
+  --on-accent: #FFFFFF;
+
+  /* The blue accent set stays the donor's — R-18 (25 Aug 2026, Paul), which
+     this build carries in as many words ("family branding blue, never
+     module-repainted"), as Governance's does. Restated in this selector only. */
+  --head-blue: #076D9E;
+  --ref-accent: #2F7361;
+}
+
+@media screen {
+  [data-theme="dark"][data-app="ai-architecture"] {
+    /* Dark --gold-text is the accent-soft alias; the build's own dark --gold-text is #7A9DAA
+       (4.72:1 on #242E3C, AA) — labels, insight cards, Read links. Measured against the prototype. */
+    --accent-soft: #7A9DAA;
+    --head-blue: #38B5EF;
+    --ref-accent: #7FBFAD;
+  }
+}
+
+/* AI-Ready Architecture — the Home hero's own surfaces (21 Oct 2026).
+   The shell's styles.css has rules for these selectors with the SUITE's values, so the module
+   stylesheet generator (tools/module-css-delta.js) drops the build's versions as duplicates and
+   the shell's won: a cool rgba(234,238,244,.72) panel behind the 90-Day Plan list instead of the
+   build's warm paper, and a near-black dark wash over the hero image instead of the build's own
+   dark ground. Restated here, scoped to this program, from Architecture-styles.css verbatim,
+   because the generated module sheet would lose a hand edit. Measured with getComputedStyle
+   against the prototype: after this the Home hero differs only in the nav height and the AA
+   button label (above). Dark rules sit in @media screen, as every dark override here does. */
+[data-app="ai-architecture"] .hero .u-6d56738 {
+  background: rgba(245, 242, 236, .72);
+}
+
+@media screen {
+  [data-theme="dark"][data-app="ai-architecture"] .hero .u-6d56738 {
+    background: rgba(14, 11, 8, .6);
+  }
+
+  [data-theme="dark"][data-app="ai-architecture"] .hero-bg::after {
+    background: linear-gradient(90deg, rgba(36, 46, 60, .9) 0%, rgba(36, 46, 60, .55) 30%, rgba(36, 46, 60, .42) 50%, rgba(36, 46, 60, .6) 74%, rgba(36, 46, 60, .86) 100%);
+  }
+}
+
+/* AI-Ready Architecture — the build's own content styling, restated over the shell (21 Oct 2026).
+   GENERATED once from Architecture-styles.css against assets/css/styles.css (scratchpad gen-scoped.js); kept
+   here because the module-sheet generator drops any rule whose selector the shell also has, and the shell's
+   then wins. Two things, nothing else — shell chrome (header, sidebar, AI Guide, sign-in, layout) is left alone:
+
+   1. The PHASE PALETTE: the build's muted Map/Build/Test/Embed/Manage tints instead of the Pipeline's.
+   2. Its "done / success" colour: the build decoupled it from phase 1 into --ok-t ("PROVISIONAL pending family
+      ratification"), so every rule the shell colours with --ph1-t for success is restated with --ok-t —
+      without this, item 1 would turn every tick and milestone teal-grey. Plus the handful of content rules the
+      shell styles differently (.bs, the insight cards' hover — the shell's still carry the Pipeline's orange).
+      Only classes this program renders: three the generator also matched (.u-e6b5a04, .no-btn, .u-10e0573) are
+      the SHELL's elsewhere — the Help guide's intro, Org & Team, the Pipeline's steps — and restating them here
+      hid the Help intro's text in light mode, so they were removed (22 Oct 2026). */
+[data-app="ai-architecture"] {
+  --ph1: #3D6B6E;
+  --ph2: #4A6E8A;
+  --ph3: #7A6B4A;
+  --ph4: #6E4A5A;
+  --ph5: #5A6B7A;
+  --ph1-t: #3D6B6E;
+  --ph2-t: #4A6E8A;
+  --ph3-t: #7A6B4A;
+  --ph4-t: #6E4A5A;
+  --ph5-t: #5A6B7A;
+}
+
+@media screen {
+  [data-theme="dark"][data-app="ai-architecture"] {
+    --ph1-t: #66C4CA;
+    --ph2-t: #83B2D6;
+    --ph3-t: #CDB47C;
+    --ph4-t: #C57878;
+    --ph5-t: #8FAECA;
+  }
+}
+
+[data-app="ai-architecture"] .milestone-label {
+  color: var(--ok-t);
+}
+
+[data-app="ai-architecture"] .gate-btn.pass {
+  border-color: var(--ok-t);
+  color: var(--ok-t);
+}
+
+[data-app="ai-architecture"] .tag-go {
+  color: var(--ok-t);
+}
+
+[data-app="ai-architecture"] .step-nav-btn.done {
+  color: var(--ok-t);
+}
+
+[data-app="ai-architecture"] .complete-icon {
+  color: var(--ok-t);
+}
+
+[data-app="ai-architecture"] .bsh-btn.buy {
+  color: var(--ok-t);
+}
+
+[data-app="ai-architecture"] .insight-view-btn.active {
+  background: rgba(var(--rule-rgb),.12);
+}
+
+[data-app="ai-architecture"] .insight-card:hover {
+  border-color: rgba(var(--rule-rgb),.28);
+}
+
+[data-app="ai-architecture"] .phase-step-check {
+  color: var(--ok-t);
+}
+
+[data-app="ai-architecture"] .outcome-summary-title {
+  color: var(--ok-t);
+}
+
+[data-app="ai-architecture"] .bs {
+  background: transparent;
+  color: var(--ok-t);
+  border: 1px solid #1B6B5A;
+}
+
+[data-app="ai-architecture"] .chip-btn.active {
+  color: var(--ok-t);
+}
+
+[data-app="ai-architecture"] .chip-btn.done {
+  color: var(--ok-t);
+}
+
+[data-app="ai-architecture"] .card-success p {
+  color: var(--ok-t);
+}
+
+[data-app="ai-architecture"] .hint-toggle {
+  color: var(--ok-t);
+}
+
+[data-app="ai-architecture"] .milestone-mini-label {
+  color: var(--ok-t);
+}
+
+[data-app="ai-architecture"] .score-num-go {
+  color: var(--ok-t);
+}
+
+[data-app="ai-architecture"] .ta-helper {
+  display: block;
+}
+
+[data-app="ai-architecture"] .sel-helper {
+  display: block;
+}
+
+[data-app="ai-architecture"] .sec-tab[data-sel="1"] {
+  color: var(--ok-t);
+}
+
+[data-app="ai-architecture"] .mini-chip[data-sel="1"] {
+  border-color: var(--ok-t);
+  color: var(--ok-t);
+}
+
+[data-app="ai-architecture"] .pp-label[data-full="1"] {
+  color: var(--ok-t);
+}
+
+[data-app="ai-architecture"] .flow-label[data-done="1"] {
+  color: var(--ok-t);
+}
+
+[data-app="ai-architecture"] .u-2000639 {
+  color: var(--ok-t);
+}
+
+[data-app="ai-architecture"] .u-5ca1883 {
+  color: var(--ok-t);
+}
+
+[data-app="ai-architecture"] .u-c613036 {
+  color: var(--ok-t);
+}
+
+[data-app="ai-architecture"] .u-4c93db9 {
+  color: var(--ok-t);
+}
+
+[data-app="ai-architecture"] .u-e572595 {
+  color: var(--ok-t);
+}
+
+[data-app="ai-architecture"] .u-842890f {
+  color: var(--ok-t);
+}
+
+[data-app="ai-architecture"] .u-a5b7f18 {
+  color: var(--ok-t);
+}
+
+[data-app="ai-architecture"] .u-5b23054 {
+  color: var(--ok-t);
+}
+
+[data-app="ai-architecture"] .u-7f56e57 {
+  color: var(--ok-t);
+}
+
+[data-app="ai-architecture"] .analytics-title em {
+  color: var(--head-blue);
+}
+
+/* V · AI-Ready Culture — teal. Working with and for humans. */
+[data-app="ai-culture"] {
+  --accent: #12736A;
+  --accent-rgb: 18, 115, 106;
+  --accent-light: #2A9187;
+  --accent-strong: #0E5F58;
+  --accent-soft: #5CC4B7;
+  --accent-pale: #D6F0EC;
+  --on-accent: #FFFFFF;
+}
+
+@media screen {
+  [data-theme="dark"][data-app="ai-culture"] {
+    --accent-light: #3FAA9E;
+  }
+}
+
+/* VI · Workforce Readiness — violet. Closing the capability gap. */
+[data-app="workforce-readiness"] {
+  --accent: #7A4A9E;
+  --accent-rgb: 122, 74, 158;
+  --accent-light: #9366B8;
+  --accent-strong: #663D85;
+  --accent-soft: #C0A0DC;
+  --accent-pale: #EEE4F6;
+  --on-accent: #FFFFFF;
+}
+
+@media screen {
+  [data-theme="dark"][data-app="workforce-readiness"] {
+    --accent-light: #A67BC8;
+  }
+}
+
+
+/* ════════════════════════════════════════════════════════════
+   LEADERS  ·  an individual, an organization of one
+   Six programs in a warmer register than the Enterprise six, so the two
+   role spaces are told apart at a glance on the launchpad — which shows
+   both — before any single program's colour is read.
+   ════════════════════════════════════════════════════════════ */
+
+/* I · The Decision Lab — gold. Critical thinking & judgment.
+   The one live program whose reference build has NO colour of its own:
+   leaders/dev/judgment-critical-thinking/DL-styles.css is the innovation stylesheet
+   unmodified, so it renders in the Pipeline's #E8621A. Copying that
+   would give two programs one identity and leave the launchpad with two
+   orange cards. So this comes from the other source in the repo —
+   config/catalogue.json's `leader` role accent, #B8892A — kept for the
+   space's first program. If that build is ever given an identity, it
+   supersedes this. */
+[data-app="decision-lab"] {
+  --accent: #B8892A;
+  --accent-rgb: 184, 137, 42;
+  --accent-light: #CFA043;
+  --accent-strong: #8A6414;
+  --accent-soft: #DCAE47;
+  --accent-pale: #F7EBD2;
+  --on-accent: #241A05;
+}
+
+@media screen {
+  [data-theme="dark"][data-app="decision-lab"] {
+    --accent-light: #D8A93F;
+  }
+}
+
+/* II · The Friction Map — magenta. Adaptive learning & curiosity. */
+[data-app="friction-map"] {
+  --accent: #A6356B;
+  --accent-rgb: 166, 53, 107;
+  --accent-light: #C04E85;
+  --accent-strong: #8C2A59;
+  --accent-soft: #E58CB4;
+  --accent-pale: #F8DEEA;
+  --on-accent: #FFFFFF;
+}
+
+@media screen {
+  [data-theme="dark"][data-app="friction-map"] {
+    --accent-light: #D06E9C;
+  }
+}
+
+/* III · The Connection Practice — coral. Emotional intelligence. */
+[data-app="connection-practice"] {
+  --accent: #B0492E;
+  --accent-rgb: 176, 73, 46;
+  --accent-light: #C86348;
+  --accent-strong: #933A22;
+  --accent-soft: #E89478;
+  --accent-pale: #FAE2DA;
+  --on-accent: #FFFFFF;
+}
+
+@media screen {
+  [data-theme="dark"][data-app="connection-practice"] {
+    --accent-light: #D4785C;
+  }
+}
+
+/* IV · The Ethics Engine — green. Ethical reasoning & moral courage.
+   VERBATIM from leaders/dev/conscience-ethical-reasoning/ee-styles.css, which gives its
+   module accent as --mod #2E7D46, --mod-light #4A9E63 light / #7ED89E
+   dark, --mod-text #236238 light / #5FC788 dark, and re-points
+   --head-blue at the same green. Every one of those is below, under this
+   file's names for them; nothing here was chosen. */
+[data-app="ethics-engine"] {
+  --accent: #2E7D46;
+  --accent-rgb: 46, 125, 70;
+  --accent-light: #4A9E63;
+  --accent-strong: #236238;
+  --accent-soft: #5FC788;
+  --accent-pale: #DCF0E3;
+  --on-accent: #FFFFFF;
+}
+
+@media screen {
+  [data-theme="dark"][data-app="ethics-engine"] {
+    --accent-light: #7ED89E;
+  }
+}
+
+/* V · The Authorship Studio — periwinkle. Creative & original thinking. */
+[data-app="authorship-studio"] {
+  --accent: #5158B8;
+  --accent-rgb: 81, 88, 184;
+  --accent-light: #6C73CE;
+  --accent-strong: #43499C;
+  --accent-soft: #A0A6EC;
+  --accent-pale: #E4E5F9;
+  --on-accent: #FFFFFF;
+}
+
+@media screen {
+  [data-theme="dark"][data-app="authorship-studio"] {
+    --accent-light: #8B91DE;
+  }
+}
+
+/* VI · The Narrative Forge — bronze. Narrative & communication mastery. */
+[data-app="narrative-forge"] {
+  --accent: #9A6314;
+  --accent-rgb: 154, 99, 20;
+  --accent-light: #B67C29;
+  --accent-strong: #7E5010;
+  --accent-soft: #D9A55C;
+  --accent-pale: #F5E7D0;
+  --on-accent: #FFFFFF;
+}
+
+@media screen {
+  [data-theme="dark"][data-app="narrative-forge"] {
+    --accent-light: #C08D3C;
+  }
+}
+
+
+/* ════════════════════════════════════════════════════════════
+   PAPER  ·  the light scheme, in the program's own colour
+   ════════════════════════════════════════════════════════════
+   styles.css flips every token back to a light value for print, so a
+   page taken from dark mode comes off the printer as dark type on white
+   rather than pale type on nothing (it matters most in Safari, which
+   does not paint backgrounds unless the reader asks). It does that with
+   `:root, :root[data-theme="dark"]` — specificity (0,2,0) — and states
+   the LIGHT ACCENT LITERALLY, because when it was written there was one
+   accent and it was the Pipeline's orange.
+
+   That block outranks the (0,1,0) aliases at the top of this file. So
+   without this, printing The Ethics Engine produced green on screen and
+   ORANGE on paper: the shared sheet's literal beat the program's accent
+   at exactly the moment nobody would check.
+
+   Same selector, same specificity, later file — so these win, and they
+   win generically: --accent-strong and --accent-pale are per-program and
+   carry no mode of their own, which is why one block covers all twelve
+   and a thirteenth needs no edit here.
+
+   The dark side needs no undoing: every dark override in this file is
+   scoped to @media screen, so print never sees it. */
+@media print {
+
+  :root,
+  :root[data-theme="dark"] {
+    --gold-text: var(--accent-strong);
+    --mod-text: var(--accent-strong);
+    --gold-pale: var(--accent-pale);
+    --head-blue: var(--accent-strong);
+    --ref-accent: var(--accent-strong);
+  }
+}

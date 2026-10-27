@@ -1,0 +1,59 @@
+<!-- ─────────────────────────────────────────────────────────────
+     login.html — Sign-in screen (markup only; no inline JS)
+     Served at /apps/{role}/{module}/login — every program has its own
+     door, so this screen already knows which program and which role
+     space it is the entrance to. Hydrated by auth.js →
+     Entry.mount('login', …). Dynamic bits (field values, errors, busy
+     state and focus) are filled in JS.
+     data-go   → switch entry step        data-field → validation key
+     data-err  → error slot for a field   data-submit → submit button
+     ───────────────────────────────────────────────────────────── -->
+<div class="login-screen"><div class="login-card">
+  <div class="login-eyebrow" data-slot="module-name">AI Innovation Pipeline</div>
+  <h1 class="login-title">Sign <em>in</em></h1>
+  <p class="login-sub" data-slot="sub">Enter your username and password to open your organization's workspace.</p>
+
+  <!-- The account this device signed in as last, offered rather than assumed.
+       Filled in and unhidden by auth.js (hydrateLogin) only when there is one;
+       clicking it restores that session, and ignoring it and typing signs in as
+       somebody else. See bootApp in js/app.js for why it is not automatic. -->
+  <div class="entry-resume" data-slot="resume" hidden>
+    <button type="button" class="btn-gold login-btn" data-resume>Continue as <span data-slot="resume-name"></span></button>
+    <p class="login-sub entry-resume-sub">or sign in as someone else</p>
+  </div>
+
+  <form class="entry-form" data-auth="login" novalidate autocomplete="off">
+    <!-- Two fields, for every account. An Organization field used to come
+         first, because a username was only unique inside its own tenant and the
+         server would otherwise have had to search for the name and could find
+         the wrong person. Usernames are unique across the installation again
+         (api/sql/global-unique-login.sql), enforced wherever one can be created
+         or renamed — so the username IS the identity and there is nothing left
+         for that field to disambiguate. See AuthController. -->
+    <input id="loginUser" class="entry-text-input" type="text" autocomplete="username"
+           placeholder="Username" data-field="user" aria-label="Username"/>
+    <div class="entry-field-err" data-err="user" role="alert"></div>
+
+    <!-- A password (Directive 2 Oct 2026, Part 5): checked by the server, never
+         kept by this page. An old PIN still works once and must then be replaced. -->
+    <input id="loginPassword" class="entry-text-input" type="password"
+           autocomplete="current-password" placeholder="Password" data-field="password" aria-label="Password"/>
+    <div class="entry-field-err" data-err="password" role="alert"></div>
+
+    <div class="entry-err" data-err="_general" role="alert" hidden></div>
+
+    <label class="entry-remember">
+      <input type="checkbox" id="loginRemember"/> <span>Remember me on this device</span>
+    </label>
+
+    <button type="submit" class="btn-gold login-btn" data-submit>Sign In &rarr;</button>
+  </form>
+
+  <div class="entry-foot">
+    <!-- Sign-up for THIS program. The label says which kind of account that
+         makes, because the role is no longer a question on the form — it is
+         the address. auth.js rewrites it per role space. -->
+    <button type="button" class="entry-foot-btn" data-go="setup" data-slot="signup-link">Create an account</button>
+    <button type="button" class="entry-foot-btn" data-go="admin-login">Admin</button>
+  </div>
+</div></div>

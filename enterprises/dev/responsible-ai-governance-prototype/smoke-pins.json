@@ -1,0 +1,1105 @@
+[
+ {
+  "str": "login-screen",
+  "polarity": "presence"
+ },
+ {
+  "str": "nav-user-chip",
+  "polarity": "presence"
+ },
+ {
+  "str": "Team Chat",
+  "polarity": "presence"
+ },
+ {
+  "str": "Notes",
+  "polarity": "presence"
+ },
+ {
+  "str": "Admin",
+  "polarity": "presence"
+ },
+ {
+  "str": "login",
+  "polarity": "presence"
+ },
+ {
+  "str": "Dark Mode",
+  "polarity": "presence"
+ },
+ {
+  "str": "zoom-wrap",
+  "polarity": "presence"
+ },
+ {
+  "str": "vp-carousel",
+  "polarity": "presence"
+ },
+ {
+  "str": "done-wrap",
+  "polarity": "presence"
+ },
+ {
+  "str": "btn bd done-btn",
+  "polarity": "presence"
+ },
+ {
+  "str": "mini",
+  "polarity": "presence"
+ },
+ {
+  "str": "sidebar-mini-max",
+  "polarity": "presence"
+ },
+ {
+  "str": "sidebar-mini-dot",
+  "polarity": "presence"
+ },
+ {
+  "str": "sidebar-mini",
+  "polarity": "presence"
+ },
+ {
+  "str": "Minimize",
+  "polarity": "presence"
+ },
+ {
+  "str": "sidebar-size-tog",
+  "polarity": "presence"
+ },
+ {
+  "str": "sidebar-phase-tog",
+  "polarity": "presence"
+ },
+ {
+  "str": "Days 1",
+  "polarity": "presence"
+ },
+ {
+  "str": "sidebar-collapsed",
+  "polarity": "presence"
+ },
+ {
+  "str": "Track Program",
+  "polarity": "presence"
+ },
+ {
+  "str": "Module",
+  "polarity": "presence"
+ },
+ {
+  "str": "steps complete",
+  "polarity": "presence"
+ },
+ {
+  "str": "of the 90",
+  "polarity": "presence"
+ },
+ {
+  "str": "This Week",
+  "polarity": "presence"
+ },
+ {
+  "str": "Phase 1",
+  "polarity": "presence"
+ },
+ {
+  "str": "Download as PDF",
+  "polarity": "presence"
+ },
+ {
+  "str": "viz-stat-strip",
+  "polarity": "presence"
+ },
+ {
+  "str": "u-1390122",
+  "polarity": "presence"
+ },
+ {
+  "str": "u-f78be26",
+  "polarity": "presence"
+ },
+ {
+  "str": "u-6f946a0",
+  "polarity": "presence"
+ },
+ {
+  "str": "+ Add Risk",
+  "polarity": "presence"
+ },
+ {
+  "str": "Re-assess",
+  "polarity": "presence"
+ },
+ {
+  "str": "Exit Director",
+  "polarity": "absence"
+ },
+ {
+  "str": "Standing Governance Meeting",
+  "polarity": "presence"
+ },
+ {
+  "str": "Step 4.1: Manage and Monitor",
+  "polarity": "presence"
+ },
+ {
+  "str": "TEVV Evidence Register",
+  "polarity": "presence"
+ },
+ {
+  "str": "Burn-up",
+  "polarity": "presence"
+ },
+ {
+  "str": "Velocity",
+  "polarity": "presence"
+ },
+ {
+  "str": "Workload",
+  "polarity": "presence"
+ },
+ {
+  "str": "Signals",
+  "polarity": "presence"
+ },
+ {
+  "str": "NIST",
+  "polarity": "presence"
+ },
+ {
+  "str": "Light Mode",
+  "polarity": "presence"
+ },
+ {
+  "str": "Load the seeded example",
+  "polarity": "presence"
+ },
+ {
+  "str": "Reset all data",
+  "polarity": "presence"
+ },
+ {
+  "str": "Voice",
+  "polarity": "presence"
+ },
+ {
+  "str": "conv-card",
+  "polarity": "presence"
+ },
+ {
+  "str": "Existing Ethical Governance",
+  "polarity": "presence"
+ },
+ {
+  "str": "Rapid Risk Screen",
+  "polarity": "presence"
+ },
+ {
+  "str": "Save Rapid Screen",
+  "polarity": "presence"
+ },
+ {
+  "str": "Principle Register",
+  "polarity": "presence"
+ },
+ {
+  "str": "AI Ethics Review Board",
+  "polarity": "presence"
+ },
+ {
+  "str": "Ethics Overview",
+  "polarity": "presence"
+ },
+ {
+  "str": "Which named principles could this breach?",
+  "polarity": "presence"
+ },
+ {
+  "str": "Rescan Due With This Review",
+  "polarity": "presence"
+ },
+ {
+  "str": "Rescan Configuration",
+  "polarity": "presence"
+ },
+ {
+  "str": "Compliance Catalog",
+  "polarity": "presence"
+ },
+ {
+  "str": "Potential Compliance Register",
+  "polarity": "presence"
+ },
+ {
+  "str": "Assessment Demand",
+  "polarity": "presence"
+ },
+ {
+  "str": "Urgent Risks",
+  "polarity": "presence"
+ },
+ {
+  "str": "Needs by Domain",
+  "polarity": "presence"
+ },
+ {
+  "str": "Prioritization",
+  "polarity": "presence"
+ },
+ {
+  "str": "Build capacity",
+  "polarity": "absence",
+  "reason": "item 64 swap (citation): Part 1 deleted the ceremony editor's capacity branches and the label left source entirely \u2014 polarity presence\u2192absence; the old presence pin dated from the pre-item-61 three-decision bar"
+ },
+ {
+  "str": "Preliminary Risk Card",
+  "polarity": "presence"
+ },
+ {
+  "str": "Stakeholder Feedback",
+  "polarity": "presence"
+ },
+ {
+  "str": "Skills Gap Analysis",
+  "polarity": "presence"
+ },
+ {
+  "str": "Deepen Assessment",
+  "polarity": "presence"
+ },
+ {
+  "str": "Root causes",
+  "polarity": "presence"
+ },
+ {
+  "str": "Untick to restore",
+  "polarity": "presence"
+ },
+ {
+  "str": "Detailed Assessment",
+  "polarity": "presence"
+ },
+ {
+  "str": ">Archive<",
+  "polarity": "presence"
+ },
+ {
+  "str": "Guided Ethics Pass",
+  "polarity": "presence"
+ },
+ {
+  "str": "Breach analysis",
+  "polarity": "presence"
+ },
+ {
+  "str": "Testing Plans",
+  "polarity": "presence"
+ },
+ {
+  "str": "NIST Template",
+  "polarity": "presence"
+ },
+ {
+  "str": "The NIST way to plan testing",
+  "polarity": "presence"
+ },
+ {
+  "str": "Risk Pulse",
+  "polarity": "absence"
+ },
+ {
+  "str": "\u26a0",
+  "polarity": "presence"
+ },
+ {
+  "str": "Preliminary emergency response plan",
+  "polarity": "presence"
+ },
+ {
+  "str": "(optional",
+  "polarity": "presence"
+ },
+ {
+  "str": "Monitoring plan",
+  "polarity": "presence"
+ },
+ {
+  "str": "Escalate",
+  "polarity": "presence"
+ },
+ {
+  "str": "Tinted-Glass Defect Miss Rate",
+  "polarity": "presence"
+ },
+ {
+  "str": "Monitor Enh.",
+  "polarity": "absence"
+ },
+ {
+  "str": "No plan",
+  "polarity": "presence"
+ },
+ {
+  "str": "AI-Powered Quoting Engine",
+  "polarity": "presence"
+ },
+ {
+  "str": "Inventory record",
+  "polarity": "presence"
+ },
+ {
+  "str": "The risk picture",
+  "polarity": "presence"
+ },
+ {
+  "str": "Incident log",
+  "polarity": "presence"
+ },
+ {
+  "str": "read it before you write",
+  "polarity": "presence"
+ },
+ {
+  "str": "Risk Review Cadence",
+  "polarity": "presence"
+ },
+ {
+  "str": "Review Frequency",
+  "polarity": "presence"
+ },
+ {
+  "str": "The Standing Review Agenda",
+  "polarity": "presence"
+ },
+ {
+  "str": "ethics board",
+  "polarity": "presence"
+ },
+ {
+  "str": "gr_meetingFrequency",
+  "polarity": "absence"
+ },
+ {
+  "str": "gr_emergencyTriggers",
+  "polarity": "absence"
+ },
+ {
+  "str": "Deployment Gates",
+  "polarity": "presence"
+ },
+ {
+  "str": "pre-deployment tests",
+  "polarity": "presence"
+ },
+ {
+  "str": "Draft the First Exit Plans",
+  "polarity": "presence"
+ },
+ {
+  "str": "eo_reassessFrequency",
+  "polarity": "absence"
+ },
+ {
+  "str": "Draft an exit plan",
+  "polarity": "presence"
+ },
+ {
+  "str": "drafted, not decided",
+  "polarity": "presence"
+ },
+ {
+  "str": "Pre-filled from the draft",
+  "polarity": "presence"
+ },
+ {
+  "str": "the re-scan",
+  "polarity": "presence"
+ },
+ {
+  "str": "Computed from the responsibility matrix",
+  "polarity": "presence"
+ },
+ {
+  "str": "The Retro",
+  "polarity": "presence"
+ },
+ {
+  "str": "fr_cultureEvidence",
+  "polarity": "absence"
+ },
+ {
+  "str": "one accountable name",
+  "polarity": "presence"
+ },
+ {
+  "str": "NIST AI RMF",
+  "polarity": "presence"
+ },
+ {
+  "str": "Scoping needed",
+  "polarity": "presence"
+ },
+ {
+  "str": "Colorado AI Act",
+  "polarity": "presence"
+ },
+ {
+  "str": "Disclose AI-assisted quoting",
+  "polarity": "presence"
+ },
+ {
+  "str": "GOVERN 2.2",
+  "polarity": "presence"
+ },
+ {
+  "str": "MAP 3.4",
+  "polarity": "presence"
+ },
+ {
+  "str": "Third-party / vendor",
+  "polarity": "presence"
+ },
+ {
+  "str": "NOT YET RUN",
+  "polarity": "presence"
+ },
+ {
+  "str": "On schedule",
+  "polarity": "presence"
+ },
+ {
+  "str": "OVERDUE",
+  "polarity": "presence"
+ },
+ {
+  "str": "Testing plan",
+  "polarity": "presence"
+ },
+ {
+  "str": "Evidence log",
+  "polarity": "presence"
+ },
+ {
+  "str": "Environmental Impact",
+  "polarity": "presence"
+ },
+ {
+  "str": "training",
+  "polarity": "presence"
+ },
+ {
+  "str": "Compliance Dashboard",
+  "polarity": "presence"
+ },
+ {
+  "str": "ACHIEVED",
+  "polarity": "absence"
+ },
+ {
+  "str": "ADDRESSED",
+  "polarity": "presence"
+ },
+ {
+  "str": "principle register",
+  "polarity": "presence"
+ },
+ {
+  "str": "never asserts compliance",
+  "polarity": "presence"
+ },
+ {
+  "str": "Show the certification column",
+  "polarity": "absence"
+ },
+ {
+  "str": "Northwind account",
+  "polarity": "presence"
+ },
+ {
+  "str": "Obligations under this regime",
+  "polarity": "presence"
+ },
+ {
+  "str": "Edit in the register",
+  "polarity": "presence"
+ },
+ {
+  "str": "Dashboard page",
+  "polarity": "presence"
+ },
+ {
+  "str": ">Culture<",
+  "polarity": "presence"
+ },
+ {
+  "str": "gc_raiseChannel",
+  "polarity": "presence"
+ },
+ {
+  "str": "gc_raiseResponse",
+  "polarity": "presence"
+ },
+ {
+  "str": "gc_riskSharing",
+  "polarity": "presence"
+ },
+ {
+  "str": "audit rights",
+  "polarity": "presence"
+ },
+ {
+  "str": "Walk the compliance register",
+  "polarity": "presence"
+ },
+ {
+  "str": "seven items",
+  "polarity": "presence"
+ },
+ {
+  "str": "six items",
+  "polarity": "absence"
+ },
+ {
+  "str": "Walk your vendor dependencies",
+  "polarity": "presence"
+ },
+ {
+  "str": "tolerable",
+  "polarity": "presence"
+ },
+ {
+  "str": "Margaret Chen",
+  "polarity": "presence"
+ },
+ {
+  "str": "saveRaciTeam",
+  "polarity": "presence"
+ },
+ {
+  "str": "Initial Risk Assessment",
+  "polarity": "presence"
+ },
+ {
+  "str": "Beyond the roster",
+  "polarity": "absence"
+ },
+ {
+  "str": "Regulatory Landscape",
+  "polarity": "presence"
+ },
+ {
+  "str": "Scoping:",
+  "polarity": "presence"
+ },
+ {
+  "str": "Northwind",
+  "polarity": "presence"
+ },
+ {
+  "str": "never demands itemization",
+  "polarity": "presence"
+ },
+ {
+  "str": "Testing & Evidence",
+  "polarity": "presence"
+ },
+ {
+  "str": "Recurring",
+  "polarity": "presence"
+ },
+ {
+  "str": "Management & Monitoring Plans",
+  "polarity": "presence"
+ },
+ {
+  "str": "Shutdown Sequence",
+  "polarity": "absence"
+ },
+ {
+  "str": "Monitored",
+  "polarity": "presence"
+ },
+ {
+  "str": "Monitoring Plans",
+  "polarity": "presence"
+ },
+ {
+  "str": ">Exit Plans<",
+  "polarity": "absence"
+ },
+ {
+  "str": "per-risk, on the management plans",
+  "polarity": "presence"
+ },
+ {
+  "str": "Reassessment:",
+  "polarity": "absence"
+ },
+ {
+  "str": "Drafted Exit Plans",
+  "polarity": "presence"
+ },
+ {
+  "str": "Exit plans built",
+  "polarity": "absence"
+ },
+ {
+  "str": "Plans on the cards",
+  "polarity": "presence"
+ },
+ {
+  "str": "Plans on Cards",
+  "polarity": "presence"
+ },
+ {
+  "str": "Systems View",
+  "polarity": "presence"
+ },
+ {
+  "str": "openSystemView",
+  "polarity": "presence"
+ },
+ {
+  "str": "regimes on the register",
+  "polarity": "presence"
+ },
+ {
+  "str": "NIST areas addressed",
+  "polarity": "presence"
+ },
+ {
+  "str": "itemized obligations met",
+  "polarity": "presence"
+ },
+ {
+  "str": "tests overdue or never run",
+  "polarity": "presence"
+ },
+ {
+  "str": "monitoring checks due",
+  "polarity": "presence"
+ },
+ {
+  "str": "RACI activities defined",
+  "polarity": "presence"
+ },
+ {
+  "str": "exit plans drafted",
+  "polarity": "absence"
+ },
+ {
+  "str": "Emergency Response is live",
+  "polarity": "presence"
+ },
+ {
+  "str": "Program Coverage",
+  "polarity": "presence"
+ },
+ {
+  "str": "COVERAGE / 100",
+  "polarity": "presence"
+ },
+ {
+  "str": "never the health of the risks",
+  "polarity": "presence"
+ },
+ {
+  "str": "HEALTH / 100",
+  "polarity": "absence"
+ },
+ {
+  "str": "Plan Coverage",
+  "polarity": "presence"
+ },
+ {
+  "str": "Testing Coverage",
+  "polarity": "presence"
+ },
+ {
+  "str": "Compliance Addressed",
+  "polarity": "presence"
+ },
+ {
+  "str": "Assessment Coverage",
+  "polarity": "presence"
+ },
+ {
+  "str": "Escalated",
+  "polarity": "presence"
+ },
+ {
+  "str": "Needs Attention",
+  "polarity": "presence"
+ },
+ {
+  "str": "NIST Areas Addressed",
+  "polarity": "presence"
+ },
+ {
+  "str": "Critical / High",
+  "polarity": "presence"
+ },
+ {
+  "str": "Avg Composite",
+  "polarity": "presence"
+ },
+ {
+  "str": "Avg Exposure",
+  "polarity": "absence"
+ },
+ {
+  "str": "NIST Achieved",
+  "polarity": "absence"
+ },
+ {
+  "str": "stacked by composite band",
+  "polarity": "presence"
+ },
+ {
+  "str": "from detailed scores",
+  "polarity": "presence"
+ },
+ {
+  "str": "Achieved subcategories",
+  "polarity": "absence"
+ },
+ {
+  "str": "stacked by severity",
+  "polarity": "absence"
+ },
+ {
+  "str": "Ready / no-plan split",
+  "polarity": "presence"
+ },
+ {
+  "str": "the 4.3 exercise",
+  "polarity": "presence"
+ },
+ {
+  "str": "Exit-plan completeness per system",
+  "polarity": "absence"
+ },
+ {
+  "str": "each row routes to its surface",
+  "polarity": "presence"
+ },
+ {
+  "str": "ENV",
+  "polarity": "presence"
+ },
+ {
+  "str": "Evidence logged",
+  "polarity": "presence"
+ },
+ {
+  "str": "No char-linked test",
+  "polarity": "presence"
+ },
+ {
+  "str": "not yet LIT-scored",
+  "polarity": "absence"
+ },
+ {
+  "str": "exit plans under 50%",
+  "polarity": "absence"
+ },
+ {
+  "str": "composite ranking",
+  "polarity": "presence"
+ },
+ {
+  "str": "Critical/High load",
+  "polarity": "presence"
+ },
+ {
+  "str": "Time Horizon (T)",
+  "polarity": "presence"
+ },
+ {
+  "str": "data.tevv",
+  "polarity": "absence"
+ },
+ {
+  "str": "var DEFAULT_ROSTER",
+  "polarity": "absence"
+ },
+ {
+  "str": "Paul Scade",
+  "polarity": "absence"
+ },
+ {
+  "str": "Pranay Sanklecha",
+  "polarity": "absence"
+ },
+ {
+  "str": "No specific system \u2014 enterprise-level risk",
+  "polarity": "presence"
+ },
+ {
+  "str": "completeStepGated",
+  "polarity": "presence"
+ },
+ {
+  "str": "anCaptureSnapshot",
+  "polarity": "presence"
+ },
+ {
+  "str": "moveTestRank",
+  "polarity": "presence"
+ },
+ {
+  "str": "Testing evidence:",
+  "polarity": "presence"
+ },
+ {
+  "str": "leakage",
+  "polarity": "presence"
+ },
+ {
+  "str": "data.exitPlans",
+  "polarity": "absence"
+ },
+ {
+  "str": "vizExitHealth(){",
+  "polarity": "absence"
+ },
+ {
+  "str": "harvestOpenFields();UI.abSec",
+  "polarity": "presence"
+ },
+ {
+  "str": "Mark Complete & Continue",
+  "polarity": "presence"
+ },
+ {
+  "str": "at least one AI system",
+  "polarity": "presence"
+ },
+ {
+  "str": "at least one risk",
+  "polarity": "presence"
+ },
+ {
+  "str": "loadExampleSystems",
+  "polarity": "absence"
+ },
+ {
+  "str": "Load Aurora Example Systems",
+  "polarity": "absence"
+ },
+ {
+  "str": "loadExampleRisks",
+  "polarity": "absence"
+ },
+ {
+  "str": "Load Aurora Example Risks",
+  "polarity": "absence"
+ },
+ {
+  "str": "loadExamplePrinciples",
+  "polarity": "absence"
+ },
+ {
+  "str": "Load Aurora Example Principles",
+  "polarity": "absence"
+ },
+ {
+  "str": "If something urgent surfaces",
+  "polarity": "presence"
+ },
+ {
+  "str": "Preliminary Risk Register",
+  "polarity": "presence"
+ },
+ {
+  "str": ">Compliance Register</h3>",
+  "polarity": "presence"
+ },
+ {
+  "str": "ng_name",
+  "polarity": "presence"
+ },
+ {
+  "str": "Potential Compliance Regimes",
+  "polarity": "presence"
+ },
+ {
+  "str": "Hartwell",
+  "polarity": "presence"
+ },
+ {
+  "str": "Systems Inventory",
+  "polarity": "presence"
+ },
+ {
+  "str": "\u2193 PDF",
+  "polarity": "presence"
+ },
+ {
+  "str": "renderOutRiskAssess",
+  "polarity": "absence"
+ },
+ {
+  "str": "\u25be Download PDF",
+  "polarity": "absence"
+ },
+ {
+  "str": "milestone-card",
+  "polarity": "presence"
+ },
+ {
+  "str": "ng_type",
+  "polarity": "presence"
+ },
+ {
+  "str": "ng_summary",
+  "polarity": "presence"
+ },
+ {
+  "str": "ng_link",
+  "polarity": "presence"
+ },
+ {
+  "str": "Upload documents",
+  "polarity": "presence"
+ },
+ {
+  "str": "id=\"sec-title\"",
+  "polarity": "presence"
+ },
+ {
+  "str": "See Systems Inventory",
+  "polarity": "presence"
+ },
+ {
+  "str": "Not sure yet",
+  "polarity": "absence"
+ },
+ {
+  "str": "_rrow",
+  "polarity": "presence"
+ },
+ {
+  "str": "No associated system",
+  "polarity": "presence"
+ },
+ {
+  "str": "/15",
+  "polarity": "presence"
+ },
+ {
+  "str": "rapid initial assessment",
+  "polarity": "absence"
+ },
+ {
+  "str": "bd_escalation",
+  "polarity": "absence"
+ },
+ {
+  "str": "+ Add Criterion",
+  "polarity": "presence"
+ },
+ {
+  "str": "esc_0",
+  "polarity": "presence"
+ },
+ {
+  "str": "u-d1d587b",
+  "polarity": "presence"
+ },
+ {
+  "str": "+ Log Internal Risk",
+  "polarity": "presence"
+ },
+ {
+  "str": "Order by system",
+  "polarity": "presence"
+ },
+ {
+  "str": "Must address",
+  "polarity": "absence"
+ },
+ {
+  "str": "Dismiss",
+  "polarity": "presence"
+ },
+ {
+  "str": "u-778010b",
+  "polarity": "presence"
+ },
+ {
+  "str": "event triggers are armed",
+  "polarity": "absence"
+ },
+ {
+  "str": "section-title u-967e19d",
+  "polarity": "presence"
+ },
+ {
+  "str": "u-98b80d8",
+  "polarity": "presence"
+ },
+ {
+  "str": "u-49c8739",
+  "polarity": "presence"
+ },
+ {
+  "str": "u-ac07cd3",
+  "polarity": "presence"
+ },
+ {
+  "str": "analytics-title",
+  "polarity": "presence"
+ },
+ {
+  "str": "litScores",
+  "polarity": "absence",
+  "reason": "item 64 (b): store deleted whole \u2014 seed block, two dead ls declarations, two comment mentions; computations run on litL/litI/litT"
+ },
+ {
+  "str": "vizSigMatrix",
+  "polarity": "absence",
+  "reason": "item 64: dead code purged in Part 1 (zero callers, carried the banned label)"
+ },
+ {
+  "str": "DM Sans",
+  "polarity": "absence",
+  "reason": "item 64: font swept to var(--sans,Helvetica Neue,sans-serif); print doc's fonts-link relic trimmed"
+ },
+ {
+  "str": "capacity-build",
+  "polarity": "absence",
+  "reason": "item 64: all five strings extinguished (seed texts, MG_TYPES, coach line) + the beyond-list selChip fallthrough badge"
+ },
+ {
+  "str": "ng_owner",
+  "polarity": "presence",
+  "reason": "item 64 Part 1: Owner restored to the 1.4 potential add form after Link \u2014 supersedes the item-53 absence probe"
+ },
+ {
+  "str": "Monitor Enhanced",
+  "polarity": "absence",
+  "reason": "item 64 (a): standing ban \u2014 S1 lanes are Manage/Monitor with the '\u00b7 N Enhanced' subline; S4 overview paragraph confirmed by Paul 24 July (every-document variant); string extinguished from source"
+ },
+ {
+  "str": "svc_",
+  "polarity": "presence",
+  "reason": "item 64 S5 (Paul's go, 24 July): the system-view fold toggle key namespace"
+ },
+ {
+  "str": "sys_govStatus",
+  "polarity": "presence",
+  "reason": "item 64 S5: Governance Status joins the system-view editable record (1.2 labels/options verbatim)"
+ },
+ {
+  "str": "sys_isExternal",
+  "polarity": "presence",
+  "reason": "item 64 S5: System Type joins the system-view editable record (1.2 labels/options verbatim)"
+ },
+ {
+  "str": "Logged by",
+  "polarity": "presence",
+  "reason": "item 64 S5 probe: wbHeaderStrip's attribution line \u2014 the fold-render witness"
+ }
+]

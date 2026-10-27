@@ -1,0 +1,37 @@
+# ─────────────────────────────────────────────────────────────
+# DEV COPY, THIRD DOOR (16 Oct 2026)
+# /apps/enterprises/dev/responsible-ai-governance is Responsible AI Governance, served by the
+# dev install in ../innovation-pipeline/ (see index.php here). Every address under
+# this folder is a route — /step/1.1, /login, … — and all of them go to index.php.
+# Scripts, styles and the api/ are fetched from the install itself (<base href>),
+# never from here.
+# ─────────────────────────────────────────────────────────────
+
+DirectoryIndex index.php
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    # Let the rules see the bare address (no trailing slash) — see DirectorySlash below.
+    RewriteOptions AllowNoSlash
+
+    # Dot-segments (.htaccess, .env, …) are refused outright.
+    RewriteRule (^|/)\.(?!well-known/) - [F,L]
+
+    # The bare address is the program's own URL; a plain ^$ never matches it in per-directory context.
+    RewriteCond %{REQUEST_URI} /enterprises/dev/responsible-ai-governance$
+    RewriteRule ^ index.php [QSA,L]
+
+    # Everything else here is a route.
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^ index.php [QSA,L]
+</IfModule>
+
+Options -Indexes
+
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+# The program's address has NO trailing slash; Apache would otherwise 301 the bare
+# directory name to one. Listings are off above, which is what makes this safe.
+DirectorySlash Off

@@ -1,0 +1,3 @@
+# Source material for the build (directives, briefs, supplied files). Some of it holds secrets
+# (the AI Guide stage 1 brief carries the Pinecone API key), and none of it is meant for a browser.
+Require all denied

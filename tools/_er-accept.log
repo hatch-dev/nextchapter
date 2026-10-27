@@ -1,0 +1,157 @@
+== setup ==
+  boot: {"hasSeed":true,"hasReports":true,"hasPrintDoc":true,"hasLayerMaps":3,"page":"home"}
+  ok   the app boots with renderReports and printDocument defined
+  ok   LAYER_MAPS is populated (3 record types) - the reporting engine has its maps
+  signin/seed: {"users":11,"leaders":13,"org":true}
+  ok   the example data loads Aurora Windows with thirteen leaders (got 13)
+
+== printed documents (checks 1-10) ==
+  ok   [1] Operating Rhythm prints a document (8811 bytes)
+  ok   [1] Operating Rhythm: the first page carries the NextChapter · 90-Day Executive Readiness line
+  ok   [1] Operating Rhythm: the copyright footer is on the page
+  ok   [1] Operating Rhythm: the organization's name is on the first page
+  ok   [1] Operating Rhythm: no control prints
+  ok   [2] Leadership Inventory prints a document (36706 bytes)
+  ok   [2] Leadership Inventory: the first page carries the NextChapter · 90-Day Executive Readiness line
+  ok   [2] Leadership Inventory: the copyright footer is on the page
+  ok   [2] Leadership Inventory: the organization's name is on the first page
+  ok   [2] Leadership Inventory: no control prints
+  ok   [3] Readiness Report prints a document (21843 bytes)
+  ok   [3] Readiness Report: the first page carries the NextChapter · 90-Day Executive Readiness line
+  ok   [3] Readiness Report: the copyright footer is on the page
+  ok   [3] Readiness Report: the organization's name is on the first page
+  ok   [3] Readiness Report: no control prints
+  ok   [3] Risk Map prints a document (18716 bytes)
+  ok   [3] Risk Map: the first page carries the NextChapter · 90-Day Executive Readiness line
+  ok   [3] Risk Map: the copyright footer is on the page
+  ok   [3] Risk Map: the organization's name is on the first page
+  ok   [3] Risk Map: no control prints
+  ok   [4] Competency Framework prints a document (35204 bytes)
+  ok   [4] Competency Framework: the first page carries the NextChapter · 90-Day Executive Readiness line
+  ok   [4] Competency Framework: the copyright footer is on the page
+  ok   [4] Competency Framework: the organization's name is on the first page
+  ok   [4] Competency Framework: no control prints
+  ok   [5] Fluency Assessment prints a document (21644 bytes)
+  ok   [5] Fluency Assessment: the first page carries the NextChapter · 90-Day Executive Readiness line
+  ok   [5] Fluency Assessment: the copyright footer is on the page
+  ok   [5] Fluency Assessment: the organization's name is on the first page
+  ok   [5] Fluency Assessment: no control prints
+  ok   [6] Review Report prints a document (46350 bytes)
+  ok   [6] Review Report: the first page carries the NextChapter · 90-Day Executive Readiness line
+  ok   [6] Review Report: the copyright footer is on the page
+  ok   [6] Review Report: the organization's name is on the first page
+  ok   [6] Review Report: no control prints
+  ok   [7] Leadership Structure prints a document (13987 bytes)
+  ok   [7] Leadership Structure: the first page carries the NextChapter · 90-Day Executive Readiness line
+  ok   [7] Leadership Structure: the copyright footer is on the page
+  ok   [7] Leadership Structure: the organization's name is on the first page
+  ok   [7] Leadership Structure: no control prints
+  ok   [7] Collaboration Principles prints a document (13102 bytes)
+  ok   [7] Collaboration Principles: the first page carries the NextChapter · 90-Day Executive Readiness line
+  ok   [7] Collaboration Principles: the copyright footer is on the page
+  ok   [7] Collaboration Principles: the organization's name is on the first page
+  ok   [7] Collaboration Principles: no control prints
+  ok   [8] Decision Analyses prints a document (10128 bytes)
+  ok   [8] Decision Analyses: the first page carries the NextChapter · 90-Day Executive Readiness line
+  ok   [8] Decision Analyses: the copyright footer is on the page
+  ok   [8] Decision Analyses: the organization's name is on the first page
+  ok   [8] Decision Analyses: no control prints
+  ok   [9] MM Principles prints a document (13521 bytes)
+  ok   [9] MM Principles: the first page carries the NextChapter · 90-Day Executive Readiness line
+  ok   [9] MM Principles: the copyright footer is on the page
+  ok   [9] MM Principles: the organization's name is on the first page
+  ok   [9] MM Principles: no control prints
+  ok   [10] Values Architecture prints a document (17790 bytes)
+  ok   [10] Values Architecture: the first page carries the NextChapter · 90-Day Executive Readiness line
+  ok   [10] Values Architecture: the copyright footer is on the page
+  ok   [10] Values Architecture: the organization's name is on the first page
+  ok   [10] Values Architecture: no control prints
+  ok   [7] Evaluation Plan prints a document (7003 bytes)
+  ok   [7] Evaluation Plan: the first page carries the NextChapter · 90-Day Executive Readiness line
+  ok   [7] Evaluation Plan: the copyright footer is on the page
+  ok   [7] Evaluation Plan: the organization's name is on the first page
+  ok   [7] Evaluation Plan: no control prints
+
+== particulars ==
+  ok   [2] the Inventory prints the org chart
+  ok   [2] the Inventory prints At a Glance
+  ok   [2] the Inventory prints The Leaders
+  ok   [2] the Inventory prints The Landscape
+  ok   [2] the Inventory has a landscape page for the chart
+  ok   [4] the Competency Framework prints Development Priorities
+  ok   [4] each competency score prints on one line (n / 5)
+  ok   [5] the Fluency Assessment prints The Team Project
+  ok   [5] the Fluency Assessment starts the leaders on Individual Fluency Sprints
+  ok   [5] each leader prints Task 1, Task 2 and Task 3
+  ok   [6] the Review Report prints the Structural Review
+  ok   [6] Working Well and Needs Revision both print
+  ok   [6] the Review Report starts a page of Individual Leader Reviews
+  ok   [6] the four counts print
+  ok   [8] the Decision Analyses prints The Four Scenarios
+  ok   [8] each scenario prints Our response and the ethical pre-mortem
+  ok   [9] MM Principles prints The Three Categories
+  ok   [9] MM Principles prints AI-Augmented Workflows
+  ok   [9] MM Principles prints Decisions That Stay Human
+  ok   [10] the Values Architecture prints Our Philosophical Commitments
+  ok   [10] the Values Architecture prints the AI Purpose Filter
+  ok   [10] at Full the Values Architecture adds an Appendix
+
+== page furniture and the org chart (checks 1, 12) ==
+  ok   [1] nothing prints at the top-left corner
+  ok   [1] a page number prints (counter(page))
+  ok   [2] the Inventory declares the landscape page its chart prints on
+  chart: {"lines":["Chief Innovation &","Transformation Officer"],"twoLines":true,"noEllipsis":true,"dashed":true,"svg":true,"council":true}
+  ok   [12] step 1.2 draws the org chart
+  ok   [12] a long role title takes two lines with no ellipsis (["Chief Innovation &","Transformation Officer"])
+  ok   [12] the AI Transformation Council box has a dashed border
+
+== sidebar (check 11) ==
+  sidebar: {"outputs":4,"toggle":true}
+  ok   [11] every phase shows an Outputs (n) fold in the sidebar (4)
+
+== Phase 5 (checks 13-16) ==
+  ok   [14] the Leadership Dashboard prints a document
+  ok   [14] the dashboard document is titled Leadership Structure
+  ok   [14] the dashboard document has its Org Chart page
+  ok   [14] the dashboard document ends with the Appendix and Competency Summary
+  toolbar: {"addRole":true,"addLeader":true,"summary":true,"full":true,"savePdf":true,"printOrgChartBtn":false}
+  ok   [13] the dashboard toolbar reads Add Role, Add New Leader, Save, SUMMARY, FULL, Save as PDF
+  ok   [13] the Print Org Chart button is gone
+  ok   [15] the L&D Hub prints a document
+  ok   [15] each L&D Hub page is headed L&D HUB
+  ok   [15] the L&D Hub prints Study Progress and Practice Health
+  ok   [15] the L&D Hub prints no "1 of 3" page count of its own
+  ok   [16] My Development prints a document
+  ok   [16] the My Development document is titled My Development
+
+== Track Program (check 17) ==
+  ok   [17] Track Program prints a document
+  ok   [17] the document is titled Module Management
+  ok   [17] it has an Analytics page
+  ok   [17] the individual steps 1.4 and 2.4 are left out
+
+== Report Manager (check 18) ==
+  reports page: {"len":873,"newReport":true,"rcPage":true,"sidebar":true,"toggleShown":true}
+  ok   [18] the Report Manager page renders
+  ok   [18] it offers + New report
+  ok   [18] the sidebar and its toggle are present on the Report Manager page
+  rc-page computed: {"maxWidth":"1350px","marginLeft":"0px"}
+  ok   [5] the Report Manager block takes the 1350px width its own rule sets (got 1350px)
+  ok   [18] the Report Manager prints a report (78185 bytes)
+  ok   [18] the report has a contents page
+  ok   [18] section 1 is the Readiness Report
+  ok   [18] the Leadership Dashboard appears as Leadership Structure
+  ok   [18] no "1 of 3" anywhere in the report
+
+== the example data (check 19) ==
+  seed: {"workflows":["Quote drafting","Support triage","Demand forecast"],"haveRoles":true,"models":["Customer Support:augmenter","Sales / Estimating:augmenter","Operations / Planning:advisor","Support Triage:autonomous"],"maturity":"Piloting","size":"201–1,000"}
+  ok   [19] the AI Workflow Analysis lists Quote drafting, Support triage and Demand forecast
+  ok   [19] each workflow carries an AI Role and a Human Role
+  ok   [19] the Models tab has four functions, each with a model (Customer Support:augmenter | Sales / Estimating:augmenter | Operations / Planning:advisor | Support Triage:autonomous)
+  ok   [kept] the org profile still seeds the values its dropdowns can select
+
+== console ==
+  ok   no uncaught exception while driving every document (0)
+websocket error: 
+
+PASS: 127  FAIL: 0

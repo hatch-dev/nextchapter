@@ -1,0 +1,432 @@
+/* ─────────────────────────────────────────────────────────────
+   exec-readiness/module.js — the Executive Readiness module
+   ─────────────────────────────────────────────────────────────
+   Ported from enterprises/dev/executive-readiness, which was a whole
+   second copy of the app. Everything that copy duplicated — the
+   store, sign-in, organizations, the admin console, the header and
+   its Learn / Insights / theme / Team Chat / Notes / AI Guide
+   actions, the sidebar chrome, printing — is the shell's here, and
+   this file carries only what makes the program itself: its phases,
+   the shape of its workspace, and the seams its pages need.
+
+   The pages themselves are NOT here. They are in steps.js, generated
+   from the reference build by tools/port-exec-readiness.js — the
+   Readiness overview, the four phase landings, all seventeen step
+   bodies, the thirteen output reports and the whole Lead tab, lifted
+   function for function. This file is the registration and the
+   handful of seams the generated code cannot supply for itself.
+
+   Everything is inside this IIFE. Two programs' code is never on the
+   page at once (see js/modules/boot.js), but keeping the module's
+   internals private means a shell global and a module helper can
+   never quietly shadow each other. Anything an inline onclick in
+   this module's markup needs is hung off the single global `ER`.
+   ───────────────────────────────────────────────────────────── */
+(function () {
+  'use strict';
+  if (!window.Modules) return;
+
+  /* The single global this module owns, for inline handlers in its markup.
+     steps.js creates it and hangs all 171 ported functions off it; nothing is
+     added here. Named so the pages below can reach them without depending on
+     which of the two files the browser happened to reach first. */
+  var ER = window.ER = window.ER || {};
+
+  /* ── Phases ───────────────────────────────────────────────── */
+  var PH = [
+    /* Outcomes carry no icon, exactly as in the reference build: every surface
+       that lists them (`o.icon || '□'`) shows the same neutral square, and the
+       sidebar shows an arrow. Adding per-outcome icons here would silently
+       change three screens. */
+    { id: 1, name: 'Assess', days: 'Days 1–25', color: '#1B6B5A', steps: [{ id: '1.1', name: 'Assessment Battery', icon: '▣' }, { id: '1.2', name: 'Leadership Landscape', icon: '◇' }, { id: '1.3', name: 'Risk Mapping', icon: '◎' }, { id: '1.4', name: 'Mindset Foundations', icon: '◈' }], outcomes: [{ id: 'out-readiness', name: 'Readiness Report' }, { id: 'out-inventory', name: 'Leadership Inventory' }, { id: 'out-riskmap', name: 'Risk Map' }] },
+    { id: 2, name: 'Build', days: 'Days 26–50', color: '#2D5A8E', steps: [{ id: '2.1', name: 'Leadership Structure Lab', icon: '⊞' }, { id: '2.2', name: 'AI Collaboration Lab', icon: '⊜' }, { id: '2.3', name: 'Competency Framework', icon: '↻' }, { id: '2.4', name: 'Mindset Depth', icon: '⊙' }], outcomes: [{ id: 'out-structure', name: 'Leadership Structure' }, { id: 'out-collab', name: 'Collaboration Principles' }, { id: 'out-competency', name: 'Competency Framework' }] },
+    { id: 3, name: 'Develop', days: 'Days 51–75', color: '#8B5E3C', steps: [{ id: '3.1', name: 'AI Fluency Sprint', icon: '▷' }, { id: '3.2', name: 'Decision Simulations', icon: '⊟' }, { id: '3.3', name: 'Middle Management', icon: '⊗' }, { id: '3.4', name: 'Values Architecture', icon: '⊙' }, { id: '3.5', name: 'Mindset Application', icon: '↗' }], outcomes: [{ id: 'out-fluency', name: 'Fluency Assessment' }, { id: 'out-decisions', name: 'Decision Analyses' }, { id: 'out-mmprinciples', name: 'MM Principles' }, { id: 'out-values', name: 'Values Architecture' }] },
+    { id: 4, name: 'Embed', days: 'Days 76–90', color: '#9B2D3F', steps: [{ id: '4.1', name: 'Operating Rhythm', icon: '▤' }, { id: '4.2', name: 'Evaluation & Succession', icon: '◻' }, { id: '4.3', name: 'First Leadership Review', icon: '△' }, { id: '4.4', name: 'Composure & Resilience', icon: '↯' }], outcomes: [{ id: 'out-rhythm', name: 'Operating Rhythm' }, { id: 'out-evalplan', name: 'Evaluation Plan' }, { id: 'out-review', name: 'Review Report' }] },
+    { id: 5, name: 'Lead', days: 'Ongoing', color: '#6B4C8A', steps: [{ id: '5.1', name: 'Leadership Dashboard', icon: '⬡' }, { id: '5.2', name: 'L&D Hub', icon: '≡' }, { id: '5.3', name: 'My Development', icon: '◈' }], outcomes: [] }
+  ];
+
+  /* Steps each leader completes for themselves, as the SIDEBAR groups them.
+     The reference's own map (steps.js, INDIVIDUAL_TRACK_STEPS) is the four
+     per-phase ones and decides where completion is stored; this adds 5.3,
+     because in the reference the sidebar hand-wrote phase 5's Leadership
+     Development strand as a special case and here that shape comes from
+     stepStrands() below. 5.3 is in no phase that counts towards progress
+     (phase 5 is 'Ongoing'), so the two maps cannot disagree about anything
+     but which sidebar group the row lands in. */
+  var SIDEBAR_INDIVIDUAL_STEPS = { '1.4': 1, '2.4': 1, '3.5': 1, '4.4': 1, '5.3': 1 };
+
+  var MILESTONES = {
+    '1.1': 'Baseline established — readiness scored across all five sections of the battery.',
+    '1.2': 'Landscape mapped — every senior leader profiled, gaps identified, transformation ownership assessed.',
+    '1.3': 'Risks surfaced — concrete scenarios confronted and scored.',
+    '1.4': 'Foundations laid — mindset shift begun, AI dependencies inventoried.',
+    '2.1': 'Structure designed — ownership, governance, decision rights mapped.',
+    '2.2': 'Collaboration principles articulated.',
+    '2.3': 'Competency framework defined — seven domains with gap analyses.',
+    '2.4': 'Mindset deepened — values architecture and philosophical proficiency.',
+    '3.1': 'Fluency sprint complete — every leader using AI tools personally.',
+    '3.2': 'Decisions rehearsed — four AI-era scenarios run, each with an ethical pre-mortem.',
+    '3.3': 'Middle management activated with practical workflows.',
+    '3.4': 'Shared organizational values architecture defined and ready for role tagging.',
+    '3.5': 'Mindset applied — fears and hopes surfaced, a protected skill in practice, commitments written.',
+    '4.1': 'Operating rhythm embedded — five mechanisms owned and scheduled.',
+    '4.2': 'Evaluation rewired — AI-readiness indicators in evaluation, succession bench reassessed.',
+    '4.3': 'First review complete — rescored and assessed.',
+    '4.4': 'Composure foundations set — constants named, decision practices in place, slow-thinking log begun.'
+  };
+
+  var PHASE_WRAPUPS = {
+    1: 'Phase 1 complete. You’ve scored your leadership team’s readiness across the five sections of the Assessment Battery, profiled every senior leader in the Leadership Landscape, and scored the seven risk scenarios for your organization. Next, in Phase 2, you design the leadership architecture that closes the gaps you’ve mapped.',
+    2: 'Phase 2 complete. You’ve designed the leadership structure that owns the transformation, set the rules for how people and AI collaborate, and defined the seven competencies your leaders will be measured against. The architecture is written down and agreed on. Next, your leaders build real capability against it.',
+    3: 'Phase 3 complete. You\'ve built hands-on AI fluency, pressure-tested decisions in simulation, activated middle management\'s judgment role, and anchored the work in your values architecture. Capability is no longer theoretical. Next, you embed it in how the organization runs.',
+    4: 'Phase 4 complete. You\'ve set the operating rhythm, rewired evaluation to reward the behaviors the transformation needs, and run the leadership review that closes the 90 days. The architecture now lives in how you operate. The Lead phase carries it forward, quarter after quarter.'
+  };
+
+  /* ── Seams the generated pages need ───────────────────────────
+     Three of them, and each is here rather than in steps.js for the same
+     reason: that file is generated from the reference build, so a hand-edit
+     to it is lost on the next port. */
+
+  /* 1. `UI.sec` means different things in the two programs, and the shell's
+     default belongs to the other one: the Pipeline stores a step id there
+     ('1.1'), Executive Readiness stores the A–E section letter. Only one
+     program's code is ever on the page, so they never fight — but the value
+     the shell starts with is the Pipeline's, and 1.1 rendered its tab strip
+     with no section open underneath because '1.1' matches none of A–E. */
+  var SECTIONS = { '1.1': ['A', 'B', 'C', 'D', 'E'] };
+  function normalizeSection(id) {
+    var valid = SECTIONS[id];
+    if (!valid) return;
+    if (valid.indexOf(window.UI && UI.sec) < 0) UI.sec = valid[0];
+  }
+
+  /* 2. Transient view state this program's pages read. The shell's UI object is
+     the Pipeline's set of keys, so the ones only Executive Readiness uses are
+     absent — and `UI.ctxOpen['pol_afz']` on a missing object is a TypeError
+     that takes the whole Lead page down, not a quiet undefined.
+
+     Only the keys the generated code reads WITHOUT a fallback of its own are
+     here. UI.llPage, UI.llZoom, UI.structSec, UI.collabSec and the tab keys all
+     self-default at first use, so seeding them would only duplicate a decision
+     the reference already makes.
+
+     Defaults are the reference's own (js line `var UI={sec:'A',ctxOpen:{},…}`),
+     so the program opens on the same screen state it did there. Existing values
+     are never overwritten — the shell may have restored a real one already. */
+  var UI_DEFAULTS = {
+    ctxOpen: {},          // which collapsible policy/context panels are open
+    orgAddForm: false,    // the "+ Add Role" form on the org chart
+    orgEditId: null,      // the role being edited
+    orgSelected: null,    // the role box selected on the chart
+    orgZoom: 1,           // org-chart zoom (separate from the shell's page zoom)
+    addLeaderOpen: false, // the "+ Add New Leader" panel
+    editIdx: null         // the leader being edited
+  };
+  function seedUiState() {
+    if (!window.UI) return;
+    for (var k in UI_DEFAULTS) {
+      if (!UI_DEFAULTS.hasOwnProperty(k)) continue;
+      if (UI[k] === undefined) UI[k] = UI_DEFAULTS[k];
+    }
+  }
+
+  /* 3. Wraps every page below. NOT called at load: boot.js loads a module's code
+     in the head, before app.js, so `UI` does not exist yet at that point — a
+     module's script has to be inert until it renders (see js/modules/boot.js). */
+  function page(fn) {
+    return function () {
+      seedUiState();
+      normalizeSection(window.currentStep);
+      return fn.apply(null, arguments);
+    };
+  }
+
+  /* Part 7 (directive 2 Oct 2026): a personal record prints the Team Chat messages the person sent and, for the signed-in
+     person, their own notes. On the live app both are kept on the server, not in the workspace document, and the page holds
+     them only once those panels have loaded them; so the Report Manager loads them as it opens (at most once a minute). The
+     notes API answers only the signed-in person's own notes: nobody else's private notes reach this page. */
+  var _personSourcesAt = 0;
+  function preloadPersonSources() {
+    var now = Date.now(); if (now - _personSourcesAt < 60000) return; _personSourcesAt = now;
+    try { if (typeof window.chatLoadHistory === 'function') window.chatLoadHistory(function () { }); } catch (e) { }
+    try { if (typeof window.notesLoad === 'function') window.notesLoad(function () { }); } catch (e) { }
+  }
+
+  /* The phase a landing was asked for. The shell's go() stores it as a STRING
+     ('3'), and the reference's renderPhaseHome matches phase ids with ===, so
+     handing the string straight through finds no phase and silently falls back
+     to the overview. */
+  function currentPhaseId() {
+    if (window.currentPhase) return window.currentPhase.id;
+    return parseInt(window.currentStep, 10);
+  }
+
+  /* Phase 5 has no landing in the reference build: its sidebar heading, the
+     overview's phase card and step 5.1 all go('phase5'), the Leadership
+     Dashboard, which is where the Phase Five video plays. An address that names
+     phase 5 (/phase/5, a bookmark or an old link) shows that page and becomes
+     it, so the address, the tab and Back all say Lead. UI._back keeps go() from
+     stacking this landing as a page to come back to. */
+  function phaseLanding() {
+    var id = currentPhaseId();
+    if (String(id) === '5') {
+      setTimeout(function () { if (window.currentPage === 'phase') { UI._back = true; go('phase5'); } }, 0);
+      return ER.renderDashboard();
+    }
+    return ER.renderPhaseHome(id);
+  }
+
+  /* ── Registration ─────────────────────────────────────────── */
+  Modules.define('exec-readiness', {
+
+    /* The workspace document — the Executive Readiness program's own shape.
+       Stored per organization per module, so it sits alongside the Pipeline's
+       under the same team and sign-in (api/sql/workspace-modules.sql). */
+    emptyData: function () {
+      return {
+        assessments: {}, leaders: [], risks: [], depScan: [], structure: {}, orgChart: [], roles: [],
+        collabPrinciples: {}, collabLab: {}, competencies: {}, competencyFramework: {}, valuesArch: [],
+        fluencySprint: {}, fluencyLog: [], decisions: [], decisionSims: {}, scenarios: [], mmActivation: {},
+        rhythm: {}, opRhythm: {}, evaluation: {}, evalSuccession: {}, review: {}, slowThinking: [],
+        practiceLog: {}, completedSteps: {}, completedSections: {}, stepDoneAt: {}, stepDue: {},
+        landscapeNotes: {}, notes: [], assigns: {}, roster: null, members: [], enterprise: {}, orgSetup: false,
+        settings: { aiGuide: false, voice: false }   /* Part 2 (7 Oct 2026): the AI Guide and Voice, off until an administrator switches them on */
+      };
+    },
+
+    PH: PH,
+    MILESTONES: MILESTONES,
+    PHASE_WRAPUPS: PHASE_WRAPUPS,
+
+    /* Completion for this program is not a single org-wide flag. The four
+       individual-track steps are one leader's own work, so they are stored
+       against the leader the signed-in user is linked to — which means a shared
+       surface must ask the program, not read data.completedSteps. The shell's
+       isStepDone() delegates here when a module offers this (js/app.js). */
+    isStepDone: function (sid) { return !!ER.isStepDone(sid); },
+
+    /* Which steps can be ASSIGNED to a member — the shared ones. The four
+       individual-track steps are the same per-leader work isStepDone above is
+       about: each leader does their own, and "done" is not an organization-wide
+       fact, so naming somebody responsible for one is not a thing this program
+       does. The reference build's own mgSteps says so (steps.js); My Assignments
+       asks here rather than walking PH itself, whose phase spine includes them
+       (js/features/my-assignments.js). */
+    assignSteps: function () { return ER.mgSteps(); },
+
+    /* This program's textareas do not save per keystroke: the reference harvests
+       whatever is on screen at the moment of navigation instead, which is why
+       every one of its field builders is plain markup with no onchange. The
+       shell's go() calls this first so that stays true. */
+    beforeNavigate: function () { ER.harvestOpenFields(); },
+
+    /* Part S (directive 2 Oct 2026): the shell's sealSession resets the shell's
+       session state; this resets the program's own — the role form's
+       tagged-values buffer, which only Save/Delete clear, and which would
+       otherwise carry one organization's picks into the next. */
+    sealSession: function () { if (ER.resetSessionBuffers) ER.resetSessionBuffers(); },
+
+    /* Which shared record a given input belongs to — the map behind the record
+       locks and the "someone else is editing this" banner. THE SHELL asks for
+       this (idToRecordKey, js/app.js); nothing in steps.js calls it, which is
+       why it has to be handed over here rather than pulled in on its own.
+
+       Without it the shell fell back to the PIPELINE's table, and this
+       program's ids match almost none of it: an audit of all 20 steps and 13
+       outcome pages found 54 fields that mapped to nothing at all, so no field
+       ever took a lock, nobody ever held one, and every lockBlocked() call in
+       steps.js was therefore dead code that could not fire. Three fields did
+       match — fl_project, fl_projectWorkflow, fl_projectJudgment — on the
+       Pipeline's `fl` rule, which means "funding line" there: they claimed a
+       lock called `capital`, a record this program does not have and never
+       checks. Locking was not weak here, it was absent.
+
+       THE KEYS ARE THIS PROGRAM'S OWN. Where steps.js already guards a write
+       with lockBlocked('X') the map returns exactly X — `risks`, not
+       `riskNotes`; `valuesArch`, not `valuesDiscussion` — because a lock taken
+       under one name and checked under another never meets itself. The rest use
+       their data-record name, which nothing else claims.
+
+       It lives in module.js, not steps.js: steps.js is generated by
+       tools/port-exec-readiness.js and a hand-edit there is lost on the next
+       run. This file is the seam. */
+    idToRecordKey: function (id) {
+      if (!id) return null;
+      var i = id.indexOf('_'); if (i < 0) return null;   // read1..read5 and other bare ids
+      var pre = id.slice(0, i), rest = id.slice(i + 1);
+
+      /* The Leadership Development track is written per member: myIndivStore()
+         hands each leader their OWN slot under data.<name>[leaderId], so two
+         people are never writing the same place and a lock between them would
+         stop one of them editing their own answers. Not locked, deliberately. */
+      var INDIVIDUAL = { ms: 1, md: 1, ma: 1, cr: 1, ldev: 1 };
+      if (INDIVIDUAL[pre]) return null;
+
+      /* One record per family. The five assessment sections (Purpose, Fluency,
+         Change, Structure, Ethical) are one document — assessments — and
+         steps.js guards them as one, so they lock as one. */
+      var singles = {
+        ap: 'assessments', af: 'assessments', ac: 'assessments',
+        ad: 'assessments', ae: 'assessments',
+        ll: 'landscapeNotes',
+        risk: 'risks',                  // saveRisks() guards on 'risks'
+        st: 'structure',
+        cl: 'collabLab',
+        cf: 'competencyFramework',      // cf_def_<competency>
+        dep: 'depScan',                 // add-a-dependency row; addDep() guards on it
+        ldr: 'leaders',                 // the leader editor; saveLeader() guards on it
+        org: 'orgChart',                // the role editor; saveOrgRole2() guards on it
+        bm: 'orgChart',                 // board members live on the chart
+        ds: 'decisionSims',
+        mm: 'mmActivation',
+        ov: 'valuesArch',               // saveValuesArch()/section-done guard on it
+        or: 'opRhythm',
+        ev: 'evalSuccession',
+        rv: 'leadershipReview'
+      };
+
+      /* Per-leader rows lock per leader, not per table: one person filling in
+         a colleague's fluency tasks must not freeze the other four rows. Leader
+         ids carry an underscore of their own (L<base36>_<n>), so the field name
+         is taken off the END, never split off the front. */
+      if (pre === 'fl' && rest.indexOf('lt_') === 0) {
+        var ft = rest.slice(3), fj = ft.lastIndexOf('_');
+        return fj > 0 ? 'fluencySprint::' + ft.slice(0, fj) : 'fluencySprint';
+      }
+      if (pre === 'fl') return 'fluencySprint';
+      if (pre === 'rv') {
+        /* rv_structWorking / rv_structRevision are the shared pair; anything
+           else in this family is rv_<leaderId>_<field>. */
+        if (rest === 'structWorking' || rest === 'structRevision') return 'leadershipReview';
+        var rj = rest.lastIndexOf('_');
+        return rj > 0 ? 'leadershipReview::' + rest.slice(0, rj) : 'leadershipReview';
+      }
+
+      return singles[pre] || null;
+    },
+
+    /* ── The same question, one level finer ──────────────────────
+       idToRecordKey above says which RECORD a field belongs to, which is what a
+       lock needs. This says which LEAF it is, which is what a change note
+       needs: the shell puts "X changed this — yours / now stored" under the box
+       it happened in, and it can only find the box if a reported collision
+       (`.assessments.purpose.mission`) resolves back to a field id.
+
+       Same seam and the same reason as idToRecordKey — steps.js is generated by
+       tools/port-exec-readiness.js and a hand-edit there is lost on the next
+       run — and the same failure mode without it: the shell would fall back to
+       the PIPELINE's table, where `p_` is purpose and `cap_` is a capital plan,
+       and place notes against paths this program does not have.
+
+       ONLY the families harvestFields() writes as `store[field] = el.value` for
+       the id `<prefix>_<field>`, read straight off it. Anything else returns
+       null and simply gets no note, which is the right answer where the path
+       cannot be known: a note under the wrong box is worse than none.
+
+       THE INDIVIDUAL TRACK IS DELIBERATELY ABSENT. ms_/md_/ma_/cr_/ldev_ write
+       to data.<section>[leaderId] through myIndivStore() — one leader's own
+       reflections, which Core\DocPrivacy redacts per member. They are excluded
+       from the locks above for their own reason, and excluded here so that
+       nothing on this path can address another leader's slot. */
+    idToDocPath: function (id) {
+      if (!id) return null;
+      var i = id.indexOf('_');
+      if (i < 0) return null;
+      var pre = id.slice(0, i), f = id.slice(i + 1);
+      if (!f || f.indexOf('_') >= 0) return null;   // a leader id in the middle: not this shape
+
+      var INDIVIDUAL = { ms: 1, md: 1, ma: 1, cr: 1, ldev: 1 };
+      if (INDIVIDUAL[pre]) return null;
+
+      /* The five assessment sections, each its own object under `assessments`
+         (harvestFields' `maps`). */
+      var section = { ap: 'purpose', af: 'fluency', ac: 'change', ad: 'structure', ae: 'ethical' };
+      if (section[pre]) return ['assessments', section[pre], f];
+
+      /* data.<store>[f] = $('<pre>_' + f).value. */
+      var singles = { st: 'structure', cl: 'collabLab', ll: 'landscapeNotes' };
+      return singles[pre] ? [singles[pre], f] : null;
+    },
+
+    /* Same harvest, asked for where nobody is navigating: the shell banks the
+       open page before it merges in another member's save, so what is on screen
+       is compared as this browser's work instead of being repainted away
+       (bankOpenPage, js/app.js). It is only ever a read of the page into the
+       document — no view state moves — which is why beforeNavigate, which does
+       move view state in other programs, cannot be used for it. */
+    harvestOpenPage: function () { ER.harvestOpenFields(); },
+
+    /* The sidebar lists this program's steps in two strands: the phase's
+       organization-wide work, then the one step each leader does for
+       themselves. Same split as the reference's hand-written sidebar. */
+    stepStrands: function (ph) {
+      var main = [], indiv = [];
+      (ph.steps || []).forEach(function (s) {
+        (SIDEBAR_INDIVIDUAL_STEPS[s.id] ? indiv : main).push(s);
+      });
+      /* One mark for the whole strand (◈), not each step's own icon: it names
+         the kind of work, and 3.5 carries ↗ for the phase landing's flow row. */
+      return { main: main, strands: [{ label: 'Leadership Development', icon: '◈', steps: indiv }] };
+    },
+
+    /* The reference's sidebar sends the "5. Lead" heading to the Leadership
+       Dashboard (`go(ph.id===5?'phase5':'phase-'+ph.id)`), never to a phase-5
+       landing. The shell already counts 'phase5' as phase 5 for the highlight
+       (activeNavPhaseId, js/features/sidebar.js). */
+    phaseHeadTarget: function (id) { return String(id) === '5' ? ['phase5'] : null; },
+
+    coachGreeting: 'Welcome to the Executive Readiness module. Ask me about leadership readiness, the OPEN and CARE frameworks, philosophical proficiency, or any step.',
+
+    /* This program's sample workspace — Aurora Windows, a window manufacturer
+       early in its AI journey: eleven named leaders with logins, a reporting
+       chart, a scored battery, competency ratings and a Phase-4 review that
+       shows movement from the baseline. The reference build's own seed, ported
+       with the rest (steps.js).
+
+       There is one, not two: the Pipeline's second seed is a Year 2 portfolio,
+       and this program has no portfolio and no year two. The More menu lists
+       whatever a program declares here, so it simply shows one item. */
+    seeds: [
+      { id: 'sample', label: 'Seed sample data', run: function () { return ER.seedData(); } }
+    ],
+
+    /* Pages this module owns, every one of them the reference build's own
+       renderer (steps.js). Home, Learn and Insights are not here: they are the
+       shell's screens, and this module simply ships its own markup for the
+       first two (templates/modules/exec-readiness/). */
+    pages: {
+      pipeline: page(function () { return ER.renderOverview(); }),
+      phase: page(phaseLanding),
+      step: page(function () { return ER.renderStep(); }),
+      outcome: page(function () { return ER.renderOutcomePage(); }),
+      /* The Lead tab IS step 5.1, the Leadership Structure dashboard — the org
+         chart, its policies pull-outs and the program-outputs row. It is a page
+         rather than a step because that is what the reference build made it:
+         go() maps step 5.1 to this page (js/app.js), and the sidebar and the
+         step-nav both point here. */
+      phase5: page(function () { return ER.renderDashboard(); }),
+
+      /* Track Program. The shell has a renderMgmtHub of its own (the
+         Pipeline's, js/pages/navigate.js) and this program used to fall
+         through to it. It cannot any more: step 65 of the 16 Sep 2026
+         directive makes Track Program print a Module Management
+         DOCUMENT through mgmtHubDoc(), and that only happens if the page
+         and its Save as PDF button are this program's. Same reason
+         Governance registers its own. */
+      'mgmt-hub': page(function () { return ER.renderMgmtHub(); }),
+
+      /* The Report Manager (Paul's ruling, 14 Sep 2026; ported here
+         16 Sep): outputs, Phase 5 pages, single leaders or risks and the
+         user's own text pages compiled into one printed document under
+         one cover. Reached from the More menu - see moreItems below. */
+      reports: page(function () { preloadPersonSources(); return ER.renderReports(); })
+    },
+
+    /* The reference build puts the Report Manager in its own More menu
+       (_navMoreHtml). Here the shell owns that menu and asks each program
+       what to add to it, so the item is declared rather than drawn. */
+    moreItems: [
+      { id: 'reports', icon: '☷', label: 'Report Manager', run: function () { go('reports'); } }
+    ]
+  });
+})();

@@ -1,0 +1,34 @@
+# ─────────────────────────────────────────────────────────────
+# apps/.gitignore
+# ─────────────────────────────────────────────────────────────
+
+# Secrets. The API key for the AI Guide lives here; .env.example is
+# the committed template. See api/helpers/functions.php → load_env().
+.env
+
+# Composer's install tree. api/composer.json and api/composer.lock ARE
+# committed — the lock is what makes an install reproducible — but the
+# packages themselves are not. Run `composer install` in api/ after
+# deploying; api/index.php refuses to start without it and says so.
+api/vendor/
+
+# Every .env, in every copy (live, dev, prototype) and every backup of
+# one. Only the .env.example templates are committed.
+.env
+.env.*
+!.env.example
+
+# Composer and npm install trees, wherever they are.
+vendor/
+node_modules/
+
+# Videos and the media archive are uploaded to the server directly,
+# never committed (assets is ~19 GB, almost all of it these).
+*.mp4
+*.zip
+
+# Local before-edit backups (index.php.pre-arch, program.js.pre-kbfix19 ...).
+*.pre-*
+
+# Claude Code's per-machine settings.
+.claude/

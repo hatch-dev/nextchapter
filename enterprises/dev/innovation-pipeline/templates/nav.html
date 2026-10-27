@@ -1,0 +1,41 @@
+<!-- ─────────────────────────────────────────────────────────────
+     nav.html — Top navigation bar (markup only; no inline JS)
+     Two regions, injected by nav.js into the persistent containers
+     #navTabs and #navRight (see index.html). Dynamic bits — active
+     tab, badges, theme label, the user chip and the More menu — are
+     filled in nav.js. All clicks are handled by one delegated listener
+     on <nav> via data-tab / data-act.
+     ───────────────────────────────────────────────────────────── -->
+<div data-region="tabs">
+  <button class="nav-tab" data-tab="home">Home</button>
+  <button class="nav-tab" data-tab="learn">Learn</button>
+  <button class="nav-tab" data-tab="pipeline">Pipeline</button>
+  <button class="nav-tab" data-tab="phase5">Navigate</button>
+  <button class="nav-tab" data-tab="insights">Insights</button>
+</div>
+
+<div data-region="right">
+  <span class="nav-module-wrap">
+    <button class="nav-module-btn" data-act="modules" aria-haspopup="true" aria-expanded="false" title="Switch module">
+      <span class="nav-module-eyebrow">Module</span>
+      <span class="nav-module-name" data-slot="module-name">&nbsp;</span>
+      <span class="nav-module-caret" aria-hidden="true">&#9662;</span>
+    </button>
+    <span data-slot="module-menu"></span>
+  </span>
+  <span data-slot="userchip"></span>
+  <button class="btn-ghost pad-chip-md nav-action" data-act="help" title="Help">? Help</button>
+  <button class="btn-ghost pad-chip-md nav-action" data-act="theme" title="Switch theme">&#9680; <span data-slot="theme-label">Dark Mode</span></button>
+  <button id="gchatNavBtn" class="btn-ghost pad-chip-md nav-action" data-act="gchat">&#8801; Team Chat<span id="gchatUnread" class="gchat-unread" style="display:none">0</span></button>
+  <button id="notesNavBtn" class="btn-ghost pad-chip-md nav-action" data-act="notes">&#9998; Notes<span id="notesCount" class="notes-count" style="display:none">0</span></button>
+  <!-- Directive 2 Oct 2026, Part 3: the AI Innovation Pipeline shows Demo in Notes' place (nav.js hydrateRight). -->
+  <button id="sampleNavBtn" class="btn-ghost pad-chip-md nav-action" data-act="demo" style="display:none">&#9673; Demo</button>
+  <!-- Phone/tablet only (see the responsive header block in styles.css):
+       opens the drawer that carries everything else in this region. -->
+  <button class="nav-drawer-btn" data-act="drawer" aria-haspopup="dialog" aria-expanded="false"
+          aria-controls="navDrawer" title="Menu" aria-label="Menu">&#9776;</button>
+  <span class="nav-more-wrap">
+    <button class="btn-ghost pad-chip-md nav-action" data-act="more" aria-haspopup="true" aria-expanded="false" title="More">&#8943; <span class="nav-action-label">More</span></button>
+    <span data-slot="more-menu"></span>
+  </span>
+</div>

@@ -1,0 +1,5 @@
+# The Guide route is the only thing here a browser may reach.
+Options -Indexes
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>

@@ -1,0 +1,151 @@
+# ─────────────────────────────────────────────────────────────
+# apps/.htaccess — front controller for the whole application root
+# ─────────────────────────────────────────────────────────────
+# Every human-facing URL under this directory is a route, not a file:
+#
+#   /apps/                                  launchpad (pick a program)
+#   /apps/admin                             the app-administrator console
+#   /apps/enterprises                       role hub — that role's modules
+#   /apps/enterprises/innovation-pipeline
+#   /apps/leaders/judgment-critical-thinking/login    that program's own sign-in
+#   /apps/leaders/judgment-critical-thinking/signup   that program's own sign-up
+#   /apps/leaders/judgment-critical-thinking/step/1.2
+#
+# Every program carries its own sign-in and sign-up; there is no shared
+# /apps/login or /apps/signup, and those two paths now 404.
+#
+# index.php resolves the path against config/catalogue.json and renders
+# shell.html with the right module already selected. Real files (assets,
+# js, templates, the api/) are served directly and never reach it.
+#
+# ONE EXCEPTION, and it is deliberate: the standalone review builds under
+#
+#   /apps/enterprises/dev/<program>/        e.g. executive-readiness
+#   /apps/leaders/dev/<program>/            e.g. decision-lab
+#
+# Each is a self-contained copy of a program — its own index.html, its own
+# scripts and media — kept for review. They are opened directly, with no
+# sign-in, no routing and nothing else required, so they are served as plain
+# files and never reach index.php. See the rules below.
+#
+# There is no RewriteBase: the substitution resolves against this
+# directory, so the app works at /apps, at /pipeline/apps or at the
+# document root without an edit.
+# ─────────────────────────────────────────────────────────────
+
+# index.php for the app; index.html for the review builds, which have no PHP in
+# them. Naming only index.php here left /apps/enterprises/dev/executive-readiness/
+# showing Apache's file listing instead of opening the build.
+DirectoryIndex index.php index.html
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    # DEV COPY (13 Oct 2026): let the rules below see the bare address (no trailing slash),
+    # which mod_rewrite otherwise leaves to mod_dir. See DirectorySlash at the end.
+    RewriteOptions AllowNoSlash
+
+    # Anything whose path contains a dot-segment is refused outright, before
+    # any other rule can claim it. `.env` is a REAL FILE in this directory, and
+    # every rewrite below steps aside for a real file — so without this it was
+    # served verbatim, API key and SMTP password included. The same rule covers
+    # .env.example, .gitignore and the .claude/ tree.
+    RewriteRule (^|/)\.(?!well-known/) - [F,L]
+
+    # DEV COPY (13 Oct 2026): the videos are not copied (3.7 GB). Requests for
+    # assets/media/ are handed to the main app's own assets/media/. This copy is
+    # installed at <app>/enterprises/dev/innovation-pipeline/, three levels down.
+    RewriteCond %{REQUEST_URI} ^(.*)/enterprises/dev/[^/]+/assets/media/(.+)$
+    RewriteRule ^assets/media/ %1/assets/media/%2 [L]
+
+    # The bare address (no trailing slash) is the program's own URL — see
+    # DirectorySlash below — so it goes to the front controller as it is.
+    RewriteCond %{REQUEST_URI} /enterprises/dev/innovation-pipeline$
+    RewriteRule ^ index.php [QSA,L]
+
+    # Static trees serve themselves. Listing them explicitly means a missing
+    # file under assets/ or js/ 404s like a missing file instead of silently
+    # rendering the app shell — which is what turns a typo into a mystery.
+    # api/ has its own front controller and its own .htaccess.
+    RewriteRule ^(api|assets|js|templates|rag-chat)(/|$) - [L]
+
+    # Config is read server-side (and injected into the page); not served.
+    RewriteRule ^config(/|$) - [F,L]
+
+    # Neither of these is ever fetched by the browser — tools/ is the node
+    # build and port scripts, docs/ the design notes. They used to sit in the
+    # "serves itself" list above, which with directory indexes on made both
+    # trees browsable and downloadable by anyone who guessed the path.
+    RewriteRule ^(tools|docs)(/|$) - [F,L]
+
+    # The standalone review builds. Same rule as assets/ and js/ above — this
+    # tree serves itself, whole, so a build opens on its own index.html with no
+    # sign-in and nothing to route. It sits UNDER a role name, so it has to be
+    # matched before the role rule below claims that path.
+    RewriteRule ^(enterprises|leaders)/dev(/|$) - [L]
+
+    # Everything else in a role space belongs to the app, whether or not a
+    # directory of that name happens to exist on disk.
+    #
+    # This rule is why the generic one below is not enough. `enterprises` and
+    # `leaders` are now REAL directories (they hold the review builds), and the
+    # generic rule steps aside for any real directory — so /apps/enterprises
+    # stopped being the role hub and started being an Apache file listing. That
+    # is the page you landed on after signing in, because that is where the app
+    # sends you. A role name is a route; the folder underneath it is incidental.
+    #
+    # !-f so a real file inside a role space is still served as a file.
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^(enterprises|leaders)(/|$) index.php [QSA,L]
+
+    # Everything else that isn't a real file or directory is a route.
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.php [QSA,L]
+</IfModule>
+
+# Versioned assets are kept by the browser for a year (12 Oct 2026).
+# index.php stamps every script and stylesheet it puts on the page with
+# ?v=<filemtime>, and boot.js loads a module's files from the same stamped
+# list, so a changed file is always a NEW address and an unchanged one never
+# needs asking about again. Without this every visit re-asked the server about
+# all ~40 files one by one (PageSpeed: "Use efficient cache lifetimes", 1 MB).
+# Only an exact ?v=<digits> query qualifies: anything unstamped keeps the
+# server's default and is revalidated as before. Static files only: the
+# FilesMatch keeps it off index.php and therefore off the page and the api/,
+# whose own front controller is also an index.php.
+<IfModule mod_headers.c>
+    <FilesMatch "\.(js|css|woff2|webp|jpe?g|png|svg)$">
+        <If "%{QUERY_STRING} =~ /^v=[0-9]+$/">
+            Header set Cache-Control "public, max-age=31536000, immutable"
+        </If>
+    </FilesMatch>
+</IfModule>
+
+# No directory listings anywhere under the app. The vhost turns Indexes on
+# for the whole of htdocs, which made every directory reachable by URL —
+# js/modules/, templates/, the review builds — enumerable file by file.
+Options -Indexes
+
+# shell.html is a template rendered by index.php, never served raw.
+<FilesMatch "^shell\.html$">
+    Require all denied
+</FilesMatch>
+
+# Dotfiles, belt and braces: the rewrite above already refuses them, but this
+# stands whether or not mod_rewrite is loaded, and .env is the one file in this
+# tree that must never be served under any configuration.
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+# Dependency manifests and lockfiles name the exact package versions in use.
+# Nothing in the browser reads them.
+<FilesMatch "^(composer\.(json|lock)|package(-lock)?\.json|yarn\.lock)$">
+    Require all denied
+</FilesMatch>
+
+# DEV COPY (13 Oct 2026): /apps/enterprises/dev/innovation-pipeline is the
+# program's address WITHOUT a trailing slash. Apache would otherwise answer the
+# bare directory name with a 301 that adds one. Directory listings are already
+# off (Options -Indexes above), which is what makes this safe.
+DirectorySlash Off

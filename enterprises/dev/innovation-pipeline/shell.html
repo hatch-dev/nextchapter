@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+
+  <!-- Rendered by index.php, which replaces this comment with:
+         <base href="/apps/">   so every relative asset, template and api/ call
+                                below resolves against the install directory no
+                                matter how deep the route is
+         window.APP_BOOT        the resolved route: role, module, page, step
+         window.APP_CATALOGUE   the roles and their modules (config/catalogue.json)
+       It must stay the FIRST thing in the head — the <base> has to precede the
+       first relative URL on the page, and the registry has to see APP_BOOT
+       before boot.js writes the module's <script> tags.
+       shell.html is never served directly (see .htaccess); open the app at
+       /apps/ instead. -->
+  <!--{{BOOT}}-->
+
+  <script>
+    /* DEV COPY (13 Oct 2026): this copy is served from the same site as live (/apps/dev/ beside /apps/),
+       so both would share one localStorage and sessionStorage. The copied database keeps live's
+       organization ids, so live's cached workspaces, sign-in pointers and prefs would be read here as
+       this copy's own (and written back over). Every key this page uses is kept under its own prefix
+       instead: live sees none of dev's keys and dev sees none of live's. Must run before any other
+       script touches storage. */
+    (function () {
+      try {
+        var P = 'nc-dev::', S = Storage.prototype;
+        var get = S.getItem, set = S.setItem, rem = S.removeItem, key = S.key;
+        var lenGet = Object.getOwnPropertyDescriptor(S, 'length').get;
+        function mine(st) {
+          var out = [], n = lenGet.call(st);
+          for (var i = 0; i < n; i++) { var k = key.call(st, i); if (k && k.indexOf(P) === 0) out.push(k.slice(P.length)); }
+          return out;
+        }
+        S.getItem = function (k) { return get.call(this, P + k); };
+        S.setItem = function (k, v) { return set.call(this, P + k, v); };
+        S.removeItem = function (k) { return rem.call(this, P + k); };
+        S.key = function (i) { var m = mine(this); return i >= 0 && i < m.length ? m[i] : null; };
+        S.clear = function () { var m = mine(this); for (var i = 0; i < m.length; i++) rem.call(this, P + m[i]); };
+        Object.defineProperty(S, 'length', { configurable: true, get: function () { return mine(this).length; } });
+      } catch (e) { }
+    })();
+  </script>
+
+  <script>
+    /* Apply the saved theme before first paint (default: dark) so first-time and
+       dark-mode users never see a light flash. Key written by Store.setPref —
+       only an explicit 'light' preference opts out.
+       One-time migration: browsers carrying a preference from when LIGHT was the
+       default would never see the new default, so the first load after this change
+       drops the stored value and starts dark. The toggle sticks again from there. */
+    try {
+      if (!localStorage.getItem('pipeline-theme-default-dark')) {
+        localStorage.removeItem('pipeline-theme');
+        localStorage.setItem('pipeline-theme-default-dark', '1');
+      }
+      document.documentElement.setAttribute('data-theme', localStorage.getItem('pipeline-theme') === 'light' ? 'light' : 'dark');
+    } catch (e) { document.documentElement.setAttribute('data-theme', 'dark'); }
+    /* Hold the page still under the boot loader — see html.app-booting below. */
+    document.documentElement.classList.add('app-booting');
+  </script>
+  <script>
+    /* Videos load when they are played, not when they are shown (12 Oct 2026).
+       Every program's screens write <video preload="auto"> — the shared
+       templates, app.js and the generated program code alike — and each video
+       is 65-135 MB, so opening a home screen started pulling ~15 MB of video in
+       its first 25 seconds with nothing pressed, competing with the app for the
+       connection. One guard here covers every source, generated or not: any
+       video added with preload="auto" (or none) is switched to "metadata"
+       before the browser starts fetching it. The poster, the length and the
+       controls still show; pressing play streams as before. A video that
+       autoplays is left alone. */
+    (function () {
+      if (!window.MutationObserver) return;
+      function tame(node) {
+        if (!node || node.nodeType !== 1) return;
+        var list = node.tagName === 'VIDEO' ? [node] : (node.getElementsByTagName ? node.getElementsByTagName('video') : []);
+        for (var i = 0; i < list.length; i++) {
+          var v = list[i], p = v.getAttribute('preload');
+          if (!v.autoplay && (p === null || p === '' || p === 'auto')) v.setAttribute('preload', 'metadata');
+        }
+      }
+      new MutationObserver(function (records) {
+        for (var r = 0; r < records.length; r++) {
+          var added = records[r].addedNodes;
+          for (var a = 0; a < added.length; a++) tame(added[a]);
+        }
+      }).observe(document.documentElement, { childList: true, subtree: true });
+    })();
+  </script>
+  <title>90-Day AI Innovation Pipeline — Faisal Hoque</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,600&family=DM+Mono:wght@300;400;500&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/styles.css">
+
+  <!-- One palette per program, in light and dark. MUST load after
+       styles.css: it re-points --gold and its family at whichever of the
+       twelve programs is open, and it does that at equal specificity, so
+       the later file is what makes it win. index.php stamps the program
+       onto <html data-app="…"> before the page is sent; with no attribute
+       (the launchpad and the entry screens) the suite palette applies.
+       The design system itself — spacing, type, components — is entirely
+       in styles.css and is the same for every program. -->
+  <link rel="stylesheet" href="assets/css/themes.css">
+
+  <!-- Roles and program modules. The suite runs two role spaces — Enterprise
+       and Leaders — with six 90-day programs each, all over this one shared
+       shell. registry.js reads the catalogue the front controller injected,
+       boot.js loads the active module's code and stylesheet, router.js owns
+       the URL. Everything below this point in the page is the shell, shared by
+       every role and every module. See js/modules/registry.js. -->
+  <script src="js/modules/registry.js"></script>
+  <script src="js/modules/boot.js"></script>
+  <script src="js/router.js"></script>
+
+  <style>
+    /* ── Boot loader ─────────────────────────────────────────────────────────
+   A full-screen cover shown from the very first paint until the app has
+   actually rendered. Inline here (not in styles.css) and with self-contained
+   styles so it appears even before the stylesheet, fonts, or any script have
+   loaded — which is exactly the window where the page used to flash unstyled.
+   Removed by window.hideBootLoader() at the end of bootApp(). Theme colours
+   mirror --ink/--paper so it matches the theme chosen before first paint. */
+    #appBootLoader {
+      position: fixed;
+      inset: 0;
+      z-index: 2147483647;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      background: #EAEEF4;
+      color: #1E2530;
+      font-family: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+      opacity: 1;
+      transition: opacity .45s ease;
+    }
+
+    :root[data-theme="dark"] #appBootLoader {
+      background: #242E3C;
+      color: #F4F6F9;
+    }
+
+    #appBootLoader.boot-hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* While the loader is up, everything under it is invisible and nothing
+       animates (12 Oct 2026). The shell is laid out for the 300px program
+       sidebar until the app decides otherwise, and on every screen without one
+       (sign-in, launchpad) the content then SLID 300px left with the sidebar's
+       .25s margin transition — PageSpeed's layout-shift score, 0.25-0.36 on
+       desktop. A hidden element's moves are not layout shifts, and with
+       transitions off the page reaches its final layout in one step;
+       hideBootLoader() settles that layout, then drops this class, so the
+       loader lifts off a page that is already where it will stay. */
+    html.app-booting body > :not(#appBootLoader),
+    html.app-booting body > :not(#appBootLoader) * {
+      visibility: hidden !important;
+    }
+
+    html.app-booting *,
+    html.app-booting *::before,
+    html.app-booting *::after {
+      transition: none !important;
+    }
+
+    #appBootLoader .bl-word {
+      font-size: clamp(21px, 4vw, 33px);
+      font-weight: 500;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+    }
+
+    #appBootLoader .bl-word i {
+      font-style: italic;
+      letter-spacing: .14em;
+      color: #076D9E;
+    }
+
+    #appBootLoader .bl-spin {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      border: 3px solid rgba(232, 98, 26, .18);
+      border-top-color: #E8621A;
+      animation: blspin .8s linear infinite;
+    }
+
+    #appBootLoader .bl-sub {
+      font-family: 'DM Mono', ui-monospace, 'Courier New', monospace;
+      font-size: 11px;
+      letter-spacing: .34em;
+      text-transform: uppercase;
+      opacity: .5;
+    }
+
+    @keyframes blspin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @media (prefers-reduced-motion:reduce) {
+      #appBootLoader .bl-spin {
+        animation-duration: 1.8s;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Boot loader: covers the page from first paint until the app has rendered
+     (removed by window.hideBootLoader() at the end of bootApp in app.js). -->
+  <div id="appBootLoader" role="status" aria-live="polite" aria-label="Loading the AI Innovation Pipeline">
+    <div class="bl-word">AI Innovation <i>Pipeline</i></div>
+    <div class="bl-spin"></div>
+    <div class="bl-sub">Loading…</div>
+  </div>
+  <script>
+    /* Name the loader for the program that is actually starting, the instant its
+       markup exists — before a paint can show another module's wordmark.
+       boot.js runs it again on DOMContentLoaded for the header. */
+    if (window.Modules && Modules.applyIdentity) Modules.applyIdentity();
+  </script>
+  <script>
+    /* Defined early so it exists before app.js calls it. Fades the loader out and
+       removes it; idempotent. A safety timeout hides it even if boot stalls or
+       throws, so the loader can never trap the user on a blank page. */
+    window.hideBootLoader = function () {
+      var el = document.getElementById('appBootLoader');
+      var root = document.documentElement;
+      if (root.classList.contains('app-booting')) {
+        /* Force the final layout NOW, while transitions are still off — or the
+           sidebar margin would animate from its first-paint value the moment
+           the class goes. Then show the page under the fading loader. */
+        void root.offsetHeight;
+        root.classList.remove('app-booting');
+      }
+      if (!el || el.__hiding) return;
+      el.__hiding = 1;
+      el.classList.add('boot-hidden');
+      setTimeout(function () { if (el && el.parentNode) el.parentNode.removeChild(el); }, 500);
+    };
+    setTimeout(function () { if (window.hideBootLoader) window.hideBootLoader(); }, 12000);
+  </script>
+
+  <button id="sidebarToggle" class="sidebar-toggle" onclick="toggleSidebar()">&#9776;</button>
+  <div id="pipSidebar" class="sidebar"></div>
+  <nav>
+    <div class="nav-logo" onclick="go('home')">AI Innovation <span>Pipeline</span></div>
+    <div class="nav-tabs" id="navTabs"></div>
+    <div id="navRight"></div>
+  </nav>
+
+  <!-- Mobile navigation drawer (js/nav.js). OUTSIDE <nav> on purpose: nav sets
+       backdrop-filter, which makes it the containing block for any
+       position:fixed descendant — a drawer rendered inside it would be laid
+       out against the header bar instead of the viewport. -->
+  <div id="navDrawerHost"></div>
+
+  <div id="app" class="main-content"></div>
+
+  <footer id="appFooter" class="app-footer">
+    <div class="app-footer-inner">
+      <div class="app-footer-copy">&copy; <span id="footerYear">2026</span> Next Chapter, LLC. All rights reserved.
+      </div>
+      <div class="app-footer-links">
+        <a href="https://nextchapter.org/terms.html" target="_blank" rel="noopener">Terms of Use</a>
+        <span class="app-footer-divider">|</span>
+        <a href="https://nextchapter.org/privacy.html" target="_blank" rel="noopener">Privacy Policy</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Voice FAB -->
+  <button class="voice-fab" id="voiceFab" onclick="toggleVoice()"><span class="voice-fab-icon"
+      id="voiceIcon">◉</span><span id="voiceLabel">Voice</span></button>
+  <div class="voice-toast" id="voiceToast"></div>
+
+  <!-- Modal -->
+  <div id="modalRoot"></div>
+
+  <!-- Team Chat panel (trigger lives in the top-right nav) -->
+  <div id="gchatPanel" class="gchat-panel"></div>
+
+  <!-- Notes panel (trigger lives in the top-right nav) -->
+  <div class="notes-panel" id="notesPanel"></div>
+
+  <!-- Coach FAB -->
+  <div class="coach-fab-pulse" id="fabPulse"></div>
+  <button class="coach-fab" id="coachFab" onclick="toggleCoach()">&#10022; AI Guide</button>
+  <div class="coach-panel" id="coachPanel"></div>
+
+  <!-- Per-screen modules (load before app.js, which dispatches to them).
+     screen-loader.js provides shared template-fetch/wiring plumbing;
+     each screen is <name>.html (markup) + <name>.js (logic).
+     templates-local.js is the generated bundle that lets the app run
+     from disk (file://) — regenerate via `node build-templates.js`
+     after editing any screen's .html.
+
+     Every script from here down is `defer` (12 Oct 2026): they still run in
+     this order, after the page has been parsed and before DOMContentLoaded,
+     but the boot loader above can paint while they download. As plain
+     blocking tags nothing appeared until all of them had arrived and run —
+     PageSpeed's 7-second first paint on mobile. Keep `src` FIRST in the tag:
+     the harness and the tools/ checks read this list with <script\s+src=". -->
+  <script src="js/templates-local.js" defer></script>
+  <script src="js/screen-loader.js" defer></script>
+  <script src="js/home.js" defer></script>
+  <script src="js/learn.js" defer></script>
+  <script src="js/insights.js" defer></script>
+  <script src="js/auth.js" defer></script>
+  <script src="js/launchpad.js" defer></script>
+  <script src="js/nav.js" defer></script>
+  <!-- Feature modules (extracted from app.js; plain global scripts, load before app.js) -->
+  <script src="js/features/coach.js" defer></script>
+  <script src="js/features/chat.js" defer></script>
+  <script src="js/features/notes.js" defer></script>
+  <script src="js/features/help.js" defer></script>
+  <script src="js/features/email.js" defer></script>
+  <script src="js/features/sidebar.js" defer></script>
+  <script src="js/features/budget.js" defer></script>
+  <script src="js/features/charts.js" defer></script>
+  <script src="js/features/org-admin.js" defer></script>
+  <script src="js/features/assignments.js" defer></script>
+  <script src="js/features/my-assignments.js" defer></script>
+  <script src="js/features/voice.js" defer></script>
+  <script src="js/features/collab-notices.js" defer></script>
+  <!-- Pipeline phase-step bodies (routed to from renderStepContent in app.js) -->
+  <script src="js/steps/phase1.js" defer></script>
+  <script src="js/steps/phase2.js" defer></script>
+  <script src="js/steps/phase3.js" defer></script>
+  <script src="js/steps/phase4.js" defer></script>
+  <!-- Page renderers -->
+  <script src="js/pages/navigate.js" defer></script>
+  <script src="js/pages/reports.js" defer></script>
+  <!-- Dev / sample-data seeds -->
+  <script src="js/dev/seed.js" defer></script>
+  <script src="js/app.js" defer></script>
+
+
+  <!-- Sidebar: on click, scroll the menu so the clicked item anchors to the top.
+     Click is captured BEFORE the app re-renders the sidebar (so the item is still
+     in the DOM); the matching item is then re-located in the rebuilt menu and
+     scrolled to the top of the scroll area. -->
+  <script>
+    (function () {
+      var SB_ITEM = '.sidebar-step,.sidebar-home,.sidebar-outcome,.sidebar-phase-head,.sidebar-mini-row';
+      document.addEventListener('click', function (e) {
+        var sb = document.getElementById('pipSidebar');
+        if (!sb) return;
+        var item = e.target.closest && e.target.closest(SB_ITEM);
+        if (!item || !sb.contains(item)) return;            // capture phase: item still attached
+        var key = item.getAttribute('onclick') || item.textContent;
+        // The inline onclick re-renders the sidebar synchronously; anchor on the next frame.
+        requestAnimationFrame(function () {
+          var scroll = document.querySelector('#pipSidebar .sidebar-scroll');
+          if (!scroll) return;
+          var items = scroll.querySelectorAll(SB_ITEM), match = null;
+          for (var i = 0; i < items.length; i++) {
+            if ((items[i].getAttribute('onclick') || items[i].textContent) === key) { match = items[i]; break; }
+          }
+          if (!match) return;
+          var ANCHOR_OFFSET = 16; // breathing room so the anchored item's full text is visible
+          var sRect = scroll.getBoundingClientRect(), iRect = match.getBoundingClientRect();
+          scroll.scrollTo({ top: scroll.scrollTop + (iRect.top - sRect.top) - ANCHOR_OFFSET, behavior: 'smooth' });
+        });
+      }, true); // capture
+    })();
+  </script>
+
+  <!-- YouTube facade: clicking the thumbnail swaps in the player (user gesture allows playback). -->
+  <script>
+    (function () {
+      function load(f) {
+        var id = f.getAttribute('data-yt'); if (!id) return;
+        // Embedded playback can't work from a file:// page (YouTube needs a real origin/referrer),
+        // so when opened directly from the desktop we open the video on YouTube instead.
+        if (location.protocol === 'file:') {
+          window.open('https://www.youtube.com/watch?v=' + id, '_blank', 'noopener');
+          return;
+        }
+        var src = 'https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1&rel=0&playsinline=1';
+        f.innerHTML = '<iframe src="' + src + '" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>';
+        f.classList.remove('yt-facade'); f.removeAttribute('role'); f.removeAttribute('tabindex');
+      }
+      document.addEventListener('click', function (e) {
+        var f = e.target.closest && e.target.closest('.yt-facade[data-yt]'); if (f) load(f);
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        var f = e.target.closest && e.target.closest('.yt-facade[data-yt]'); if (f) { e.preventDefault(); load(f); }
+      });
+    })();
+  </script>
+</body>
+
+</html>

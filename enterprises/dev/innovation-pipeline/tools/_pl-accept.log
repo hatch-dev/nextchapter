@@ -1,0 +1,161 @@
+== boot ==
+  {"seed":true,"reports":true,"printDoc":true,"printDocs":14,"layerMaps":2,"reviewPage":true,"portPage":true}
+  ok   the app boots with seedData and printDocument defined
+  ok   js/pages/reports.js loaded and declared renderReports
+  ok   the Quarterly Review and live portfolio pages are defined
+  ok   PRINT_DOCS is filled - 14 documents registered (>= 12)
+  ok   LAYER_MAPS is filled - 2 record types (idea, project)
+  seed: {"ideas":20,"projects":11,"reviewItems":9,"done42":true,"done44":true}
+  ok   the example data loads
+  ok   the seeded quarterly review decides all nine live initiatives (got 9)
+  ok   steps 4.2 and 4.4 are complete on the seed
+
+== printed documents (checks 1-4, 6, 9-12, 16) ==
+  ok   [2] Assessment Report: the first page carries the module line
+  ok   [2] Assessment Report: the copyright line is in the page footer
+  ok   [2] Assessment Report: no control prints
+  ok   [2] Assessment Report: the document has a body (18186 bytes)
+  ok   [3] Blue Sky Portfolio: the first page carries the module line
+  ok   [3] Blue Sky Portfolio: the copyright line is in the page footer
+  ok   [3] Blue Sky Portfolio: no control prints
+  ok   [3] Blue Sky Portfolio: the document has a body (24532 bytes)
+  ok   [4] Org Readiness: the first page carries the module line
+  ok   [4] Org Readiness: the copyright line is in the page footer
+  ok   [4] Org Readiness: no control prints
+  ok   [4] Org Readiness: the document has a body (19754 bytes)
+  ok   [5] RACI Matrix: the first page carries the module line
+  ok   [5] RACI Matrix: the copyright line is in the page footer
+  ok   [5] RACI Matrix: no control prints
+  ok   [5] RACI Matrix: the document has a body (21782 bytes)
+  ok   [6] Exploration Portfolio: the first page carries the module line
+  ok   [6] Exploration Portfolio: the copyright line is in the page footer
+  ok   [6] Exploration Portfolio: no control prints
+  ok   [6] Exploration Portfolio: the document has a body (41451 bytes)
+  ok   [9] Capital Snapshot: the first page carries the module line
+  ok   [9] Capital Snapshot: the copyright line is in the page footer
+  ok   [9] Capital Snapshot: no control prints
+  ok   [9] Capital Snapshot: the document has a body (58838 bytes)
+  ok   [10] Development Portfolio: the first page carries the module line
+  ok   [10] Development Portfolio: the copyright line is in the page footer
+  ok   [10] Development Portfolio: no control prints
+  ok   [10] Development Portfolio: the document has a body (30444 bytes)
+  ok   [1] Governance Framework: the first page carries the module line
+  ok   [1] Governance Framework: the copyright line is in the page footer
+  ok   [1] Governance Framework: no control prints
+  ok   [1] Governance Framework: the document has a body (9457 bytes)
+  ok   [11] Org Design Review: the first page carries the module line
+  ok   [11] Org Design Review: the copyright line is in the page footer
+  ok   [11] Org Design Review: no control prints
+  ok   [11] Org Design Review: the document has a body (8967 bytes)
+  ok   [12] Portfolio Review: the first page carries the module line
+  ok   [12] Portfolio Review: the copyright line is in the page footer
+  ok   [12] Portfolio Review: no control prints
+  ok   [12] Portfolio Review: the document has a body (28476 bytes)
+  ok   [16] Operational Portfolio: the first page carries the module line
+  ok   [16] Operational Portfolio: the copyright line is in the page footer
+  ok   [16] Operational Portfolio: no control prints
+  ok   [16] Operational Portfolio: the document has a body (21654 bytes)
+  ok   [12] the Portfolio Review prints the decisions, not a second Development Portfolio
+  ok   [12] and it is a different document from the Development Portfolio
+  ok   [3] the Blue Sky Portfolio prints the ideas as record tables
+
+== Summary / Full (checks 2, 6-7, 10, 16) ==
+  ok   out-report: Full prints more than Summary (18186 -> 35434)
+  ok   out-bluesky: Full prints more than Summary (24532 -> 34429)
+  ok   out-explore: Full prints more than Summary (41451 -> 132945)
+  ok   out-expbriefs: Full prints more than Summary (30444 -> 109118)
+  ok   out-oper: Full prints more than Summary (21654 -> 117298)
+
+== the RACI matrix (check 5) ==
+  {"chips":42,"legend":true,"cols":6}
+  ok   a RACI cell cycles on click (raciCycle is wired to the cells)
+  ok   the legend names Responsible, Accountable, Consulted, Informed
+  ok   every embedded lead and senior leader has a column (6)
+
+== the Review Snapshot (check 18) ==
+  {"drift":false,"variance":false,"overrides":false,"cap":false,"intake":true}
+  ok   [18] no section with no content is printed
+
+== the Phase 5 pages (checks 13-15, 17, 20) ==
+  ok   [13] the Pipeline Dashboard prints its own document (42104 bytes)
+  ok   [13] headed Pipeline Overview
+  review page: {"len":36878,"head":true,"surface":true,"phase":5,"rail":true}
+  ok   [14] the Quarterly Review page shows the shared review surface
+  ok   [14] and the sidebar stays on Phase 5
+  ok   [14] and the page keeps the sidebar
+  live portfolios: {"out-bluesky":{"len":10839,"phase":5},"out-explore":{"len":13209,"phase":5},"out-expbriefs":{"len":11412,"phase":5},"out-oper":{"len":12728,"phase":5}}
+  ok   [15] the live out-bluesky page renders
+  ok   [15] and belongs to Phase 5, not its own phase
+  ok   [15] the live out-explore page renders
+  ok   [15] and belongs to Phase 5, not its own phase
+  ok   [15] the live out-expbriefs page renders
+  ok   [15] and belongs to Phase 5, not its own phase
+  ok   [15] the live out-oper page renders
+  ok   [15] and belongs to Phase 5, not its own phase
+  ok   [17] the Capital Planning Hub prints its document (37789 bytes)
+  ok   [20] Track Program prints a Module Management document
+
+== the sidebar (check 19) ==
+  {"p1":"▸ Outputs (2)","p4":"▸ Outputs (3)","openWhenViewing":"▾ Outputs (3)","listed":["→ Governance Framework","→ Org Design Review","→ Portfolio Review"],"p4third":"Portfolio Review"}
+  ok   [19] Phase 1 reads "▸ Outputs (2)" - got "▸ Outputs (2)"
+  ok   [19] Phase 4 reads "▸ Outputs (3)" - got "▸ Outputs (3)"
+  ok   [19] the fold opens itself while one of its outputs is the page being viewed
+  ok   [19] and Phase 4's third output is listed as Portfolio Review
+  ok   [19] PH names it Portfolio Review
+
+== the Report Manager (check 21) ==
+  {"len":818,"rail":true,"wide":true,"catalogue":34,"kinds":{"output":11,"page":3,"record":20}}
+  ok   [21] the Report Manager page renders
+  More menu: {"found":true,"label":"Report Manager","icon":"☷","landed":"reports"}
+  ok   [21] the More menu carries a Report Manager item (Modules.moreItems())
+  ok   [21] labelled "Report Manager"
+  ok   [21] and clicking it opens the page (got page "reports")
+  design hooks: {"cols":true,"colChildren":2,"rows":34,"h4":0,"subMd":2}
+  ok   [21] the two columns carry .rc-cols, so they are dressed as the app's cards
+  ok   [21] its headings are .h-sub-md like every other card, not bare <h4>s
+  ok   [21] catalogue rows carry .rc-row for the app's row rhythm (34)
+  ok   [21] and the stylesheet that dresses them is loaded
+  in the open menu: {"present":true,"text":"☷ Report Manager","beside":true}
+  ok   [21] and the item is in the More menu as drawn, beside Track Program
+  ok   [21] reading "☷ Report Manager"
+  ok   [21] and keeps the sidebar and its toggle
+  ok   [21] and asks for the wide rc-page block
+  ok   [21] the catalogue offers what a report can contain (34 items)
+  ok   [21] outputs, Phase 5 pages and individual ideas are all offered
+  report: {"picked":["output:Assessment Report","page:Pipeline Dashboard","record:AI-Assisted Customer Triage"],"units":4,"html":70720,"bodies":[{"kind":"output","body":14022},{"kind":"page","body":37999},{"kind":"record","body":15538},{"kind":"text","body":77}]}
+  ok   [21] a report takes an output, a Phase 5 page, an idea and a text page
+  ok   [21] and compiles to a whole document (70720 bytes)
+  ok   [21] the output section prints a body, not just a heading (14022 bytes)
+  ok   [21] the page section prints a body, not just a heading (37999 bytes)
+  ok   [21] the record section prints a body, not just a heading (15538 bytes)
+  sanitize: {"out":"<b>keep</b><i>this</i><br>","bold":true,"script":false,"img":false}
+  ok   [21] a text page keeps bold and italics and drops script and img
+
+== the stylesheet (section 5) ==
+  {"wide":"1350px","native":"900px","sameLine":true,"ctlRight":true,"rowWraps":false,"btnText":"▾ Save as PDF","btnBg":"rgba(0, 0, 0, 0)","btnBorder":"1px"}
+  ok   Change 4: the Report Manager keeps its wider block (1350px) while every other page stays in the app's column (900px)
+  ok   Change 3: the control sits on the title line, at the right, and the row does not wrap
+  ok   the button reads ▾ Save as PDF ("▾ Save as PDF")
+  ok   Change 1: it is a small outlined button, not a filled one
+
+== the printed paper (check 5) ==
+  RACI Matrix pages: [P,P]
+  ok   [5] the RACI Matrix is two PORTRAIT pages - a cover and the matrix (18 Sep ruling)
+  Governance Framework pages: [P,P]
+  ok   [1] and every other document is portrait throughout too
+  at A4 printable width (688px): {"doc":673,"cols":7,"clipped":0}
+  ok   [5] and it fits the printable width of A4 portrait, the narrower paper
+  ok   [5] with no column header cut off - the names wrap instead
+
+== the print window prints itself ==
+  ok   the document carries its own print call
+  ok   and it sits inside <body>, not after </html>
+  ok   and it waits for load rather than a fixed delay
+  ok   and the opener never calls print() on the popup
+  ok   the print window declares its encoding, so a saved document reopens without mojibake
+
+== uncaught exceptions ==
+  ok   no uncaught exception during any of it
+websocket error: 
+
+PASS: 118  FAIL: 0

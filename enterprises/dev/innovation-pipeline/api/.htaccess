@@ -1,0 +1,36 @@
+# Route every request that isn't a real file/dir through the front controller.
+# No RewriteBase: the substitution is resolved against this directory, so the
+# API works unchanged wherever it is deployed.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # index.php is the only entry point — source dirs are never served directly.
+    # vendor/ is on the list for the same reason: it is Composer's install tree,
+    # third-party PHP the front controller includes and no browser ever asks for
+    # by path.
+    RewriteRule ^(config|core|controllers|models|validation|helpers|routes|sql|vendor)(/|$) - [F,L]
+
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.php [QSA,L]
+</IfModule>
+
+# Keep config, sql and source out of direct browser reach.
+<FilesMatch "\.(sql|md)$">
+    Require all denied
+</FilesMatch>
+
+# The API answers requests; it never lists itself. vendor/ in particular is a
+# whole dependency tree, and Indexes is on for the document root.
+Options -Indexes
+
+# Dotfiles are never served. Nothing here is meant to be, but the rule belongs
+# next to the tree it protects rather than only in the parent .htaccess.
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+# composer.json / composer.lock name the exact package versions installed.
+<FilesMatch "^composer\.(json|lock)$">
+    Require all denied
+</FilesMatch>

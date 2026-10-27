@@ -1,0 +1,42 @@
+<!-- ─────────────────────────────────────────────────────────────
+     insights.html — Insights screen (skeleton; hydrated by insights.js)
+     The hero, the three section headings and the tab bar are static.
+     The card lists (Latest Thoughts, Conversations, Worth Your Time)
+     are data-driven and filled into the [data-slot] containers by
+     js/insights.js from its data arrays. Tab clicks scroll to a
+     section (delegated on [data-insights-tabs]); no inline JS.
+     ───────────────────────────────────────────────────────────── -->
+<div class="u-70c6b34">
+
+  <div class="u-4f90335">
+    <div class="section-label">Insights</div>
+    <div class="u-3536245">
+      <div>
+        <h1 class="section-title u-d51702b">Ideas &amp; <em>Conversations</em></h1>
+        <p class="u-7e59c65">Faisal Hoque&rsquo;s latest writing across six outlets, the CONVERGENCE podcast and interview appearances, and a shelf of work by people we admire.</p>
+      </div>
+    </div>
+
+    <div class="u-58a9696" data-insights-tabs>
+      <button type="button" class="insight-filter" data-itab="latest">Latest Thoughts</button>
+      <button type="button" class="insight-filter" data-itab="conversations">Conversations</button>
+      <button type="button" class="insight-filter" data-itab="worth">Worth Your Time</button>
+    </div>
+  </div>
+
+  <div class="u-dc4836c">
+    <div id="insights-latest" class="insights-section">
+      <div class="section-title insights-section-title">Latest <em>Thoughts</em></div>
+      <div data-slot="latest"></div>
+    </div>
+    <div id="insights-conversations" class="insights-section" style="margin-top:56px">
+      <div class="section-title insights-section-title">Conversations</div>
+      <div data-slot="conversations"></div>
+    </div>
+    <div id="insights-worth" class="insights-section" style="margin-top:56px">
+      <div class="section-title insights-section-title">Worth Your <em>Time</em></div>
+      <div data-slot="worth"></div>
+    </div>
+  </div>
+
+</div>

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Judgment — Leadership Edge Module 1</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,600&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<script>
+/* Apply saved theme before first paint (default: light, per ruling). Key: dl-theme. */
+try{document.documentElement.setAttribute('data-theme',localStorage.getItem('dl-theme')==='dark'?'dark':'light');}catch(e){document.documentElement.setAttribute('data-theme','light');}
+</script>
+<link rel="stylesheet" href="DL-styles.css">
+</head>
+<body>
+<nav>
+<div class="nav-logo" onclick="go('home')">Judgment — <span>Critical Thinking</span></div>
+<div class="nav-tabs" id="navTabs"></div>
+<div id="navRight" style="display:flex;gap:6px;align-items:center"></div>
+</nav>
+<button id="railToggle" class="prail-toggle" onclick="toggleRail()" style="display:none">&#9776;</button>
+<div class="prail" id="prail"></div>
+<div id="app"></div>
+<footer id="appFooter" class="app-footer"><div class="app-footer-inner"><div class="app-footer-copy">&copy; 2026 Next Chapter, LLC. All rights reserved.</div><div class="app-footer-links"><a href="https://nextchapter.org/terms.html" target="_blank" rel="noopener">Terms of Use</a><span class="app-footer-divider">|</span><a href="https://nextchapter.org/privacy.html" target="_blank" rel="noopener">Privacy Policy</a></div></div></footer>
+
+<!-- Floating Notes -->
+<!-- Notes now lives in the top-right nav (see navRight) -->
+<div class="notes-panel" id="notesPanel"></div>
+
+
+<!-- Floating AI Guide -->
+<div class="coach-fab-pulse" id="fabPulse"></div>
+<div class="focus-bg" id="focusBg"><div class="focus-card" id="focusCard"><div id="focusInner"></div></div></div>
+
+<button class="coach-fab" id="coachFab" onclick="toggleCoach()"><span class="coach-fab-icon">&#10022;</span>AI Guide</button>
+<div class="coach-panel" id="coachPanel"></div>
+<div class="voice-toast" id="voiceToast"></div>
+
+<!-- Per-screen modules (load before app.js, which dispatches to them).
+     screen-loader.js provides shared template-fetch/wiring plumbing;
+     each screen is <name>.html (markup) + <name>.js (logic).
+     templates-local.js is the generated bundle that lets the app run
+     from disk (file://) — regenerate via `node DL-build-templates.js`
+     after editing any screen's .html. -->
+<script>window.__SCREEN_FILE_PREFIX="DL-";</script>
+<script src="DL-templates-local.js"></script>
+<script src="DL-screen-loader.js"></script>
+<script src="DL-home.js"></script>
+<script src="DL-learn.js"></script>
+<script src="DL-app.js"></script>
+
+</body>
+</html>

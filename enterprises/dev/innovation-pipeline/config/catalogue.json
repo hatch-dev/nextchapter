@@ -1,0 +1,446 @@
+{
+  "_comment": [
+    "catalogue.json — the ONE definition of the app's roles and their modules.",
+    "",
+    "Four consumers read this file and nothing else:",
+    "  index.php               resolves /apps/{role}/{module} to a role + module",
+    "  js/modules/registry.js  (via window.APP_CATALOGUE, injected by index.php)",
+    "  api/config/modules.php  server-side allowlist for the workspace endpoints",
+    "  tools/_unused/harness.js reads it straight off disk",
+    "There is deliberately no second copy of this list anywhere.",
+    "",
+    "The twelve programs and their order match the marketing site's",
+    "'For Enterprises' and 'For Leaders' module lists. Keep them in step: the",
+    "site is where people meet these names first.",
+    "",
+    "role.key   stable identifier — used in the database (organizations.account_type)",
+    "role.slug  the URL segment: /apps/{slug}/...",
+    "",
+    "module.id     STORAGE key. It is the workspaces.module column, the",
+    "              localStorage namespace and the coach/help scope. Once a",
+    "              module has data, NEVER change it. 'pipeline' and",
+    "              'exec-readiness' predate everything here and are frozen.",
+    "module.slug   URL segment: /apps/{role.slug}/{module.slug}. Safe to rename —",
+    "              list the old one in $LEGACY_MODULE_SLUGS in index.php and it",
+    "              301s to the new address instead of going dead.",
+    "module.tag    the discipline line under the name on the site and the",
+    "              launchpad — short, uppercase, no sentence.",
+    "module.status 'live' = has its own code | 'planned' = renders the shared",
+    "              placeholder. Flip to 'live' when you point scripts at real code.",
+    "module.scripts/styles/templates/tabs/logo/title — see js/modules/registry.js.",
+    "",
+    "To add a module: append an entry, create js/modules/<id>/module.js calling",
+    "Modules.define(), set status to 'live'. Nothing else needs editing — the",
+    "server allowlist, the router, the launchpad and the switcher all read here."
+  ],
+  "defaults": {
+    "role": "enterprise",
+    "module": "pipeline"
+  },
+  "suite": {
+    "name": "Next Chapter Programs",
+    "title": "Next Chapter — 90-Day Programs",
+    "logo": {
+      "lead": "Next",
+      "accent": "Chapter"
+    }
+  },
+  "roles": [
+    {
+      "key": "enterprise",
+      "slug": "enterprises",
+      "name": "Enterprise",
+      "sub": "Organization-wide 90-day transformation programs, run by a team.",
+      "accent": "#076D9E",
+      "modules": [
+        {
+          "id": "exec-readiness",
+          "slug": "executive-readiness",
+          "status": "live",
+          "name": "Executive Readiness",
+          "tag": "AI fluency & judgment",
+          "sub": "Leading in the AI era — assess, build, develop, embed.",
+          "logo": {
+            "lead": "Executive",
+            "accent": "Readiness",
+            "mini": "ER",
+            "side": "Executive",
+            "sideAccent": "Readiness"
+          },
+          "title": "Executive Readiness — Leading in the AI Era",
+          "tabs": {
+            "home": "Home",
+            "learn": "Learn",
+            "pipeline": "Readiness",
+            "phase5": "Lead",
+            "insights": "Insights"
+          },
+          "scripts": [
+            "js/modules/exec-readiness/steps.js",
+            "js/modules/exec-readiness/module.js",
+            "js/modules/exec-readiness/help.js"
+          ],
+          "styles": [
+            "assets/css/modules/exec-readiness.css"
+          ],
+          "templates": [
+            "home",
+            "learn"
+          ]
+        },
+        {
+          "id": "pipeline",
+          "slug": "innovation-pipeline",
+          "status": "live",
+          "name": "AI Innovation Pipeline",
+          "tag": "Innovation strategy",
+          "sub": "From standing start to functioning pipeline in 90 days.",
+          "logo": {
+            "lead": "AI Innovation",
+            "accent": "Pipeline",
+            "mini": "AI",
+            "side": "AI",
+            "sideAccent": "Pipeline"
+          },
+          "title": "90-Day AI Innovation Pipeline — Faisal Hoque",
+          "tabs": {
+            "home": "Home",
+            "learn": "Learn",
+            "pipeline": "Pipeline",
+            "phase5": "Navigate",
+            "insights": "Insights"
+          },
+          "scripts": [
+            "js/modules/pipeline/module.js",
+            "js/modules/pipeline/help.js"
+          ],
+          "styles": [],
+          "templates": [
+            "home",
+            "learn",
+            "insights"
+          ]
+        },
+        {
+          "id": "ai-governance",
+          "slug": "responsible-ai-governance",
+          "status": "live",
+          "name": "Responsible AI Governance",
+          "tag": "Managing AI risk",
+          "sub": "Policy, oversight and controls that keep AI accountable.",
+          "logo": {
+            "lead": "Responsible AI",
+            "accent": "Governance",
+            "mini": "RG",
+            "side": "Responsible",
+            "sideAccent": "Governance"
+          },
+          "title": "90-Day Responsible AI Governance — NextChapter",
+          "tabs": {
+            "home": "Home",
+            "learn": "Learn",
+            "pipeline": "Framework",
+            "phase5": "Governance",
+            "insights": "Insights"
+          },
+          "scripts": [
+            "js/modules/ai-governance/program.js",
+            "js/modules/ai-governance/module.js",
+            "js/modules/ai-governance/help.js"
+          ],
+          "styles": [
+            "assets/css/modules/ai-governance.css"
+          ],
+          "templates": [
+            "home",
+            "learn"
+          ]
+        },
+        {
+          "id": "ai-architecture",
+          "slug": "ai-ready-architecture",
+          "status": "live",
+          "name": "AI-Ready Architecture",
+          "tag": "The technical foundation",
+          "sub": "The data, systems and platform the work has to stand on.",
+          "logo": {
+            "lead": "AI-Ready",
+            "accent": "Architecture",
+            "mini": "AR",
+            "side": "AI-Ready",
+            "sideAccent": "Architecture"
+          },
+          "title": "90 Days to an AI-Ready Architecture — NextChapter",
+          "tabs": {
+            "home": "Home",
+            "learn": "Learn",
+            "pipeline": "Framework",
+            "phase5": "Dashboard",
+            "insights": "Insights"
+          },
+          "scripts": [
+            "js/modules/ai-architecture/program.js",
+            "js/modules/ai-architecture/module.js",
+            "js/modules/ai-architecture/help.js"
+          ],
+          "styles": [
+            "assets/css/modules/ai-architecture.css"
+          ],
+          "templates": [
+            "home",
+            "learn"
+          ]
+        },
+        {
+          "id": "ai-culture",
+          "slug": "ai-ready-culture",
+          "status": "planned",
+          "name": "AI-Ready Culture",
+          "tag": "Working with and for humans",
+          "sub": "The habits, norms and trust that decide whether any of it lands.",
+          "logo": {
+            "lead": "AI-Ready",
+            "accent": "Culture",
+            "mini": "AC",
+            "side": "AI-Ready",
+            "sideAccent": "Culture"
+          },
+          "title": "AI-Ready Culture — 90-Day Program",
+          "tabs": {
+            "home": "Home",
+            "learn": "Learn",
+            "pipeline": "Program",
+            "phase5": "Sustain",
+            "insights": "Insights"
+          },
+          "scripts": [
+            "js/modules/_placeholder/module.js"
+          ],
+          "styles": [],
+          "templates": []
+        },
+        {
+          "id": "workforce-readiness",
+          "slug": "workforce-readiness",
+          "status": "planned",
+          "name": "Workforce Readiness",
+          "tag": "Closing the capability gap",
+          "sub": "Reshape roles and skills around what the organization can now do.",
+          "logo": {
+            "lead": "Workforce",
+            "accent": "Readiness",
+            "mini": "WR",
+            "side": "Workforce",
+            "sideAccent": "Readiness"
+          },
+          "title": "Workforce Readiness — 90-Day Program",
+          "tabs": {
+            "home": "Home",
+            "learn": "Learn",
+            "pipeline": "Program",
+            "phase5": "Sustain",
+            "insights": "Insights"
+          },
+          "scripts": [
+            "js/modules/_placeholder/module.js"
+          ],
+          "styles": [],
+          "templates": []
+        }
+      ]
+    },
+    {
+      "key": "leader",
+      "slug": "leaders",
+      "name": "Leaders",
+      "sub": "Individual 90-day programs for the person doing the leading.",
+      "accent": "#B8892A",
+      "modules": [
+        {
+          "id": "decision-lab",
+          "slug": "judgment-critical-thinking",
+          "status": "live",
+          "name": "Judgment",
+          "tag": "Critical thinking & judgment",
+          "sub": "Judgment, evidence and speed when the machine has an opinion.",
+          "logo": {
+            "lead": "Judgment —",
+            "accent": "Critical Thinking",
+            "mini": "JCT",
+            "side": "Judgment —",
+            "sideAccent": "Critical Thinking"
+          },
+          "title": "Judgment — Leadership Edge Module 1",
+          "tabs": {
+            "home": "Home",
+            "learn": "Learn",
+            "assess": "Assess",
+            "lab": "Practice",
+            "dashboard": "Dashboard",
+            "insights": "Insights"
+          },
+          "scripts": [
+            "js/modules/decision-lab/program.js",
+            "js/modules/decision-lab/module.js",
+            "js/modules/decision-lab/help.js"
+          ],
+          "styles": [
+            "assets/css/modules/decision-lab.css"
+          ],
+          "templates": [
+            "home",
+            "learn"
+          ]
+        },
+        {
+          "id": "friction-map",
+          "slug": "friction-map",
+          "status": "planned",
+          "name": "The Friction Map",
+          "tag": "Adaptive learning & curiosity",
+          "sub": "Find where you stop learning, and take the resistance apart.",
+          "logo": {
+            "lead": "The Friction",
+            "accent": "Map",
+            "mini": "FM",
+            "side": "Friction",
+            "sideAccent": "Map"
+          },
+          "title": "The Friction Map — 90-Day Program",
+          "tabs": {
+            "home": "Home",
+            "learn": "Learn",
+            "pipeline": "Program",
+            "phase5": "Practice",
+            "insights": "Insights"
+          },
+          "scripts": [
+            "js/modules/_placeholder/module.js"
+          ],
+          "styles": [],
+          "templates": []
+        },
+        {
+          "id": "connection-practice",
+          "slug": "connection-practice",
+          "status": "planned",
+          "name": "The Connection Practice",
+          "tag": "Emotional intelligence",
+          "sub": "The read on a room that no model will ever do for you.",
+          "logo": {
+            "lead": "The Connection",
+            "accent": "Practice",
+            "mini": "CP",
+            "side": "Connection",
+            "sideAccent": "Practice"
+          },
+          "title": "The Connection Practice — 90-Day Program",
+          "tabs": {
+            "home": "Home",
+            "learn": "Learn",
+            "pipeline": "Program",
+            "phase5": "Practice",
+            "insights": "Insights"
+          },
+          "scripts": [
+            "js/modules/_placeholder/module.js"
+          ],
+          "styles": [],
+          "templates": []
+        },
+        {
+          "id": "ethics-engine",
+          "slug": "conscience-ethical-reasoning",
+          "status": "live",
+          "name": "Conscience",
+          "tag": "Ethical reasoning & moral courage",
+          "sub": "The calls no model should make for you, and saying them out loud.",
+          "logo": {
+            "lead": "Conscience —",
+            "accent": "Ethical Reasoning",
+            "mini": "CER",
+            "side": "Conscience —",
+            "sideAccent": "Ethical Reasoning"
+          },
+          "title": "Conscience — Leadership Edge Module 4",
+          "tabs": {
+            "home": "Home",
+            "learn": "Learn",
+            "assess": "Assess",
+            "lab": "Practice",
+            "dashboard": "Dashboard",
+            "insights": "Insights"
+          },
+          "scripts": [
+            "js/modules/ethics-engine/program.js",
+            "js/modules/ethics-engine/module.js",
+            "js/modules/ethics-engine/help.js"
+          ],
+          "styles": [
+            "assets/css/modules/ethics-engine.css"
+          ],
+          "templates": [
+            "home",
+            "learn"
+          ]
+        },
+        {
+          "id": "authorship-studio",
+          "slug": "authorship-studio",
+          "status": "planned",
+          "name": "The Authorship Studio",
+          "tag": "Creative & original thinking",
+          "sub": "Keep the work yours when the first draft is free.",
+          "logo": {
+            "lead": "The Authorship",
+            "accent": "Studio",
+            "mini": "AS",
+            "side": "Authorship",
+            "sideAccent": "Studio"
+          },
+          "title": "The Authorship Studio — 90-Day Program",
+          "tabs": {
+            "home": "Home",
+            "learn": "Learn",
+            "pipeline": "Program",
+            "phase5": "Practice",
+            "insights": "Insights"
+          },
+          "scripts": [
+            "js/modules/_placeholder/module.js"
+          ],
+          "styles": [],
+          "templates": []
+        },
+        {
+          "id": "narrative-forge",
+          "slug": "narrative-forge",
+          "status": "planned",
+          "name": "The Narrative Forge",
+          "tag": "Narrative & communication mastery",
+          "sub": "Carry an organization through a change it did not ask for.",
+          "logo": {
+            "lead": "The Narrative",
+            "accent": "Forge",
+            "mini": "NF",
+            "side": "Narrative",
+            "sideAccent": "Forge"
+          },
+          "title": "The Narrative Forge — 90-Day Program",
+          "tabs": {
+            "home": "Home",
+            "learn": "Learn",
+            "pipeline": "Program",
+            "phase5": "Practice",
+            "insights": "Insights"
+          },
+          "scripts": [
+            "js/modules/_placeholder/module.js"
+          ],
+          "styles": [],
+          "templates": []
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+<!-- ─────────────────────────────────────────────────────────────
+     admin-login.html — the administrator's sign-in (markup only)
+     Hydrated by auth.js → Entry.mount('admin-login', …). A username and a
+     password (Directive 2 Oct 2026, Part 5.12): the account exists from
+     installation, so there is no first-use screen.
+
+     This is the ONE entry screen with no program behind it — the console
+     reaches across every organization — so it keeps the root address
+     /apps/admin, and its way out is the launchpad rather than any one
+     program's sign-in. Every other door belongs to a program.
+     ───────────────────────────────────────────────────────────── -->
+<div class="login-screen"><div class="login-card entry-pass-card">
+  <button type="button" class="entry-back" data-go="launchpad">&larr; All programs</button>
+  <div class="login-eyebrow">Administrator</div>
+  <h1 class="login-title" data-slot="title">Admin <em>sign in</em></h1>
+  <p class="login-sub" data-slot="sub">Enter the administrator username and password to view all organizations and users.</p>
+
+  <form class="entry-form" data-auth="admin" novalidate autocomplete="off">
+    <input id="adminUser" class="entry-text-input" type="text" autocomplete="username"
+           placeholder="Username" data-field="user" aria-label="Username"/>
+    <div class="entry-field-err" data-err="user" role="alert"></div>
+
+    <input id="adminPassword" class="entry-text-input" type="password" autocomplete="current-password"
+           placeholder="Password" data-field="password" aria-label="Password"/>
+    <div class="entry-field-err" data-err="password" role="alert"></div>
+
+    <div class="entry-err" data-err="_general" role="alert" hidden></div>
+
+    <button type="submit" class="btn-gold login-btn" data-slot="submit" data-submit>Enter &rarr;</button>
+  </form>
+</div></div>
