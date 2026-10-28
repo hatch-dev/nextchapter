@@ -73,15 +73,33 @@
        video added with preload="auto" (or none) is switched to "metadata"
        before the browser starts fetching it. The poster, the length and the
        controls still show; pressing play streams as before. A video that
-       autoplays is left alone. */
+       autoplays is left alone.
+
+       A poster while it loads (28 Oct 2026). Most Enterprise videos were
+       written without a poster, so until the first frame arrived they showed
+       as an empty black box. Every Enterprise video now has a frame taken from
+       it saved beside it under the same name (assets/media/.../exec-phase1.mp4
+       → exec-phase1.jpg; this copy's assets/media/ is the main app's, see
+       .htaccess), and any video in an Enterprise program with no poster of its
+       own is given that frame. A video's own poster always wins. A new video
+       needs its frame added the same way. */
     (function () {
       if (!window.MutationObserver) return;
+      var boot = window.APP_BOOT, enterprise = !!(boot && boot.roleSlug === 'enterprises' && boot.moduleId);
+      function thumb(v) {
+        if (!enterprise || v.getAttribute('poster')) return;
+        var el = v.getAttribute('src') ? v : v.querySelector('source[src]'), src = el ? el.getAttribute('src') : '';
+        if (/\.mp4$/i.test(src)) v.setAttribute('poster', src.slice(0, -4) + '.jpg');
+      }
       function tame(node) {
         if (!node || node.nodeType !== 1) return;
+        // The parser can add a <video> before its <source>: catch the source arriving.
+        if (node.tagName === 'SOURCE') { if (node.parentNode && node.parentNode.tagName === 'VIDEO') thumb(node.parentNode); return; }
         var list = node.tagName === 'VIDEO' ? [node] : (node.getElementsByTagName ? node.getElementsByTagName('video') : []);
         for (var i = 0; i < list.length; i++) {
           var v = list[i], p = v.getAttribute('preload');
           if (!v.autoplay && (p === null || p === '' || p === 'auto')) v.setAttribute('preload', 'metadata');
+          thumb(v);
         }
       }
       new MutationObserver(function (records) {
