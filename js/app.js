@@ -2833,6 +2833,7 @@ function sealSession() {
   carouselState = { idx: 0, timer: null, stepId: null, hover: false };
   gateArmed = false; _lastGateStep = null;
   coachMsgs = JSON.parse(COACH_MSGS_PRISTINE); coachCtx = 'Overview';
+  coachBusy = false; /* AI Guide stage 1: a question still in flight belongs to the discarded thread (see sendCoach) */
   try { gchatUnreadCount = 0; } catch (e) { }
   try { orgSetupMode = false; } catch (e) { }
 }
@@ -3387,7 +3388,7 @@ function syncSidebarToViewport(force) {
 var coachOpen = false, notesOpen = false;
 // Pipeline module UI state
 var UI = { v: 'home', prev: null, navStack: [], _back: false, sb: true, sec: '1.1', ap: null, icDraft: null, showEx: {}, sf: false, ec: null, addForm: false, expanded: {}, ni: { name: '', desc: '', strategic: '', cost: '', timeframe: '', dept: '', when: 'now' } };
-var coachMsgs = [{ role: 'ai', text: Modules.coachGreeting() }];
+var coachMsgs = [{ role: 'ai', welcome: true, text: Modules.coachGreeting() }];   /* welcome: never resent to the AI (AI Guide stage 1) */
 var UI_PRISTINE = JSON.stringify(UI); var COACH_MSGS_PRISTINE = JSON.stringify(coachMsgs); /* the session's starting state, for sealSession (Part S) */
 var coachCtx = 'Overview';
 

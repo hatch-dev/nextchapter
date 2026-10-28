@@ -93,6 +93,14 @@ svg [stroke="#B8B0A5"] {stroke:var(--stone)
 }
 .step-nav-btn:last-child {border-right:none
 }
+.coach-close {background:none;border:1px solid var(--border-faint);color:var(--stone);width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;transition:all .2s
+}
+.coach-close:hover {border-color:var(--gold-text);color:var(--gold-text)
+}
+.coach-msg.ai .coach-sender {font-family:var(--mono);font-size:13px;letter-spacing:.12em;color:var(--gold-text);text-transform:uppercase;margin-bottom:6px
+}
+.coach-msg.user .coach-sender {font-family:var(--mono);font-size:13px;letter-spacing:.12em;color:var(--stone);text-transform:uppercase;margin-bottom:6px
+}
 .btn.bg2 {white-space:nowrap;padding:7px 14px;border-radius:6px;align-self:flex-start;height:fit-content
 }
 @media (max-width:960px) {

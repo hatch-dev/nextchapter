@@ -375,7 +375,9 @@
        (activeNavPhaseId, js/features/sidebar.js). */
     phaseHeadTarget: function (id) { return String(id) === '5' ? ['phase5'] : null; },
 
-    coachGreeting: 'Welcome to the Executive Readiness module. Ask me about leadership readiness, the OPEN and CARE frameworks, philosophical proficiency, or any step.',
+    /* AI Guide (16 Oct 2026): the Pipeline's stage-1 Guide, so its greeting takes the same shape — what to ask,
+       and what the answers draw on (this program's Pinecone assistant: Faisal Hoque's articles + the program guide). */
+    coachGreeting: 'Welcome to Executive Readiness. I\'m your AI Guide. Ask me how to complete the step you\'re on, what to do next, or for ideas drawn from Faisal Hoque\'s writing on AI-era leadership.',
 
     /* This program's sample workspace — Aurora Windows, a window manufacturer
        early in its AI journey: eleven named leaders with logins, a reporting

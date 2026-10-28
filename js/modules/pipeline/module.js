@@ -78,7 +78,7 @@
       4: 'You’ve launched your first experiments, established governance that outlasts these ninety days, stress-tested your organization, and made your first buy-sell-hold decisions. You have a working pipeline, a real portfolio, live experiments, and the discipline to sustain all of it. When day ninety arrives, the pipeline doesn’t switch off — it becomes your engine, taking in new ideas, advancing the strong ones, and retiring the rest. The ninety days were only ever the key to the ignition. After that, the road is yours.'
     },
 
-    coachGreeting: 'Welcome to the AI Innovation Pipeline. I\'m your strategic guide through the 90-day transformation journey. Ask me about any step, framework, or concept — or challenge me on where you\'re stuck.',
+    coachGreeting: 'Welcome to the AI Innovation Pipeline. I\'m your AI Guide. Ask me how to complete the step you\'re on, what to do next, or for ideas drawn from Faisal Hoque\'s book TRANSCEND.',   /* AI Guide stage 1 brief, 12 Oct 2026, section 6 item 1 */
 
     /* This program's sample workspaces. Both build the Pipeline's own document —
        ideas, projects, a capital envelope, a portfolio — so they belong to the

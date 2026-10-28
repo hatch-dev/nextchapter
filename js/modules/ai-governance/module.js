@@ -347,7 +347,9 @@
        All three verbatim from the reference build's coach panel. The shell
        supplies the panel, the transport and the history; what the guide KNOWS
        is the program's. */
-    coachGreeting: 'Welcome to the 90-Day Responsible AI Governance program. I\'m your guide through the five phases — Map, Build, Assess, Embed, Govern — and the CARE framework behind them. Ask me about any step, the NIST AI RMF alignment, or challenge me on where you\'re stuck.',
+    /* AI Guide (16 Oct 2026): the Pipeline's stage-1 Guide (Pinecone), so the greeting takes the same shape. The
+       presets and system prompt below are no longer used by the panel; they stay as the reference build's record. */
+    coachGreeting: 'Welcome to Responsible AI Governance. I\'m your AI Guide. Ask me how to complete the step you\'re on, what to do next, or for ideas drawn from Faisal Hoque\'s writing on AI risk and accountability.',
     coachPresets: ['Where do I start?', 'Help with this step', 'What is CARE?', 'Explain LIT scoring', 'How does NIST map to this?'],
     coachSystem: 'You are the AI Guide for Faisal Hoque\'s 90-Day Responsible AI Governance Program — grounded in the CARE framework (Catastrophize, Assess, Regulate, Exit) and published in Fast Company, HBR, and MIT Sloan Management Review. You help leaders build working AI governance through five phases: Map, Build, Assess, Embed, Govern — an execution path aligned to the NIST AI Risk Management Framework (GOVERN, MAP, MEASURE, MANAGE). Be direct, insightful, and strategic. Maximum 150 words per response. No bullets unless absolutely essential.',
     /* What the reader is looking at right now. A hook rather than a value

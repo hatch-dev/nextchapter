@@ -14,6 +14,7 @@ use Controllers\AdminController;
 use Controllers\AssignmentController;
 use Controllers\AuthController;
 use Controllers\ClaudeController;
+use Controllers\GuideController;
 use Controllers\MessageController;
 use Controllers\NoteController;
 use Controllers\NotifyController;
@@ -111,6 +112,12 @@ $router->post('/seed', [SeedController::class, 'sync']);
 // Unlike every other endpoint here, the success body is the Messages API's
 // own shape rather than the house envelope; ClaudeController explains why.
 $router->post('/claude', [ClaudeController::class, 'messages']);
+
+// AI Guide stage 1 (built in dev 13 Oct 2026, live 28 Oct 2026): the AI Innovation Pipeline's Guide asks the Pinecone Assistant,
+// which holds TRANSCEND and the module guide. Signed-in only; returns { answer } and nothing else.
+// 16 Oct 2026: Executive Readiness too — the body names its module, the server picks that program's assistant.
+// See Controllers\GuideController.
+$router->post('/guide', [GuideController::class, 'ask']);
 
 // Email notifications. js/features/email.js POSTs the eight fields of the
 // 3 Sep 2026 directive here when a step is completed or a deadline is a week

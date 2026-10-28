@@ -129,6 +129,39 @@ function helpToolsHtml(tools) {
 /* One section, whichever kind it is. A shared section is resolved first, so
    `{ shared:'tools', extra:[…] }` renders the shell's list plus the module's
    own entries. */
+/* AI Guide stage 1 (brief of 12 Oct 2026, section 6 items 2 and 3; built in dev 13 Oct 2026, live 28 Oct 2026). On the AI
+   Innovation Pipeline the Guide now asks Pinecone, so two shared sentences would be untrue there: the
+   tool-list line and the privacy sentence. They change for the Pipeline only — every other program's
+   Guide still asks Anthropic directly through the server, and its help keeps saying so. */
+var HELP_PIPELINE_GUIDE_LINE = 'Orange button, bottom-right corner. It knows which step you are on and draws on Faisal Hoque’s book TRANSCEND and a guide to this program. Ask it how to complete a step, what comes next, or for ideas. It can’t see the data you have entered.';
+/* 16 Oct 2026: Executive Readiness got the same Guide, so the same two sentences change there too. Its line names
+   its own button colour (the program's accent) and its own reference material (its Pinecone assistant holds
+   Faisal Hoque's articles on AI-era leadership and a guide to this program, not TRANSCEND). */
+var HELP_GUIDE_LINES = {
+  'pipeline': HELP_PIPELINE_GUIDE_LINE,
+  'exec-readiness': 'Purple button, bottom-right corner. It knows which step you are on and draws on Faisal Hoque’s writing on AI-era leadership and a guide to this program. Ask it how to complete a step, what comes next, or for ideas. It can’t see the data you have entered.',
+  /* Responsible AI Governance (16 Oct 2026): its button is the program's teal accent; its assistant holds Faisal
+     Hoque's articles on AI risk and accountability and a guide to this program. */
+  'ai-governance': 'Teal button, bottom-right corner. It knows which step you are on and draws on Faisal Hoque’s writing on AI risk and accountability and a guide to this program. Ask it how to complete a step, what comes next, or for ideas. It can’t see the data you have entered.',
+  /* AI-Ready Architecture (21 Oct 2026): slate button; its assistant holds Faisal Hoque's articles on enterprise
+     architecture for AI and a guide to this program. */
+  'ai-architecture': 'Slate button, bottom-right corner. It knows which step you are on and draws on Faisal Hoque’s writing on enterprise architecture for AI and a guide to this program. Ask it how to complete a step, what comes next, or for ideas. It can’t see the data you have entered.'
+};
+var HELP_PRIVACY_OLD = 'The AI Guide sends only your question and the current step context to the Anthropic API, routed through the program’s server rather than directly from your browser.';
+var HELP_PRIVACY_NEW = 'The AI Guide sends your question, your recent messages in the Guide panel, and the name of the step you are on to Pinecone, an AI service, routed through the program’s server rather than directly from your browser. Pinecone adds relevant passages from the program’s reference material and has a Claude model, made by Anthropic, write the answer.';
+function helpPipelineGuideCopy(sec) {
+  var line = '';
+  try { for (var id in HELP_GUIDE_LINES) if (window.Modules && Modules.isActive(id)) line = HELP_GUIDE_LINES[id]; } catch (e) { }
+  if (!line) return sec;
+  var out = {}; for (var k in sec) out[k] = sec[k];
+  /* one AI Guide row: Executive Readiness adds its own beside the shared one, and both would now say the same */
+  var seen = false;
+  if (out.tools) out.tools = out.tools.filter(function (t) { if (!t || t.ic !== '✦ AI Guide') return true; if (seen) return false; seen = true; return true; })
+    .map(function (t) { return t && t.ic === '✦ AI Guide' ? { ic: t.ic, d: line } : t; });
+  if (typeof out.body === 'string' && out.body.indexOf(HELP_PRIVACY_OLD) >= 0) out.body = out.body.replace(HELP_PRIVACY_OLD, HELP_PRIVACY_NEW);
+  return out;
+}
+
 function helpSectionHtml(sec) {
   if (sec.shared) {
     var base = HELP_SHARED[sec.shared];
@@ -141,6 +174,7 @@ function helpSectionHtml(sec) {
       funnel: base.funnel,
       tools: base.tools && sec.extra ? base.tools.concat(sec.extra) : base.tools
     };
+    sec = helpPipelineGuideCopy(sec);
   }
   var h = '<div class="mb-6">';
   if (sec.title) h += '<div class="section-label mb-3">' + sec.title + '</div>';
