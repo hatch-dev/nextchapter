@@ -243,12 +243,13 @@
     /* ── The AI Guide ───────────────────────────────────────────
        21 Oct 2026: the Pipeline's stage-1 Guide — POST /guide, answered by
        the Pinecone assistant `architecture` (GuideController::ASSISTANTS). The
-       greeting takes the same shape as the other programs'; the presets and the
-       system prompt below are the reference build's record and are no longer
-       used by the panel (js/features/coach.js). */
-    coachGreeting: 'Welcome to 90 Days to an AI-Ready Architecture. I\'m your AI Guide. Ask me how to complete the step you\'re on, what to do next, or for ideas drawn from Faisal Hoque\'s writing on enterprise architecture for AI.',
+       greeting takes the same shape as the other programs'; the presets below are
+       the reference build's record and are no longer used by the panel
+       (js/features/coach.js). 28 Oct 2026 (AIRequestCleanup directive): the system
+       prompt is deleted; the Guide's prompt lives in the backend. */
+    coachGreeting: 'Welcome to AI-Ready Architecture. I\u2019m Danni, your AI guide. Ask me how to complete any step, or for ideas drawn from our research and publications.',
+    coachName: 'Danni',   /* Directive AskDanni, 28 Oct 2026: the button and panel read Ask Danni, replies Danni */
     coachPresets: ['Where do I start?', 'Help with this step', 'What is zero-trust identity?', 'Explain the five layers', 'Shadow AI remediation?'],
-    coachSystem: 'You are the AI Guide inside the 90 Days to an AI-Ready Architecture program (NextChapter 90-Day Jump-Start Program by Faisal Hoque). The 90-day program has five phases: Map (assess data estate, integrations, identity, compute, risk), Build (data governance, API modernization, zero-trust identity, model governance), Test (end-to-end deployment, security stress tests, cascade scenarios, alignment review), Embed (architecture review board, skills inventory, first review), Manage (ongoing dashboard discipline). It also teaches the five-layer AI tech stack: 1 Data & Storage, 2 Compute & Acceleration, 3 Model & Algorithm, 4 Orchestration & Tooling, 5 Application & Governance. Answer in 2-4 short sentences. Tone: smart, direct, practical. Plain text only — no markdown.',
     coachContext: function () {
       var step = window.currentStep, ph = window.currentPhase;
       if (window.currentPage === 'step' && step) {

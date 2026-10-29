@@ -127,8 +127,19 @@
       if (window.currentPage !== pageId) return;
       if (typeof window.getCurrentUser === 'function' && !window.getCurrentUser()) return;
       var z = (window.UI && window.UI.zoom) || 1;
+      /* Already on screen: leave it (29 Oct 2026). render() runs on every click in the top bar and the
+         menus — More, the theme, a menu opening — and remounting threw Home and Learn away each time:
+         the page blanked, the reveal replayed and the video loaded again, which read as the page
+         reloading. Their markup is static, so the one on screen is already right; only the zoom can
+         have changed. A screen with an afterMount (Insights) draws live data and is still rebuilt. */
+      var live = container.__screen;
+      if (!opts.afterMount && live && live.key === key(name) && live.el.parentNode === container) {
+        live.el.style.zoom = (z && z !== 1) ? z : '';
+        return;
+      }
       var zs = (z && z !== 1) ? (' style="zoom:' + z + '"') : '';
       container.innerHTML = '<div class="zoom-wrap" id="zoomWrap"' + zs + '>' + html + '</div>';
+      container.__screen = { key: key(name), el: container.firstElementChild };
       wire(container);
       reveal(container);
       if (typeof opts.afterMount === 'function') opts.afterMount(container);

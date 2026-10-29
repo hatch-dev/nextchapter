@@ -218,7 +218,7 @@ var currentPage = 'home', currentStep = null, currentPhase = null; var gateArmed
 var coachOpen = false, notesOpen = false;
 var UI = { sec: 'A', ctxOpen: {}, addForm: false, editIdx: null, assignOpen: null, orgAddForm: false, orgEditId: null, orgSelected: null, orgZoom: 1, zoom: 1, navMore: false, navOpen: undefined, _navPageKey: null, mfTab: 'intro', crTab: 'reflections' };
 var UI_PRISTINE = JSON.stringify(UI); /* the session's starting state, for sealSession */
-var coachMsgs = [{ role: 'ai', text: 'Welcome to the Executive Readiness module. Ask me about leadership readiness, the OPEN and CARE frameworks, philosophical proficiency, or any step.' }];
+var coachMsgs = [{ role: 'ai', text: 'Welcome to Executive Readiness. I\u2019m Danni, your AI guide. Ask me how to complete any step, or for ideas drawn from our research and publications.' }];
 var COACH_MSGS_PRISTINE = JSON.stringify(coachMsgs); /* the AI Guide's opening, for sealSession */
 
 /* ═══ USERS & AUTH ═══ */
@@ -7072,10 +7072,10 @@ function toggleCoach() {
   if (coachOpen) renderCoach();
 }
 function renderCoach() {
-  var h = '<div class="coach-header"><div style="font-family:var(--mono);font-size:11px;letter-spacing:.15em;color:var(--gold);text-transform:uppercase">\u2726 AI Guide</div><button class="coach-close" onclick="toggleCoach()" title="Close">\u00D7</button></div>';
+  var h = '<div class="coach-header"><div style="font-family:var(--mono);font-size:11px;letter-spacing:.15em;color:var(--gold);text-transform:uppercase">\u2726 Ask Danni</div><button class="coach-close" onclick="toggleCoach()" title="Close">\u00D7</button></div>';
   h += '<div class="coach-ai-notice">You are talking to an AI assistant. It can make mistakes, so check anything important.</div>'; /* Part 2 (A.2.6): "AI Guide" is a name, not a plain statement */
   h += '<div class="coach-msgs" id="coachMsgs">';
-  coachMsgs.forEach(function (m) { h += '<div class="coach-msg ' + m.role + '">' + esc(m.text) + '</div>' });
+  coachMsgs.forEach(function (m) { h += '<div class="coach-msg ' + m.role + '"><div class="coach-sender">' + (m.role === 'ai' ? 'Danni' : 'You') + '</div>' + esc(m.text) + '</div>' });
   h += '</div>';
   h += '<div class="coach-input-row"><textarea id="coachInput" placeholder="Ask about OPEN/CARE, CITO, philosophical proficiency\u2026" onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();sendCoach()}"></textarea><button class="coach-send" onclick="sendCoach()">Send</button></div>';
   $('coachPanel').innerHTML = h;

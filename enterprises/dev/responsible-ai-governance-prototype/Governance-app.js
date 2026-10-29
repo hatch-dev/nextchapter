@@ -1555,7 +1555,7 @@ function goPhase(id){
   }
 }
 var coachOpen=false,notesOpen=false;
-var coachMsgs=[{role:'ai',text:'Welcome to the 90-Day Responsible AI Governance program. I\'m your guide through the five phases — Map, Build, Assess, Embed, Govern — and the CARE framework behind them. Ask me about any step, the NIST AI RMF alignment, or challenge me on where you\'re stuck.'}];
+var coachMsgs=[{role:'ai',text:'Welcome to Responsible AI Governance. I\u2019m Danni, your AI guide. Ask me how to complete any step, or for ideas drawn from our research and publications.'}];
 var COACH_MSGS_PRISTINE = JSON.stringify(coachMsgs); /* the AI Guide's opening, for sealSession */
 var coachCtx='Overview';
 
@@ -8065,174 +8065,6 @@ function setInsightView(v){
   if(g)g.innerHTML=buildInsightCards(insightsState.filter,v);
 }
 
-function setInsightStatus(msg,loading){
-  var st=document.getElementById('insightStatusText');
-  var sp=document.getElementById('insightSpinner');
-  if(st)st.textContent=msg;
-  if(sp)sp.style.display=loading?'block':'none';
-  if(st)st.style.display=loading?'none':'block';
-}
-
-// ── Live feed fetcher (uses Claude web_search — server-side, no CORS) ────────
-function fetchLiveInsights(){
-  if(!aiGuideOn()) return; /* Part 2: no request to the AI service; Insights keeps its curated content */
-  if(insightsState.loading)return;
-  insightsState.loading=true;
-  var btn=document.getElementById('insightRefreshBtn');
-  if(btn){btn.disabled=true;btn.textContent='\u23f3 Fetching\u2026';}
-  setInsightStatus('',true);
-
-  // Build one search request per source that has a profileUrl
-  // We batch them: ask Claude to search all sources in one call using web_search
-  var sourceList=INSIGHT_FEEDS.map(function(f,i){
-    return (i+1)+'. '+f.label+' — profile: '+f.profileUrl+(f.feedUrl?' / rss: '+f.feedUrl:'');
-  }).join('\n');
-
-  var systemPrompt='You are a research assistant. Use web_search to find the 3–4 most recent public articles, posts, or podcast episodes for each source listed. Return ONLY a JSON object — no markdown, no explanation. Format:\n{\n  "fastco": [{title,date,url,excerpt},...],\n  "psych": [...],\n  "hbr": [...],\n  "mitsloan": [...],\n  "imd": [...],\n  "linkedin": [...],\n  "convergence": [{title,date,url,excerpt,duration},...]\n}\nFor podcasts include duration if found. Excerpts should be 1–2 sentences. Dates as YYYY-MM-DD or YYYY-MM.';
-
-  var userMsg='Find the latest content from Faisal Hoque at these sources:\n'+sourceList+'\n\nReturn only the JSON object described.';
-
-  fetch(CLAUDE_API_URL,{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({
-      model:'claude-sonnet-4-20250514',
-      max_tokens:4000,
-      system:systemPrompt,
-      tools:[{type:'web_search_20250305',name:'web_search'}],
-      messages:[{role:'user',content:userMsg}]
-    })
-  })
-  .then(function(r){
-    if(!r.ok)throw new Error('API '+r.status);
-    return r.json();
-  })
-  .then(function(data){
-    insightsState.loading=false;
-    if(btn){btn.disabled=false;btn.innerHTML='\u21bb Refresh Live';}
-
-    // Collect all text blocks from the response (Claude may use tool + then respond)
-    var text='';
-    if(data.content&&data.content.length){
-      for(var i=0;i<data.content.length;i++){
-        if(data.content[i].type==='text')text+=data.content[i].text;
-      }
-    }
-
-    // Extract JSON from response text
-    var parsed=null;
-    try{
-      var s=text.indexOf('{'),e=text.lastIndexOf('}');
-      if(s>=0&&e>s)parsed=JSON.parse(text.slice(s,e+1));
-    }catch(err){parsed=null;}
-
-    if(parsed){
-      var liveCount=0;
-      for(var i=0;i<INSIGHT_FEEDS.length;i++){
-        var f=INSIGHT_FEEDS[i];
-        if(parsed[f.id]&&Array.isArray(parsed[f.id])&&parsed[f.id].length){
-          f._live=parsed[f.id].slice(0,6);
-          insightsState.liveLoaded[f.id]=true;
-          liveCount++;
-        }
-      }
-      _refreshInsightGrid();
-      var total=_insightCount('all');
-      setInsightStatus('\u2713 '+total+' items \u00b7 '+liveCount+' source'+(liveCount!==1?'s':'')+' live \u00b7 '+new Date().toLocaleTimeString(),false);
-    } else {
-      setInsightStatus('Live fetch complete. Feed data unavailable \u2014 showing curated content.',false);
-    }
-  })
-  .catch(function(err){
-    insightsState.loading=false;
-    if(btn){btn.disabled=false;btn.innerHTML='\u21bb Refresh Live';}
-    setInsightStatus('Fetch failed ('+err.message+'). Showing curated content.',false);
-    console.error('Insights fetch error:',err);
-  });
-}
-
-function _refreshInsightGrid(){
-  // Rebuild filter strip counts too
-  var filters=document.querySelectorAll('.insight-filter');
-  filters.forEach(function(b){
-    var fid=b.getAttribute('data-feed');
-    var cnt=_insightCount(fid);
-    b.innerHTML=(fid==='all'?'All':
-      (function(){var f=INSIGHT_FEEDS.filter(function(x){return x.id===fid;})[0];return f?(f.type==='podcast'?'&#9654; ':f.type==='post'?'&#9998; ':'')+f.shortLabel:fid;}())
-    )+' <span style="opacity:.5;font-size:12px">'+cnt+'</span>';
-    b.classList.toggle('active',fid===insightsState.filter);
-  });
-  var g=document.getElementById('insightGrid');
-  if(g)g.innerHTML=buildInsightCards(insightsState.filter,insightsState.view);
-}// ── AI-powered live feed fetcher ───────────────────────────────────────────
-function fetchLiveInsights(){
-  if(!aiGuideOn()) return; /* Part 2: no request to the AI service; Insights keeps its curated content */
-  if(insightsState.loading)return;
-  insightsState.loading=true;
-  var btn=document.getElementById('insightRefreshBtn');
-  if(btn){btn.disabled=true;btn.textContent='\u23f3 Fetching\u2026';}
-  setInsightStatus('',true);
-
-  // Build list of feeds with URLs to try
-  var feedsWithUrls=INSIGHT_FEEDS.filter(function(f){return f.feedUrl;});
-  var feedNames=feedsWithUrls.map(function(f){return f.label+' ('+f.feedUrl+')';}).join(', ');
-
-  var prompt='You are an RSS aggregator. Please fetch and parse the following RSS/podcast feeds and return the 5 most recent items from each as JSON.\n\nFeeds to fetch:\n'
-    +feedsWithUrls.map(function(f,i){return (i+1)+'. '+f.label+': '+f.feedUrl;}).join('\n')
-    +'\n\nFor each feed, return an array of items with fields: title, date (YYYY-MM-DD), url, excerpt (2-3 sentences, plain text), duration (podcasts only).\n\nReturn ONLY a JSON object like:\n{"fastco":[...],"psych":[...],"convergence":[...]}\n\nUse the feed IDs: '+feedsWithUrls.map(function(f){return f.id;}).join(', ')+'\n\nIf a feed is unreachable, return an empty array for that key. Return pure JSON only, no markdown.';
-
-  fetch(CLAUDE_API_URL,{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({
-      model:'claude-sonnet-4-20250514',
-      max_tokens:4000,
-      messages:[{role:'user',content:prompt}]
-    })
-  })
-  .then(function(r){return r.json();})
-  .then(function(data){
-    insightsState.loading=false;
-    if(btn){btn.disabled=false;btn.innerHTML='\u21bb Refresh Live';}
-    var text='';
-    if(data.content&&data.content.length){
-      for(var i=0;i<data.content.length;i++){if(data.content[i].type==='text')text+=data.content[i].text;}
-    }
-    // Parse JSON from response
-    var clean=text.replace(/```json|```/g,'').trim();
-    // Find JSON object
-    var start=clean.indexOf('{'),end=clean.lastIndexOf('}');
-    if(start>=0&&end>start){
-      try{
-        var parsed=JSON.parse(clean.slice(start,end+1));
-        var liveCount=0;
-        for(var i=0;i<INSIGHT_FEEDS.length;i++){
-          var f=INSIGHT_FEEDS[i];
-          if(parsed[f.id]&&parsed[f.id].length){
-            f._live=parsed[f.id];
-            insightsState.liveLoaded[f.id]=true;
-            liveCount++;
-          }
-        }
-        var g=document.getElementById('insightGrid');
-        if(g)g.innerHTML=buildInsightCards(insightsState.filter,insightsState.view);
-        // Update filter counts
-        if(currentPage==='insights'){render();}
-        setInsightStatus('\u2713 Live feeds updated \u2014 '+liveCount+' source'+(liveCount!==1?'s':'')+' refreshed \u00b7 '+new Date().toLocaleTimeString(),false);
-      }catch(e){
-        setInsightStatus('Could not parse feed data. Showing curated content.',false);
-      }
-    } else {
-      setInsightStatus('Live fetch returned no data. Showing curated content.',false);
-    }
-  })
-  .catch(function(e){
-    insightsState.loading=false;
-    if(btn){btn.disabled=false;btn.innerHTML='\u21bb Refresh Live';}
-    setInsightStatus('Live fetch failed. Showing curated content.',false);
-  });
-}
-
 
 /* \u2500\u2500 Chunk 15: gate liveness (D-6) \u2500\u2500 field saves never mark; the Mark Complete
    button is the only completion path, pushable only when the step's criteria hold.
@@ -8585,12 +8417,12 @@ if(coachOpen)renderCoachPanel();
 function renderCoachPanel(){
 var panel=$('coachPanel');if(!panel)return;
 var ctx=currentStep?ctxLabel(currentStep):'Overview';
-var h='<div class="coach-header"><div class="coach-header-title"><span>✦</span> AI Guide</div><button class="coach-close" onclick="toggleCoach()">×</button></div>';
+var h='<div class="coach-header"><div class="coach-header-title"><span>✦</span> Ask Danni</div><button class="coach-close" onclick="toggleCoach()">×</button></div>';
 h+='<div class="coach-ai-notice">You are talking to an AI assistant. It can make mistakes, so check anything important.</div>'; /* Part 2 (A.2.6): "AI Guide" is a name, not a plain statement */
 h+='<div style="padding:10px 24px;border-bottom:1px solid rgba(var(--fg-rgb),.06);background:rgba(var(--fg-rgb),.02);flex-shrink:0"><div style="font-family:var(--mono);font-size:12px;letter-spacing:.08em;color:var(--stone)">Context: '+esc(ctx)+'</div></div>';
 h+='<div class="coach-msgs" id="coachMsgsEl">';
 for(var i=0;i<coachMsgs.length;i++){var m=coachMsgs[i];
-h+='<div class="coach-msg '+m.role+'"><div class="coach-sender">'+(m.role==='ai'?'AI Guide':'You')+'</div>'+esc(m.text)+'</div>'}
+h+='<div class="coach-msg '+m.role+'"><div class="coach-sender">'+(m.role==='ai'?'Danni':'You')+'</div>'+esc(m.text)+'</div>'}
 h+='</div>';
 h+='<div class="coach-presets">';
 var presets=['Where do I start?','Help with this step','What is CARE?','Explain LIT scoring','How does NIST map to this?'];
@@ -8611,11 +8443,10 @@ var thread=coachMsgs;/* Part S follow-up (7 Oct 2026): the reply belongs to the 
 coachMsgs.push({role:'user',text:userText});
 renderCoachPanel();
 var ctx='User is working on: '+(currentStep?ctxLabel(currentStep)+' ('+currentPhase?.name+')':'the pipeline overview');
-var sysPrompt='You are the AI Guide for Faisal Hoque\'s 90-Day Responsible AI Governance Program \u2014 grounded in the CARE framework (Catastrophize, Assess, Regulate, Exit) and published in Fast Company, HBR, and MIT Sloan Management Review. You help leaders build working AI governance through five phases: Map, Build, Assess, Embed, Govern \u2014 an execution path aligned to the NIST AI Risk Management Framework (GOVERN, MAP, MEASURE, MANAGE). Be direct, insightful, and strategic. Maximum 150 words per response. No bullets unless absolutely essential.';
 
 fetch(CLAUDE_API_URL,{method:'POST',headers:{'Content-Type':'application/json'},
-body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:300,
-messages:[{role:'user',content:sysPrompt+'\n\n'+ctx+'\n\nUser question: '+userText}]})
+body:JSON.stringify({
+messages:[{role:'user',content:ctx+'\n\nUser question: '+userText}]})
 }).then(function(r){return r.json()}).then(function(j){
 var text='';if(j.content)for(var i=0;i<j.content.length;i++)if(j.content[i].text)text+=j.content[i].text;
 if(!text)text='Could not generate response. Try again.';

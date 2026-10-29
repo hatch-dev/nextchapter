@@ -324,7 +324,7 @@ if(typeof window!=='undefined'){
 }
 
 if(typeof window!=='undefined'){ window.addEventListener('resize', function(){ syncNavHeight(); }); }
-var coachMsgs=[{role:'ai',text:'Welcome to the 90 Days to an AI-Ready Architecture program. Ask me about the five-layer AI tech stack, strategic enterprise architecture, data governance, integration modernization, identity architecture, or any step in the program.'}];var COACH_MSGS_PRISTINE=JSON.stringify(coachMsgs); /* 1 Oct 2026 (Paul): the AI Guide's opening, for a clean start */
+var coachMsgs=[{role:'ai',text:'Welcome to AI-Ready Architecture. I\u2019m Danni, your AI guide. Ask me how to complete any step, or for ideas drawn from our research and publications.'}];var COACH_MSGS_PRISTINE=JSON.stringify(coachMsgs); /* 1 Oct 2026 (Paul): the AI Guide's opening, for a clean start */
 
 /* ═══ USERS & AUTH ═══
    Multi-user identity: each org carries its own roster (data.roster);
@@ -6576,12 +6576,12 @@ function toggleCoach(){ if(!coachOpen&&!aiGuideOn())return; /* opening only: the
 }
 function renderCoachPanel(){
   var panel=$('coachPanel');if(!panel)return;
-  var h='<div class="coach-header"><div style="font-family:var(--serif);font-size:18px;font-weight:300;color:var(--paper)">\u2726 AI Guide</div><button class="coach-close" onclick="toggleCoach()">\u00D7</button></div>';
+  var h='<div class="coach-header"><div style="font-family:var(--serif);font-size:18px;font-weight:300;color:var(--paper)">\u2726 Ask Danni</div><button class="coach-close" onclick="toggleCoach()">\u00D7</button></div>';
   h+='<div class="coach-ctx"><div class="coach-ctx-txt">Context: '+esc(currentPage==='step'&&currentStep?('Step '+currentStep):notesWhere())+'</div></div>';
   h+='<div class="coach-msgs" id="coachMsgsEl">';
   for(var i=0;i<coachMsgs.length;i++){
     var m=coachMsgs[i];
-    h+='<div class="coach-msg '+(m.role==='user'?'user':'ai')+'">'+esc(m.text)+'</div>';
+    h+='<div class="coach-msg '+(m.role==='user'?'user':'ai')+'"><div class="coach-sender">'+(m.role==='user'?'You':'Danni')+'</div>'+esc(m.text)+'</div>';
   }
   if(_coachThinking)h+='<div class="coach-msg ai" style="opacity:.6">Thinking\u2026</div>';
   h+='</div>';
@@ -6605,13 +6605,13 @@ function sendCoach(){ if(!aiGuideOn())return; /* 2 Oct 2026 (Spec §25.2): no re
   var text=inp.value.trim();inp.value='';
   coachMsgs.push({role:'user',text:text});
   _coachThinking=true;renderCoachPanel();
-  var sys='You are the AI Guide inside the 90 Days to an AI-Ready Architecture program (NextChapter 90-Day Jump-Start Program by Faisal Hoque). The 90-day program has five phases: Map (assess data estate, integrations, identity, compute, risk), Build (data governance, API modernization, zero-trust identity, model governance), Test (end-to-end deployment, security stress tests, cascade scenarios, alignment review), Embed (architecture review board, skills inventory, first review), Manage (ongoing dashboard discipline). It also teaches the five-layer AI tech stack: 1 Data & Storage, 2 Compute & Acceleration, 3 Model & Algorithm, 4 Orchestration & Tooling, 5 Application & Governance. '+coachContext()+' Answer in 2-4 short sentences. Tone: smart, direct, practical. Plain text only \u2014 no markdown.';
+  var sys=coachContext();
   var history=coachMsgs.slice(-12).map(function(m){return{role:m.role==='user'?'user':'assistant',content:m.text}});
   if(history.length&&history[0].role!=='user')history=history.slice(1);   // API requires a user-first turn
   history[history.length-1]={role:'user',content:sys+'\n\nUser question: '+text};
   fetch(CLAUDE_API_URL,{
     method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:400,messages:history})
+    body:JSON.stringify({messages:history})
   }).then(function(res){return res.json()}).then(function(j){
     var reply='';if(j.content)for(var i=0;i<j.content.length;i++)if(j.content[i].text)reply+=j.content[i].text;
     if(!reply)reply='Let me put that differently \u2014 could you rephrase the question?';

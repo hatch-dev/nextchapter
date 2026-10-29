@@ -6580,6 +6580,13 @@ function prepareSampleData(fresh) {
   }
   data.settings = { aiGuide: false, voice: false };
   applyTeamRoster();
+  /* The demo visitor is the administrator, in every program (29 Oct 2026). The tab signs in as the cast's first
+     person, and under the edit rule (assignee or administrator edits a step, js/features/assignments.js) a plain
+     member with nothing assigned found every field on every step read-only — Responsible AI Governance and the
+     Pipeline demos could not be typed into. AI-Ready Architecture already did this in its own sampleSeed; this is
+     the same rule for all of them, and it runs on a stored sample as well as a fresh one. The tab never leaves
+     this browser. */
+  if (USERS[0]) { USERS[0].admin = true; if (data.roster && data.roster[0]) data.roster[0].admin = true; }
   (data.roster || []).concat(USERS).forEach(function (u) { if (u) delete u.passcode; });
   saveData();
   Auth.setSession((USERS[0] && USERS[0].id) || null);

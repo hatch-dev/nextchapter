@@ -87,6 +87,32 @@
   border-color: rgba(245, 242, 236, .15)
 }
 
+/* The org chart's boxes in light mode (Step 1.2, the 5.1 dashboard; orgChartNodeSvg).
+   Each box's title is fill="#F5F2EC", which the shared SVG remap already turns
+   dark in light mode; the box itself is fill="rgba(26,22,18,.95)", which nothing
+   remapped, so the title went dark on a near-black box and vanished. In light
+   mode the box takes the light card surface, the leader's name (#d4cfca, light
+   grey) the soft text colour, and the selected box a faint tint. Dark mode keeps
+   its literals. Presentation attributes, so a stylesheet rule is the only way in
+   (see SVG THEME REMAP in styles.css); print never loads this file. */
+:root:not([data-theme="dark"]) svg [fill="rgba(26,22,18,.95)"] {
+  fill: var(--bg-elev)
+}
+
+:root:not([data-theme="dark"]) svg [fill="rgba(245,242,236,.08)"] {
+  fill: rgba(var(--fg-rgb), .08)
+}
+
+:root:not([data-theme="dark"]) svg text[fill="#d4cfca"] {
+  fill: var(--text-soft)
+}
+
+/* The reporting lines between the boxes: a light hairline the shared remap does
+   not cover (it has .15 and .25, not .18), so in light mode they vanished. */
+:root:not([data-theme="dark"]) svg [stroke="rgba(245,242,236,.18)"] {
+  stroke: rgba(var(--fg-rgb), .18)
+}
+
 .org-board-canvas {
   overflow: auto;
   position: relative;

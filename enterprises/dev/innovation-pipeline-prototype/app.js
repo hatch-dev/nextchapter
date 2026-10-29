@@ -939,7 +939,7 @@ var coachOpen=false,notesOpen=false;
 // Pipeline module UI state
 var UI={v:'home',prev:null,navStack:[],_back:false,sb:true,sec:'1.1',ap:null,icDraft:null,showEx:{},sf:false,ec:null,addForm:false,expanded:{},ni:{name:'',desc:'',strategic:'',cost:'',timeframe:'',dept:'',when:'now'}};
 var UI_PRISTINE = JSON.stringify(UI); /* the session's starting state, for sealSession */
-var coachMsgs=[{role:'ai',welcome:true,text:'Welcome to the AI Innovation Pipeline. I\'m your AI Guide. Ask me how to complete the step you\'re on, what to do next, or for ideas drawn from Faisal Hoque\'s book TRANSCEND.'}];
+var coachMsgs=[{role:'ai',welcome:true,text:'Welcome to the AI Innovation Pipeline. I\u2019m Danni, your AI guide. Ask me how to complete any step, or for ideas drawn from our research and publications.'}];
 var COACH_MSGS_PRISTINE = JSON.stringify(coachMsgs); /* the AI Guide's opening, for sealSession */
 var coachCtx='Overview';
 
@@ -5781,7 +5781,7 @@ function coachToLatest(){var el=document.getElementById('coachMsgsEl');if(el){el
 
 var COACH_AVATAR='<span class="coach-avatar" aria-hidden="true">✦</span>';
 function coachAiRow(body,extra,canCopy){
-return '<div class="coach-row ai'+(extra?' '+extra:'')+'">'+COACH_AVATAR+'<div class="coach-col"><div class="coach-sender">AI Guide</div>'
+return '<div class="coach-row ai'+(extra?' '+extra:'')+'">'+COACH_AVATAR+'<div class="coach-col"><div class="coach-sender">Danni</div>'
 +'<div class="coach-msg ai'+(extra?' '+extra:'')+'"><div class="coach-body">'+body+'</div>'
 +(canCopy?'<div class="coach-tools"><button class="coach-tool" onclick="coachCopy(this)">Copy</button></div>':'')
 +'</div></div></div>';
@@ -5797,7 +5797,7 @@ panel.setAttribute('role','dialog');panel.setAttribute('aria-label','AI Guide');
 panel.onkeydown=function(e){if(e.key==='Escape'&&coachOpen){e.preventDefault();toggleCoach();var f=$('coachFab');if(f&&f.focus)f.focus();}};
 var me=(typeof getCurrentUser==='function'&&getCurrentUser())||null;
 var started=coachMsgs.some(function(m){return !m.welcome;});
-var h='<div class="coach-header"><div class="coach-id">'+COACH_AVATAR+'<div class="coach-id-text"><div class="coach-header-title">AI Guide</div><div class="coach-where">'+esc(guideWhere())+'</div></div></div>';
+var h='<div class="coach-header"><div class="coach-id">'+COACH_AVATAR+'<div class="coach-id-text"><div class="coach-header-title">Ask Danni</div><div class="coach-where">'+esc(guideWhere())+'</div></div></div>';
 h+='<div class="coach-actions">';
 if(started)h+='<button class="coach-icon-btn" onclick="newCoachConversation()" title="New conversation" aria-label="Start a new conversation"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></button>';
 h+='<button class="coach-icon-btn coach-close" onclick="toggleCoach()" title="Close (Esc)" aria-label="Close the AI Guide">×</button>';

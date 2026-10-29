@@ -377,7 +377,8 @@
 
     /* AI Guide (16 Oct 2026): the Pipeline's stage-1 Guide, so its greeting takes the same shape — what to ask,
        and what the answers draw on (this program's Pinecone assistant: Faisal Hoque's articles + the program guide). */
-    coachGreeting: 'Welcome to Executive Readiness. I\'m your AI Guide. Ask me how to complete the step you\'re on, what to do next, or for ideas drawn from Faisal Hoque\'s writing on AI-era leadership.',
+    coachGreeting: 'Welcome to Executive Readiness. I\u2019m Danni, your AI guide. Ask me how to complete any step, or for ideas drawn from our research and publications.',
+    coachName: 'Danni',   /* Directive AskDanni, 28 Oct 2026: the button and panel read Ask Danni, replies Danni */
 
     /* This program's sample workspace — Aurora Windows, a window manufacturer
        early in its AI journey: eleven named leaders with logins, a reporting

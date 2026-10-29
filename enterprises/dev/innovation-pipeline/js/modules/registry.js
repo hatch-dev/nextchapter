@@ -211,6 +211,10 @@
   function resolve(v) { return typeof v === 'function' ? v() : v; }
   function coachPresets() { return resolve(_runtime && _runtime.coachPresets) || null; }
   function coachSystem() { return resolve(_runtime && _runtime.coachSystem) || null; }
+  /* The name the guide goes by (Directive_DEV_AllModules_AskDanni_28Oct2026): a program that sets coachName
+     shows "Ask <name>" on the guide's button and panel title, and <name> above the guide's replies. Null keeps
+     "AI Guide", which is what the Leaders programs still show. */
+  function coachName() { return (_runtime && _runtime.coachName) || null; }
   /* How a phase's steps are grouped in the sidebar. Most programs are one flat
      list, which is the default here; Executive Readiness pulls its per-phase
      individual step out into a "Leadership Development" strand, because that
@@ -330,7 +334,7 @@
     defineHelp: defineHelp, help: help,
     PH: PH, MILESTONES: MILESTONES, PHASE_WRAPUPS: PHASE_WRAPUPS,
     emptyData: emptyData, coachGreeting: coachGreeting, page: page, hook: hook,
-    coachPresets: coachPresets, coachSystem: coachSystem,
+    coachPresets: coachPresets, coachSystem: coachSystem, coachName: coachName,
     stepStrands: stepStrands, seeds: seeds, moreItems: moreItems,
     hasTemplate: hasTemplate, templatePath: templatePath, templateKey: templateKey,
     DEFAULT_ID: DEFAULT_ID, DEFAULT_ROLE: DEFAULT_ROLE

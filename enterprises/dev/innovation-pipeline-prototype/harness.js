@@ -4729,7 +4729,7 @@ async function guideStage1(){
   let ph = $('coachPanel').innerHTML;
   ok(ph.indexOf('coach-preset') < 0 && typeof G.sendCoachPreset === 'undefined', 'GUIDE 1: no preset question buttons, and sendCoachPreset is gone');
   ok(ph.indexOf('coach-ai-notice') > 0 && ph.indexOf('coach-ai-notice') < ph.indexOf('coachMsgsEl'), 'GUIDE: the panel still opens with the AI notice (A.2.6)');
-  eq(JSON.stringify(G.coachMsgs[0]), JSON.stringify({role:'ai', welcome:true, text:'Welcome to the AI Innovation Pipeline. I\'m your AI Guide. Ask me how to complete the step you\'re on, what to do next, or for ideas drawn from Faisal Hoque\'s book TRANSCEND.'}), 'GUIDE copy 1: the welcome message, word for word, flagged welcome:true');
+  eq(JSON.stringify(G.coachMsgs[0]), JSON.stringify({role:'ai', welcome:true, text:'Welcome to the AI Innovation Pipeline. I’m Danni, your AI guide. Ask me how to complete any step, or for ideas drawn from our research and publications.'}), 'GUIDE copy 1: the welcome message, word for word, flagged welcome:true (Ask Danni directive, 28 Oct 2026)');
   eq(JSON.stringify(G.guideHistory()), '[]', 'GUIDE: the welcome message is never resent');
 
   /* step context */
@@ -4753,7 +4753,7 @@ async function guideStage1(){
   eq(JSON.stringify(r1.body.history), '[]', 'GUIDE: the first question carries no history');
   ok(G.coachBusy === true, 'GUIDE 9: busy while the answer is pending');
   ph = $('coachPanel').innerHTML;
-  has(ph, '<div class="coach-sender">AI Guide</div><div class="coach-msg ai coach-thinking"><div class="coach-body"><span class="coach-dots" aria-hidden="true"><i></i><i></i><i></i></span>Thinking…</div></div>', 'GUIDE 9: the panel shows Thinking… with the typing dots');
+  has(ph, '<div class="coach-sender">Danni</div><div class="coach-msg ai coach-thinking"><div class="coach-body"><span class="coach-dots" aria-hidden="true"><i></i><i></i><i></i></span>Thinking…</div></div>', 'GUIDE 9: the panel shows Thinking… with the typing dots');
   ok(/<textarea id="coachInput"[^>]* disabled/.test(ph) && /<button class="coach-send"[^>]* disabled>/.test(ph), 'GUIDE 9: the text box and send button are disabled');
   ask('a second question too soon');
   eq(sent.length, 1, 'GUIDE 9: sending again while waiting does nothing');

@@ -52,7 +52,7 @@ function setCoachVisible(on) {
   try { stopVoiceIfOff(); } catch (e) { }
   var fab = $('coachFab'), pulse = $('fabPulse'), panel = $('coachPanel');
   if (on) {
-    if (fab) fab.style.display = '';
+    if (fab) { fab.textContent = '✦ ' + coachTitle(); fab.style.display = ''; }
     if (pulse) pulse.style.display = coachOpen ? 'none' : '';
     if (panel) panel.style.display = '';
     return;
@@ -198,9 +198,14 @@ function coachScrollWatch(el) {
 }
 function coachToLatest() { var el = document.getElementById('coachMsgsEl'); if (el) { el.scrollTop = el.scrollHeight; coachScrollWatch(el); } }
 
+/* Directive_DEV_AllModules_AskDanni_28Oct2026: the four Enterprise programs present the guide as Danni
+   (Modules.coachName); a program without a name keeps "AI Guide". Button, panel title and reply name only. */
+function coachName() { try { return (window.Modules && Modules.coachName && Modules.coachName()) || null; } catch (e) { return null; } }
+function coachTitle() { var n = coachName(); return n ? 'Ask ' + n : 'AI Guide'; }
+
 var COACH_AVATAR = '<span class="coach-avatar" aria-hidden="true">✦</span>';
 function coachAiRow(body, extra, canCopy) {
-  return '<div class="coach-row ai' + (extra ? ' ' + extra : '') + '">' + COACH_AVATAR + '<div class="coach-col"><div class="coach-sender">AI Guide</div>'
+  return '<div class="coach-row ai' + (extra ? ' ' + extra : '') + '">' + COACH_AVATAR + '<div class="coach-col"><div class="coach-sender">' + esc(coachName() || 'AI Guide') + '</div>'
     + '<div class="coach-msg ai' + (extra ? ' ' + extra : '') + '"><div class="coach-body">' + body + '</div>'
     + (canCopy ? '<div class="coach-tools"><button class="coach-tool" onclick="coachCopy(this)">Copy</button></div>' : '')
     + '</div></div></div>';
@@ -218,7 +223,7 @@ function renderCoachPanel() {
   var me = (typeof getCurrentUser === 'function' && getCurrentUser()) || null;
   var started = coachMsgs.some(function (m) { return !m.welcome; });
 
-  var h = '<div class="coach-header"><div class="coach-id">' + COACH_AVATAR + '<div class="coach-id-text"><div class="coach-header-title">AI Guide</div><div class="coach-where">' + esc(guideWhere()) + '</div></div></div>';
+  var h = '<div class="coach-header"><div class="coach-id">' + COACH_AVATAR + '<div class="coach-id-text"><div class="coach-header-title">' + esc(coachTitle()) + '</div><div class="coach-where">' + esc(guideWhere()) + '</div></div></div>';
   h += '<div class="coach-actions">';
   if (started) h += '<button class="coach-icon-btn" onclick="newCoachConversation()" title="New conversation" aria-label="Start a new conversation"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg></button>';
   h += '<button class="coach-icon-btn coach-close" onclick="toggleCoach()" title="Close (Esc)" aria-label="Close the AI Guide">×</button>';
@@ -308,13 +313,13 @@ function sendCoach() {
   var ctx = 'User is working on: ' + (window.Modules && Modules.hook('coachContext')
     ? coachContext()
     : (currentStep ? 'Step ' + currentStep + ' (' + (currentPhase && currentPhase.name) + ')' : 'the pipeline overview'));
-  var sysPrompt = (window.Modules && Modules.coachSystem()) ||
-    'You are the AI Guide for Faisal Hoque\'s 90-Day AI Innovation Pipeline — a framework grounded in the OPEN and CARE frameworks and published in Fast Company, HBR, and MIT Sloan Management Review. You help leaders build structured AI innovation pipelines through five phases: Diagnose, Organize, Prepare, Ignite, Navigate. Be direct, insightful, and strategic. Maximum 150 words per response. No bullets unless absolutely essential.';
+  /* 28 Oct 2026 (AIRequestCleanup directive): the Pipeline's old paragraph is gone; a program sends a prompt only if it has its own */
+  var sysPrompt = (window.Modules && Modules.coachSystem()) || '';
   fetch(CLAUDE_API_URL, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: 'claude-sonnet-4-6', max_tokens: 300,
-      messages: [{ role: 'user', content: sysPrompt + '\n\n' + ctx + '\n\nUser question: ' + userText }]
+      messages: [{ role: 'user', content: (sysPrompt ? sysPrompt + '\n\n' : '') + ctx + '\n\nUser question: ' + userText }]
     })
   }).then(function (r) { return r.json(); }).then(function (j) {
     var text = ''; if (j.content) for (var i = 0; i < j.content.length; i++) if (j.content[i].text) text += j.content[i].text;
