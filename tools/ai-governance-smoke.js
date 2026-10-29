@@ -1103,7 +1103,7 @@ G.alert = () => { };
   const aiCalls = []; const realFetch = G.fetch;
   G.fetch = (u) => { if (String(u) === String(G.CLAUDE_API_URL)) aiCalls.push(String(u)); return realFetch ? realFetch.apply(null, arguments) : Promise.resolve({ ok: true, json: () => Promise.resolve({}) }); };
   const keepSettings = G.data.settings;
-  if (JSON.stringify(G.Modules.emptyData().settings) !== '{"aiGuide":false,"voice":false}') broken.push('AI: this program\'s emptyData() does not carry settings, both off');
+  if (JSON.stringify(G.Modules.emptyData().settings) !== '{"aiGuide":true,"voice":true}') broken.push('AI: this program\'s emptyData() does not carry settings, both on');
   if (!G.aiSwitchesApply()) broken.push('AI: the switches do not apply on a Responsible AI Governance page');
   delete G.data.settings;
   if (G.aiGuideOn() || G.voiceOn()) broken.push('AI: a workspace without settings does not count as both off');

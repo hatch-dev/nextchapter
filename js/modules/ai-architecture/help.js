@@ -111,7 +111,7 @@
       {
         shared: 'tools',
         extra: [
-          { ic: '✦ AI Guide', d: 'Bottom-right, once switched on. Answers questions about the step you are on, the five layers, and the sovereignty program. Off by default; an administrator switches it on under AI Features on the Org &amp; Team page.' },
+          { ic: '✦ AI Guide', d: 'Bottom-right, once switched on. Answers questions about the step you are on, the five layers, and the sovereignty program. On by default; an administrator can switch it off under AI Features on the Org &amp; Team page.' },
           { ic: '☷ Report Manager', d: 'More menu. Builds printed reports from any part of the program.' },
           { ic: '▾ Save as PDF', d: 'On every output. Choose the Summary or Full version, then print or save it as a formatted document.' }
         ]

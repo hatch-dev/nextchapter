@@ -34,8 +34,8 @@
   "members": [],
   "orgSetup": false,
   "settings": {
-   "aiGuide": false,
-   "voice": false
+   "aiGuide": true,
+   "voice": true
   },
   "reportDefs": []
  },
@@ -77,8 +77,8 @@
   "enterprise": {},
   "orgSetup": false,
   "settings": {
-   "aiGuide": false,
-   "voice": false
+   "aiGuide": true,
+   "voice": true
   }
  },
  "ai-governance": {
@@ -105,20 +105,20 @@
   "stepDue": {},
   "assigns": {},
   "reportDefs": [],
-  "startDate": "2026-10-21",
+  "startDate": "2026-10-29",
   "roster": null,
   "members": [],
   "enterprise": {},
   "orgSetup": false,
   "settings": {
-   "aiGuide": false,
-   "voice": false
+   "aiGuide": true,
+   "voice": true
   }
  },
  "ai-architecture": {
   "settings": {
-   "aiGuide": false,
-   "voice": false
+   "aiGuide": true,
+   "voice": true
   },
   "commitmentChecks": {},
   "computeResources": [],
@@ -168,7 +168,7 @@
   "completedSteps": {},
   "stepDoneAt": {},
   "stepDue": {},
-  "startDate": "2026-10-21",
+  "startDate": "2026-10-29",
   "completedSections": {},
   "notes": [],
   "assigns": {},

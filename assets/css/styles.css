@@ -12086,7 +12086,7 @@ a.lp-card:hover {
 .ai-fold .ai-fold-note:last-child{margin-bottom:4px}
 
 /* -- SAMPLE TAB (Directive 2 Oct 2026, Part 3; live, AI Innovation Pipeline): the red note above the Back button on every page, and the refused-tab line -- */
-.sample-note{color:#B3261E;font-family:var(--sans);font-style:normal;font-size:28px;font-weight:800;line-height:1.25;letter-spacing:0;text-align:center;text-transform:none;margin:0 0 20px}
+.sample-note{color:#B3261E;font-family:var(--serif);font-style:normal;font-size:30px;font-weight:600;line-height:1.25;letter-spacing:0;text-align:center;text-transform:none;margin:0 0 20px}   /* 29 Oct 2026: Cormorant Garamond (--serif), the face of the program's titles */
 /* Dark mode (the live default): #B3261E is 2.1:1 on the dark page; its dark-theme partner #F28B82 is 5.7:1 (WCAG AA). Light mode keeps #B3261E (5.6:1). */
 [data-theme="dark"] .sample-note{color:#F28B82}
 .sample-refused{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:40px 24px;text-align:center}

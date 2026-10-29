@@ -756,7 +756,8 @@ function renderAdminModal() {
     h += '<div class="u-ea28b89"><button class="btn-gold" onclick="closeModal()">Done</button></div></div></div>';
     mr.innerHTML = h; return;
   }
-  var orgs = UI.adminData || [];
+  /* Newest organization first (29 Oct 2026). created_at is "YYYY-MM-DD hh:mm:ss", so it sorts as text. */
+  var orgs = (UI.adminData || []).slice().sort(function (a, b) { return String(b.created_at || '').localeCompare(String(a.created_at || '')); });
   var totalUsers = 0; orgs.forEach(function (o) { totalUsers += (o.users || []).length; });
   var ed = UI.adminUserEdit || null;
   var acc = UI.adminAccess || null;
@@ -771,6 +772,12 @@ function renderAdminModal() {
     + ' \xb7 ' + leaderCount + ' leader' + (leaderCount === 1 ? '' : 's')
     + ' \xb7 ' + totalUsers + ' user' + (totalUsers === 1 ? '' : 's') + '.</div>';
   if (UI.adminError) h += '<div class="entry-err" style="margin:0 0 12px;color:#c0392b">' + esc(UI.adminError) + ' <button class="org-btn-cancel admin-mini-btn" onclick="fetchAdminData()">Retry</button></div>';
+  /* New Organization and Done at the top (29 Oct 2026): at the bottom they sat under every organization's member list. */
+  h += '<div style="display:flex;justify-content:center;align-items:center;gap:12px;margin:0 0 14px">';
+  if (!(UI.adminNewOrg && UI.adminNewOrg.open)) h += '<button class="admin-adduser" onclick="adminNewOrgOpen()">+ New Organization</button>';
+  h += '<button class="btn-gold" onclick="closeModal()">Done</button></div>';
+  // Create a brand-new organization + its first administrator.
+  if (UI.adminNewOrg && UI.adminNewOrg.open) { h += adminNewOrgFormHtml(); }
   if (!orgs.length && !UI.adminError) h += '<div class="u-e6b5a04" style="opacity:.7">No organizations yet.</div>';
   h += '<div class="admin-mgr-list">';
   orgs.forEach(function (o) {
@@ -802,6 +809,7 @@ function renderAdminModal() {
     h += '<button class="org-btn-cancel admin-mini-btn" onclick="adminResetOrg(\'' + o.id + '\')">Reset data</button>';
     if (!cur) h += '<button class="org-row-btn org-row-del" title="Delete organization" onclick="adminDeleteOrg(\'' + o.id + '\')">\xd7</button>';
     h += '</div></div>';
+    h += adminAiFeaturesRowHtml(o);
     // The organization's plan, when it is the one being edited.
     if (acc && acc.orgId === o.id) h += adminAccessEditorHtml(o);
     // Users
@@ -832,12 +840,43 @@ function renderAdminModal() {
     h += '</div>';
   });
   h += '</div>';
-  // Create a brand-new organization + its first administrator.
-  if (UI.adminNewOrg && UI.adminNewOrg.open) { h += adminNewOrgFormHtml(); }
-  else { h += '<div style="text-align:center;margin-top:10px"><button class="admin-adduser" onclick="adminNewOrgOpen()">+ New Organization</button></div>'; }
-  h += '<div class="u-ea28b89"><button class="btn-gold" onclick="closeModal()">Done</button></div>';
   h += '</div></div>';
   mr.innerHTML = h;
+  Array.prototype.forEach.call(mr.querySelectorAll('input[data-ai-mixed]'), function (el) { el.indeterminate = true; });
+}
+
+/* ── Admin: the AI Guide and Voice, per organization (29 Oct 2026) ──────────────
+   One pair of switches on each organization's card, for every program it has opened that carries them
+   (OrganizationController::aiFeatures). Programs that disagree show as Mixed until a switch is set. The
+   organization's own administrators still set them per program on its Organization & Team page. */
+function adminAiFeaturesRowHtml(o) {
+  var ai = o.ai; if (!ai) return '';
+  var row = 'display:flex;flex-wrap:wrap;align-items:center;gap:6px 18px;padding:8px 16px 10px;font-family:var(--sans);font-style:normal;font-size:13px;color:var(--paper)';
+  var cap = '<span style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--stone)">AI features</span>';
+  if (!ai.programs || !ai.programs.length) {
+    if (o.account_type === 'leader') return '';
+    return '<div class="admin-org-ai" style="' + row + '">' + cap + '<span style="color:var(--stone)">On when its first program opens.</span></div>';
+  }
+  function sw(key, label) {
+    var v = ai[key];
+    return '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:600">'
+      + '<input type="checkbox" role="switch" style="width:16px;height:16px;margin:0;accent-color:var(--gold);cursor:pointer"'
+      + (v === true ? ' checked' : '') + (v === null ? ' data-ai-mixed="1"' : '')
+      + ' onchange="adminSetAiFeature(\'' + o.id + '\',\'' + key + '\',this.checked)"/> ' + label
+      + (v === null ? ' <span style="font-weight:400;color:var(--stone)">(mixed)</span>' : '') + '</label>';
+  }
+  return '<div class="admin-org-ai" style="' + row + '">' + cap + sw('aiGuide', 'AI Guide') + sw('voice', 'Voice') + '</div>';
+}
+function adminSetAiFeature(orgPublicId, key, on) {
+  if (!isAppAdmin || (key !== 'aiGuide' && key !== 'voice')) return;
+  var org = adminOrgById(orgPublicId);
+  if (org && org.ai) { org.ai[key] = !!on; renderAdminModal(); }
+  postJSON(API_BASE + '/organizations/ai-features', { id: orgPublicId, key: key, on: !!on },   /* the app administrator's session authorises it */
+    function () {
+      /* The organization being viewed: read its new settings now rather than at the next poll. */
+      try { if (orgServerId() === orgPublicId && Store.checkRemote) Store.checkRemote(); } catch (e) { }
+    },
+    function (err) { alert((err && err.message) || 'Could not change the AI features for this organization.'); fetchAdminData(); });
 }
 
 // First-run gate: force org/team setup once if it has never been completed

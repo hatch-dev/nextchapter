@@ -205,10 +205,11 @@ class WorkspaceController extends Controller
             ], 409);
         }
 
-        $doc    = $this->reencode($privacy->forWrite(
+        $written = $privacy->forWrite(
             json_decode($doc),
             $stored !== null ? json_decode((string) $stored['doc']) : null
-        )) ?? $doc;
+        );
+        $doc    = $this->reencode($stored === null ? self::withAiDefaults($written, $module) : $written) ?? $doc;
 
         $newRev = $workspace->save((int) $org['id'], $doc, $baseRev, $actor['public_id'], $schemaVersion, $module);
 
@@ -324,8 +325,9 @@ class WorkspaceController extends Controller
             $actor['public_id'],
             $schemaVersion,
             $module,
-            static function (object $sections, ?object $stored) use ($privacy): object {
-                return $privacy->forPatch($sections, $stored);
+            static function (object $sections, ?object $stored) use ($privacy, $module): object {
+                $out = $privacy->forPatch($sections, $stored);
+                return $stored === null ? self::withAiDefaults($out, $module) : $out;
             }
         );
 
@@ -624,6 +626,22 @@ class WorkspaceController extends Controller
     {
         $json = json_encode($doc, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         return $json === false ? null : $json;
+    }
+
+    /** The programs whose workspace carries the AI Guide and Voice switches (js/features/coach.js, aiSwitchesApply). */
+    private const AI_SWITCH_MODULES = ['pipeline', 'exec-readiness', 'ai-governance', 'ai-architecture'];
+
+    /**
+     * A program's FIRST document starts with the AI Guide and Voice on (29 Oct 2026), whatever the first write sent.
+     * The browser's first save is often a patch of only the sections that differ from its empty document — and since
+     * the empty document has both on, `settings` was left out, and a document without it reads as both off.
+     */
+    private static function withAiDefaults(object $doc, string $module): object
+    {
+        if (in_array($module, self::AI_SWITCH_MODULES, true) && !(isset($doc->settings) && is_object($doc->settings))) {
+            $doc->settings = (object) ['aiGuide' => true, 'voice' => true];
+        }
+        return $doc;
     }
 
     /** Resolve the org by public id or 404. */

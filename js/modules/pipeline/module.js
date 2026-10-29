@@ -39,7 +39,7 @@
         ownership: {}, incentives: {}, rhythm: {}, portfolio: {}, capAlloc: {}, capital: {}, experiments: {},
         expSelected: [], tracking: {}, review: {}, governance: {}, stress: {}, launched: [], opsData: {},
         budgetPlans: {}, notes: [], raci: {}, purpose: {}, knowledge: {}, culture: {}, decisions: {}, audit: [],
-        assigns: {}, roster: null, enterprise: {}, members: [], orgSetup: false, settings: { aiGuide: false, voice: false },
+        assigns: {}, roster: null, enterprise: {}, members: [], orgSetup: false, settings: { aiGuide: true, voice: true },
         reportDefs: [] /* 17 Sep 2026: the Report Manager's saved reports */
       };
     },

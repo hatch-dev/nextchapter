@@ -29,6 +29,7 @@ class OrganizationController extends Controller
            every member and every assignment is built from, so an N+1 here is
            an N+1 on the one screen that always asks for everything. */
         $orgGrants = $access->forOrgs(array_column($orgs, 'id'));
+        $aiByOrg   = $this->isAppAdmin() ? $this->aiFeaturesByOrg() : [];
 
         $out = [];
         foreach ($orgs as $o) {
@@ -74,8 +75,79 @@ class OrganizationController extends Controller
                 'created_at'        => $o['created_at'],
                 'users'             => $users,
             ];
+            if ($this->isAppAdmin()) {
+                $out[count($out) - 1]['ai'] = $aiByOrg[(int) $o['id']] ?? ['aiGuide' => null, 'voice' => null, 'programs' => []];
+            }
         }
         Response::success(['organizations' => $out]);
+    }
+
+    /**
+     * The AI Guide and Voice switches, per organization (29 Oct 2026). The admin console sets them for an
+     * organization as a whole: every program of RESET_MODULES it has a workspace document for. A program it
+     * has not opened yet has nothing to change; its document starts with both on (emptyData()).
+     * Per switch: true / false when its programs agree, null when they differ ("Mixed") or there are none.
+     * A document without settings counts as both off, as in the browser (js/features/coach.js, aiGuideOn).
+     */
+    private function aiFeaturesByOrg(): array
+    {
+        $in   = implode(',', array_fill(0, count(self::RESET_MODULES), '?'));
+        $stmt = Database::connection()->prepare('SELECT organization_id, module, doc FROM workspaces WHERE module IN (' . $in . ')');
+        $stmt->execute(self::RESET_MODULES);
+        $seen = [];
+        foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $r) {
+            $doc = json_decode((string) $r['doc']);
+            $s   = (is_object($doc) && isset($doc->settings) && is_object($doc->settings)) ? $doc->settings : null;
+            $seen[(int) $r['organization_id']][$r['module']] = [
+                'aiGuide' => $s !== null && !empty($s->aiGuide),
+                'voice'   => $s !== null && !empty($s->voice),
+            ];
+        }
+        $out = [];
+        foreach ($seen as $orgId => $byModule) {
+            $agreed = static function (string $key) use ($byModule): ?bool {
+                $values = array_unique(array_column($byModule, $key));
+                return count($values) === 1 ? (bool) reset($values) : null;
+            };
+            $out[$orgId] = ['aiGuide' => $agreed('aiGuide'), 'voice' => $agreed('voice'), 'programs' => array_keys($byModule)];
+        }
+        return $out;
+    }
+
+    /** POST /organizations/ai-features {id, key: 'aiGuide'|'voice', on} — the admin console only. */
+    public function aiFeatures(): void
+    {
+        $this->requireAppAdmin();
+        $input = $this->input();
+        $key   = (string) ($input['key'] ?? '');
+        if ($key !== 'aiGuide' && $key !== 'voice') {
+            Response::error('Unknown setting.', 422, ['reason' => 'bad-key']);
+        }
+        $on  = !empty($input['on']);
+        $org = (new Organization())->findByPublicId(trim((string) ($input['id'] ?? '')));
+        if ($org === null) {
+            Response::error('Organization not found.', 404, ['reason' => 'no-org']);
+        }
+        $orgId     = (int) $org['id'];
+        $workspace = new Workspace();
+        $changed   = [];
+        foreach (self::RESET_MODULES as $module) {
+            $stored = $workspace->findByOrg($orgId, $module);
+            if ($stored === null) continue;
+            /* Built from the document as it is at the moment of writing (patch re-reads on contention), so the
+               other switch is never put back to an older value. A new revision: open browsers merge it on their next poll. */
+            $set = static function (object $sections, ?object $doc) use ($key, $on): object {
+                $s = ($doc !== null && isset($doc->settings) && is_object($doc->settings)) ? clone $doc->settings : new \stdClass();
+                $s->$key = $on;
+                return (object) ['settings' => $s];
+            };
+            $result = $workspace->patch($orgId, new \stdClass(), [], null, (int) $stored['schema_version'], $module, $set);
+            if ($result === null) {
+                Response::error('Someone saved at the same moment. Try again.', 409, ['reason' => 'busy', 'changed' => $changed]);
+            }
+            $changed[] = $module;
+        }
+        Response::success(['programs' => $changed]);
     }
 
     public function delete(): void
@@ -169,7 +241,7 @@ class OrganizationController extends Controller
             $fresh->roster     = $keepRoster ? $keepRoster : null;
             $fresh->settings   = (is_object($was) && isset($was->settings) && is_object($was->settings))
                 ? $was->settings
-                : (object) ['aiGuide' => false, 'voice' => false];
+                : (object) ['aiGuide' => true, 'voice' => true];
             $fresh->enterprise = (object) ['name' => (is_object($was) && isset($was->enterprise->name) && $was->enterprise->name !== '')
                 ? (string) $was->enterprise->name
                 : (string) $org['name']];
