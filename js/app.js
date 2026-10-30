@@ -6541,7 +6541,7 @@ function scrubStoredPasswords() {
 /* -- SAMPLE ORGANIZATION (Part 3): opened from Demo in a new tab; a private copy of the built-in sample in
    each person's browser (key pipeline-org-data::org_sample_local), never in the organization list, never sent
    to the server (see SAMPLE_TAB_ADDR at the top of this file). The sample people have no passwords. -- */
-var SAMPLE_NOTE_TEXT = 'Sample organization: your changes stay in this browser only';
+var SAMPLE_NOTE_TITLE = 'DEMO', SAMPLE_NOTE_TEXT = 'Sample organization. Your changes stay in this browser only.';
 /* AI-Ready Architecture (21 Oct 2026): its build has the same Demo tab and Notes-in-More (Part 3). */
 function sampleAppliesHere() { try { return !!(window.Modules && (Modules.isActive('pipeline') || Modules.isActive('exec-readiness') || Modules.isActive('ai-governance') || Modules.isActive('ai-architecture'))); } catch (e) { return false; } }
 /* Part 4 (4.2.3) moved Reset all data out of the More menu into the admin console's Reset data — on the Pipeline (6 Oct 2026)
@@ -6635,7 +6635,8 @@ function ensureSampleNote() {
   var n = document.getElementById('sampleNote');
   if (n && n.parentNode === host && host.firstElementChild === n) return;
   if (n && n.parentNode) n.parentNode.removeChild(n);
-  n = document.createElement('div'); n.id = 'sampleNote'; n.className = 'sample-note'; n.setAttribute('role', 'note'); n.textContent = SAMPLE_NOTE_TEXT;
+  n = document.createElement('div'); n.id = 'sampleNote'; n.className = 'sample-note'; n.setAttribute('role', 'note');
+  n.innerHTML = '<div class="sample-note-title">' + SAMPLE_NOTE_TITLE + '</div><div class="sample-note-sub">' + SAMPLE_NOTE_TEXT + '</div>';   /* 30 Oct 2026: a big DEMO over a small line, left-aligned */
   host.insertBefore(n, host.firstChild);
   /* 3.3.4: the note never sits under the top bar. A page that pads its own top by a fixed amount (Governance's output
      pages: 110px) sits under a top bar that has wrapped to a second row, so the note steps down below the bar (7 Oct 2026) */

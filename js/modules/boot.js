@@ -97,9 +97,11 @@
       : { title: suite.title || suite.name, name: suite.name, logo: suite.logo || {} };
   }
   var ident = identityFor(BOOT.kind);
+  /* 30 Oct 2026: the Demo tab's window reads DEMO - before the program's name */
+  function shownTitle(t) { return /[?&]sample=1(&|$)/.test(location.search) ? 'DEMO - ' + t : t; }
 
   // Runs on DOMContentLoaded for the elements, immediately for the title.
-  try { if (ident.title) document.title = ident.title; } catch (e) { }
+  try { if (ident.title) document.title = shownTitle(ident.title); } catch (e) { }
 
   /* `kind` overrides what the URL said at load. render() passes 'module' when
      it is actually painting a program, so the wordmark can never disagree with
@@ -107,7 +109,7 @@
   function applyIdentity(kind) {
     if (kind) {
       ident = identityFor(kind);
-      try { if (ident.title) document.title = ident.title; } catch (e) { }
+      try { if (ident.title) document.title = shownTitle(ident.title); } catch (e) { }
     }
     var logo = ident.logo || {};
     var el = document.querySelector('.nav-logo');
