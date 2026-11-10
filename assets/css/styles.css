@@ -9279,6 +9279,385 @@ input.entry-text-input {
   margin: 6px 0
 }
 
+/* ── Admin console page (10 Nov 2026) ─────────────────────────────────────────
+   js/features/org-admin.js (renderAdminModal). A full-screen layer of its own,
+   under .modal-bg (200) so the password dialogs open over it, over the app and
+   the Ask Danni button. */
+html.adm-open, html.adm-open body { overflow: hidden }
+html.adm-open .admin-view-bar { display: none }   /* the page has its own way back */
+.adm-root {
+  position: fixed;
+  inset: 0;
+  z-index: 190;
+  overflow-y: auto;
+  background: var(--ink);
+  -webkit-overflow-scrolling: touch
+}
+.adm-page {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 40px 24px 64px;
+  font-family: var(--sans)
+}
+.adm-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--rule);
+  margin-bottom: 20px
+}
+.adm-title {
+  font-family: var(--serif);
+  font-weight: 300;
+  font-size: clamp(30px, 4vw, 42px);
+  line-height: 1.1;
+  margin: 6px 0 0;
+  color: var(--paper)
+}
+.adm-title em { color: var(--gold-text) }
+.adm-head-acts {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px
+}
+.adm-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 20px
+}
+.adm-stat {
+  border: 1px solid var(--rule);
+  background: rgba(var(--fg-rgb), .03);
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px
+}
+.adm-stat b {
+  font-family: var(--serif);
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--paper)
+}
+.adm-stat span {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--stone)
+}
+.adm-err { margin: 0 0 16px; color: #c0392b }
+
+/* Toolbar: search, filters, sort, New organization */
+.adm-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px
+}
+.adm-search {
+  position: relative;
+  flex: 1 1 280px;
+  min-width: 0
+}
+.adm-search .field-input { padding: 10px 14px 10px 36px; font-size: 14px }
+.adm-search-ic {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--stone);
+  font-size: 17px;
+  pointer-events: none
+}
+.adm-sel.field-sel {
+  width: auto;
+  flex: 0 0 auto;
+  padding: 10px 12px;
+  font-size: 14px
+}
+.adm-new { flex: 0 0 auto; padding: 10px 18px; white-space: nowrap }
+.adm-toolbar-sm { margin: 0 0 10px }
+
+/* Organizations table */
+.adm-table {
+  border: 1px solid var(--rule);
+  background: rgba(var(--fg-rgb), .02)
+}
+.adm-tr {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 110px 90px 70px 120px 170px;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--rule);
+  font-size: 14px;
+  color: var(--paper)
+}
+.adm-tr:first-child { border-top: 0 }
+.adm-th {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--stone);
+  background: rgba(var(--fg-rgb), .03);
+  padding-top: 9px;
+  padding-bottom: 9px
+}
+.adm-tr:not(.adm-th):hover { background: rgba(var(--fg-rgb), .03) }
+.adm-cur { box-shadow: inset 3px 0 0 var(--gold) }
+.adm-num { text-align: right; font-variant-numeric: tabular-nums }
+.adm-td-org { min-width: 0 }
+.adm-orgbtn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  max-width: 100%;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer
+}
+.adm-orgbtn:hover .adm-orgname { color: var(--gold-text) }
+.adm-badge.entry-org-badge { width: 34px; height: 34px; font-size: 15px }
+.adm-orgtxt { display: flex; flex-direction: column; min-width: 0 }
+.adm-orgname {
+  font-weight: 600;
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap
+}
+.adm-code {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--stone);
+  letter-spacing: .03em
+}
+.adm-hits { margin: 4px 0 0 46px; font-size: 12px; color: var(--stone) }
+.adm-acts {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px
+}
+.adm-pill {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border: 1px solid rgba(var(--fg-rgb), .18);
+  color: var(--stone);
+  vertical-align: middle
+}
+.adm-pill-leader { color: var(--gold-text); border-color: rgba(var(--rule-rgb), .5) }
+.adm-pill-admin { color: var(--gold-text); border-color: rgba(var(--rule-rgb), .5); margin-left: 4px }
+
+/* Pager */
+.adm-pager {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  padding: 12px 2px 0;
+  font-size: 13px;
+  color: var(--stone)
+}
+.adm-pager-info { margin-right: auto }
+.adm-pager-per { display: flex; align-items: center; gap: 8px }
+.adm-pager-per .adm-sel.field-sel { padding: 6px 10px; font-size: 13px }
+.adm-pager-nav { display: flex; align-items: center; gap: 4px }
+.adm-pg {
+  min-width: 34px;
+  height: 34px;
+  padding: 0 8px;
+  background: none;
+  border: 1px solid var(--rule);
+  color: var(--paper);
+  font-family: var(--mono);
+  font-size: 13px;
+  cursor: pointer
+}
+.adm-pg:hover:not(:disabled) { border-color: var(--gold-text); color: var(--gold-text) }
+.adm-pg.on { background: var(--gold); border-color: var(--gold); color: var(--on-accent) }
+.adm-pg:disabled { opacity: .35; cursor: default }
+.adm-pg-gap { padding: 0 4px }
+.adm-empty {
+  border: 1px dashed var(--rule);
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--stone);
+  font-size: 14px
+}
+.adm-empty-sm { padding: 16px }
+.adm-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--gold-text);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer
+}
+
+/* One organization */
+.adm-back {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0 0 14px;
+  color: var(--gold-text);
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: .04em;
+  cursor: pointer
+}
+.adm-card {
+  border: 1px solid var(--rule);
+  background: rgba(var(--fg-rgb), .03);
+  padding: 18px 20px;
+  margin-bottom: 16px;
+  min-width: 0
+}
+.adm-orghead { display: flex; align-items: center; gap: 16px; flex-wrap: wrap }
+.adm-badge-lg.entry-org-badge { width: 52px; height: 52px; font-size: 22px }
+.adm-orghead-txt { flex: 1; min-width: 220px }
+.adm-h2 {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 28px;
+  line-height: 1.15;
+  margin: 0 0 6px;
+  color: var(--paper)
+}
+.adm-btn { padding: 8px 16px }
+.adm-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px }
+.adm-grid .adm-card { margin-bottom: 16px }
+.adm-card-h {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px
+}
+.adm-h3 {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--stone);
+  margin: 0
+}
+.adm-count {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 7px;
+  border-radius: 10px;
+  background: rgba(var(--fg-rgb), .08);
+  color: var(--paper);
+  letter-spacing: 0
+}
+.adm-chips { display: flex; flex-wrap: wrap; gap: 8px }
+.adm-chip {
+  font-size: 13px;
+  padding: 5px 10px;
+  border: 1px solid var(--rule);
+  background: rgba(var(--fg-rgb), .04);
+  color: var(--paper)
+}
+.adm-ai.admin-org-ai { padding: 0 !important }
+.adm-ai.admin-org-ai > span:first-child { display: none }   /* the card heading already says AI features */
+.adm-adduser.admin-adduser { margin-top: 0 }
+/* The console's two forms (10 Nov 2026): New organization in two columns (the name across both), a member in three */
+.adm-form.org-card { padding: 20px 22px; margin: 0 0 16px; background: rgba(var(--fg-rgb), .04) }
+.adm-form .org-card-head { margin-bottom: 6px }
+.adm-form-lead { margin: 0 0 16px; font-size: 13px; line-height: 1.5; color: var(--stone); max-width: 640px }
+.adm-form .org-edit-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 20px; align-items: start }
+.adm-form-3 .org-edit-grid { grid-template-columns: repeat(3, minmax(0, 1fr)) }
+.adm-newform .org-edit-grid > div:first-child { grid-column: 1 / -1 }
+.adm-form .field-input { padding: 10px 14px; font-size: 14px }
+.adm-form .pw-rule, .adm-form .pw-note { font-size: 12px; line-height: 1.45; margin-top: 6px }
+.adm-form .org-edit-actions { margin-top: 18px; padding-top: 16px; border-top: 1px solid rgba(var(--fg-rgb), .08); display: flex; gap: 10px; flex-wrap: wrap }
+.adm-mlist > .adm-form { margin: 8px 0 }
+.adm-form .admin-tick { align-self: start; margin-top: 34px }   /* level with the password box beside it, not its hint */
+.adm-mlist { display: flex; flex-direction: column }
+.adm-mrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid rgba(var(--fg-rgb), .07)
+}
+.adm-mlist > .adm-mrow:first-child { border-top: 0 }
+.adm-minfo { flex: 1; min-width: 0 }
+.adm-mname { font-weight: 600; font-size: 14px; color: var(--paper) }
+.adm-msub {
+  font-size: 13px;
+  color: var(--stone);
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis
+}
+.adm-msub code { font-size: 12px }
+.adm-maccess { white-space: nowrap }
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap
+}
+
+@media (max-width: 860px) {
+  .adm-page { padding: 24px 16px 48px }
+  .adm-grid { grid-template-columns: minmax(0, 1fr) }
+  .adm-th { display: none }
+  .adm-tr {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px 12px;
+    padding: 14px 16px
+  }
+  .adm-td-org, .adm-acts { grid-column: 1 / -1 }
+  .adm-acts { justify-content: flex-start }
+  .adm-num { text-align: left }
+  .adm-tr > [data-label]::before {
+    content: attr(data-label);
+    display: block;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--stone)
+  }
+  .adm-sel.field-sel, .adm-new { flex: 1 1 auto }
+  .adm-form-3 .org-edit-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+}
+@media (max-width: 520px) {
+  .adm-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px }
+  .adm-stat { padding: 10px 12px }
+  .adm-stat b { font-size: 24px }
+  .adm-stat span { font-size: 10px; letter-spacing: .04em; overflow-wrap: anywhere }
+  .adm-pager-info { width: 100% }
+  .adm-form .org-edit-grid, .adm-form-3 .org-edit-grid { grid-template-columns: minmax(0, 1fr) }
+}
+
 /* Assignment bar — sits below step header */
 .assign-bar {
   display: flex;

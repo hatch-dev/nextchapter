@@ -28,10 +28,9 @@
    values replace what is below — which is exactly what happened to
    ai-governance's chosen crimson on 2026-09-01.
 
-   Two teals now sit close together: ai-governance #0E7462, taken from
-   its build, and ai-culture #12736A, still a chosen placeholder. When
-   AI-Ready Culture's build lands its own values replace that one; until
-   then the pair is only visible side by side on the launchpad grid.
+   AI-Ready Culture's build landed on 2026-11-06 and its garnet #A13848
+   replaced the chosen teal placeholder, which had sat close to
+   ai-governance's #0E7462.
 
    Read a reference's values with getComputedStyle, never by grepping:
    Exec-Readiness-styles.css contains two identity revisions at equal
@@ -635,20 +634,27 @@
   color: var(--head-blue);
 }
 
-/* V · AI-Ready Culture — teal. Working with and for humans. */
+/* V · AI-Ready Culture — garnet. Working with and for humans.
+   Taken from its build (6 Nov 2026), replacing the chosen teal placeholder:
+   Culture-styles.css, "CULTURE VISUAL IDENTITY (July 14, garnet; grounds
+   conformed 25 Sep 2026)" — one identity, a single --gold. --accent-strong is
+   the build's --gold-text (#8E2F3F light, #EC96A5 dark); the build records its
+   own contrast checks: button text 5.7:1, accent as text 6.9:1 light / 6.3:1
+   dark. No ground shift: the build's grounds follow Executive Readiness, i.e.
+   the suite's. */
 [data-app="ai-culture"] {
-  --accent: #12736A;
-  --accent-rgb: 18, 115, 106;
-  --accent-light: #2A9187;
-  --accent-strong: #0E5F58;
-  --accent-soft: #5CC4B7;
-  --accent-pale: #D6F0EC;
+  --accent: #A13848;
+  --accent-rgb: 161, 56, 72;
+  --accent-light: #C25A6A;
+  --accent-strong: #8E2F3F;
+  --accent-soft: #EC96A5;
+  --accent-pale: #F6E3E7;
   --on-accent: #FFFFFF;
 }
 
 @media screen {
   [data-theme="dark"][data-app="ai-culture"] {
-    --accent-light: #3FAA9E;
+    --accent-soft: #EC96A5;
   }
 }
 

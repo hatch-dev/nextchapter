@@ -22,7 +22,7 @@ use Models\Organization;
  *
  * Settings (.env; a real environment variable wins): PINECONE_API_KEY (required), PINECONE_ASSISTANT_HOST,
  * PINECONE_ASSISTANT_NAME, PINECONE_ASSISTANT_NAME_EXEC_READINESS, PINECONE_ASSISTANT_NAME_AI_GOVERNANCE,
- * PINECONE_ASSISTANT_NAME_ARCHITECTURE, PINECONE_MODEL,
+ * PINECONE_ASSISTANT_NAME_ARCHITECTURE, PINECONE_ASSISTANT_NAME_CULTURE, PINECONE_MODEL,
  * PINECONE_API_VERSION,
  * GUIDE_MAX_QUESTION_CHARS, GUIDE_MAX_CONTEXT_CHARS, GUIDE_MAX_HISTORY_MESSAGES, GUIDE_MAX_HISTORY_MESSAGE_CHARS,
  * GUIDE_TIMEOUT_MS. The second argument of each lookup below is the brief's value, used only when a line is missing.
@@ -43,6 +43,7 @@ class GuideController extends Controller
         'exec-readiness' => ['PINECONE_ASSISTANT_NAME_EXEC_READINESS', 'nextchapter-executive-readiness'],
         'ai-governance'  => ['PINECONE_ASSISTANT_NAME_AI_GOVERNANCE', 'nextchapter-responsible-ai-governance'],   /* 16 Oct 2026 */
         'ai-architecture' => ['PINECONE_ASSISTANT_NAME_ARCHITECTURE', 'architecture'],   /* 21 Oct 2026: AI-Ready Architecture (assistant created 21 Oct 07:07 UTC, 6 files) */
+        'ai-culture'     => ['PINECONE_ASSISTANT_NAME_CULTURE', 'culture'],   /* 10 Nov 2026: AI-Ready Culture, the same Ask Danni as the other four */
     ];
 
     public function ask(): void

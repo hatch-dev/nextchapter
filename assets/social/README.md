@@ -16,7 +16,7 @@ Keep text and logos away from the edges; some platforms crop to a square.
 | `innovation-pipeline.jpg`           | AI Innovation Pipeline                    |
 | `responsible-ai-governance.jpg`     | Responsible AI Governance                 |
 | `ai-ready-architecture.jpg`         | AI-Ready Architecture                     |
-| `ai-ready-culture.jpg`              | AI-Ready Culture                          |
+| `culture.jpg`                       | AI-Ready Culture                          |
 | `workforce-readiness.jpg`           | Workforce Readiness                       |
 | `judgment-critical-thinking.jpg`    | Judgment                                  |
 | `friction-map.jpg`                  | The Friction Map                          |

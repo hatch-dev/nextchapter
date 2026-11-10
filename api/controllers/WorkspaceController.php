@@ -629,7 +629,7 @@ class WorkspaceController extends Controller
     }
 
     /** The programs whose workspace carries the AI Guide and Voice switches (js/features/coach.js, aiSwitchesApply). */
-    private const AI_SWITCH_MODULES = ['pipeline', 'exec-readiness', 'ai-governance', 'ai-architecture'];
+    private const AI_SWITCH_MODULES = ['pipeline', 'exec-readiness', 'ai-governance', 'ai-architecture', 'ai-culture'];   /* AI-Ready Culture: 10 Nov 2026 */
 
     /**
      * A program's FIRST document starts with the AI Guide and Voice on (29 Oct 2026), whatever the first write sent.

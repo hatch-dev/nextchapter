@@ -193,8 +193,8 @@
         },
         {
           "id": "ai-culture",
-          "slug": "ai-ready-culture",
-          "status": "planned",
+          "slug": "culture",
+          "status": "live",
           "name": "AI-Ready Culture",
           "tag": "Working with and for humans",
           "sub": "The habits, norms and trust that decide whether any of it lands.",
@@ -205,19 +205,26 @@
             "side": "AI-Ready",
             "sideAccent": "Culture"
           },
-          "title": "AI-Ready Culture — 90-Day Program",
+          "title": "90-Day AI-Ready Culture — NextChapter",
           "tabs": {
             "home": "Home",
             "learn": "Learn",
-            "pipeline": "Program",
-            "phase5": "Sustain",
+            "pipeline": "Framework",
+            "phase5": "Culture Dashboard",
             "insights": "Insights"
           },
           "scripts": [
-            "js/modules/_placeholder/module.js"
+            "js/modules/ai-culture/program.js",
+            "js/modules/ai-culture/module.js",
+            "js/modules/ai-culture/help.js"
           ],
-          "styles": [],
-          "templates": []
+          "styles": [
+            "assets/css/modules/ai-culture.css"
+          ],
+          "templates": [
+            "home",
+            "learn"
+          ]
         },
         {
           "id": "workforce-readiness",

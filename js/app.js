@@ -25,8 +25,8 @@ var data = emptyData();
    browser and the tab makes no request to any server after it starts. Decided here, before the Store below
    exists, so the Store runs on this browser's storage alone, and every request to the API or the chat relay is
    refused inside the browser (the app's own files still load: "the app itself still comes from the server"). -- */
-/* + AI-Ready Architecture (21 Oct 2026): a ?sample=1 address is its Demo tab too. */
-var SAMPLE_TAB_ADDR = (function () { try { return /[?&]sample=1(&|$)/.test(location.search) && !!(window.Modules && (Modules.isActive('pipeline') || Modules.isActive('exec-readiness') || Modules.isActive('ai-governance') || Modules.isActive('ai-architecture'))); } catch (e) { return false; } })();
+/* + AI-Ready Architecture (21 Oct 2026): a ?sample=1 address is its Demo tab too. + AI-Ready Culture (10 Nov 2026), whose build has the same Demo tab. */
+var SAMPLE_TAB_ADDR = (function () { try { return /[?&]sample=1(&|$)/.test(location.search) && !!(window.Modules && (Modules.isActive('pipeline') || Modules.isActive('exec-readiness') || Modules.isActive('ai-governance') || Modules.isActive('ai-architecture') || Modules.isActive('ai-culture'))); } catch (e) { return false; } })();
 var SAMPLE_LOCAL_ID = 'org_sample_local', SAMPLE_MODE = false, SAMPLE_REFUSED = false;
 if (SAMPLE_TAB_ADDR) (function () {
   var isServer = function (u) { u = String(u || ''); return /(^|\/)api\//.test(u) || /^wss?:/i.test(u); };
@@ -2805,8 +2805,8 @@ function createOrg(name, firstUser, serverIds, accountTypeKey, modules) {
    reverses applyLoginTheme's August ruling that a sign-in keeps the reader's Light Mode: the directive's
    "preferences included" is the later ruling. UI.entry is kept: it is the sign-in screen doing the switching,
    and the sign-in path reads it straight after switchToOrg. -- */
-/* + AI-Ready Architecture (21 Oct 2026): its build seals the session the same way (UI_PRISTINE, 1 Oct 2026). */
-function sealApplies() { try { return !!(window.Modules && (Modules.isActive('pipeline') || Modules.isActive('exec-readiness') || Modules.isActive('ai-governance') || Modules.isActive('ai-architecture'))); } catch (e) { return false; } }
+/* + AI-Ready Architecture (21 Oct 2026): its build seals the session the same way (UI_PRISTINE, 1 Oct 2026). + AI-Ready Culture (10 Nov 2026): so does its build (Spec §24). */
+function sealApplies() { try { return !!(window.Modules && (Modules.isActive('pipeline') || Modules.isActive('exec-readiness') || Modules.isActive('ai-governance') || Modules.isActive('ai-architecture') || Modules.isActive('ai-culture'))); } catch (e) { return false; } }
 function sealSession() {
   if (!sealApplies()) return;
   try { if (coachOpen) toggleCoach(); } catch (e) { }
@@ -3133,7 +3133,7 @@ function adminConsoleDelete(orgId) { if (!isAppAdmin) return;   /* Sweep 4R item
    organization that exists only in this browser is gone on the next load: the
    registry is re-read from the database, which never heard of it. */
 function adminConsoleNewOrg() { if (!isAppAdmin) return;   /* Sweep 4R item 10: the app administrator's console checks its caller itself, not only by hiding its button */ persistAdminSession(); UI.entry = { step: 'admin' }; adminNewOrgOpen(); }
-function exitAdmin() { try { Auth.serverSignOut(); } catch (e) { } Auth.setAdminSession(false); UI.adminNewOrg = null; try { Store.setSession(null); } catch (e) { } UI.entry = { step: 'login', err: '' }; render(); }
+function exitAdmin() { try { Auth.serverSignOut(); } catch (e) { } Auth.setAdminSession(false); UI.adminNewOrg = null; UI.adminPage = false; try { renderAdminModal(); } catch (e) { } try { Store.setSession(null); } catch (e) { } UI.entry = { step: 'login', err: '' }; render(); }
 /* ── Change password (5.6), and the administrator's username (5.12.3) ──────────
    One dialog for both kinds of account: a member changes their own (POST /password),
    the app administrator theirs (POST /admin/password). Changing it ends the person's
@@ -3285,46 +3285,22 @@ function orgRosterPreview(orgId) {
 function renderEntry(container) {
   if (!UI.entry) UI.entry = { step: 'login' };
   var s = UI.entry.step;
-  if (s === 'admin' && isAppAdmin) { container.innerHTML = renderAdminConsole(); return; }
+  /* The console (10 Nov 2026) is one page for both surfaces, on its own layer (renderAdminModal in
+     js/features/org-admin.js); here it only needs a plain backdrop under it. */
+  if (s === 'admin' && isAppAdmin) {
+    container.innerHTML = '<div class="login-screen admin-screen"></div>';
+    UI.adminPage = true; renderAdminModal();
+    if (UI.adminData == null) fetchAdminData();
+    return;
+  }
+  if (UI.adminPage) { UI.adminPage = false; renderAdminModal(); }
   if (window.Entry) { Entry.mount(s, container); return; }
   // auth.js not loaded yet (should not happen — it's a <script> before app.js)
   container.innerHTML = '<div class="login-screen"><div class="login-card"><p class="login-sub">Loading…</p></div></div>';
 }
 
-function renderAdminConsole() {
-  var orgs = getOrgs();
-  var totalUsers = 0; orgs.forEach(function (o) { totalUsers += orgRosterPreview(o.id).length; });
-  var h = '<div class="login-screen admin-screen"><div class="admin-console">'
-    + '<div class="admin-console-head"><div><div class="login-eyebrow">Administrator</div><h1 class="login-title" style="margin:6px 0 0">All <em>organizations</em></h1></div>'
-    + '<div class="admin-console-actions"><button class="org-btn-cancel" onclick="adminConsoleNewOrg()">+ New Organization</button><button class="entry-link" onclick="openChangePassword()">Change password</button><button class="entry-link" onclick="openChangeUsername()">Change username</button><button class="entry-link" onclick="exitAdmin()">Exit admin</button></div></div>'
-    + '<p class="login-sub" style="margin-bottom:18px">' + orgs.length + ' organization' + (orgs.length === 1 ? '' : 's') + ' · ' + totalUsers + ' user' + (totalUsers === 1 ? '' : 's') + ' total. Each workspace is fully isolated.</p>';
-  if (UI.adminNewOrg && UI.adminNewOrg.open) h += adminNewOrgFormHtml(); // creates the org in the database
-  h += '<div class="admin-console-list">';
-  if (!orgs.length) { h += '<div class="entry-empty">No organizations yet.</div>'; }
-  orgs.forEach(function (o) {
-    var roster = orgRosterPreview(o.id);
-    h += '<div class="admin-cardx">';
-    h += '<div class="admin-cardx-head"><div class="entry-org-badge">' + esc((o.name || '?').slice(0, 1).toUpperCase()) + '</div>'
-      + '<div class="admin-cardx-meta"><div class="admin-org-name">' + esc(o.name) + '</div>'
-      + '<div class="admin-org-sub">' + roster.length + ' user' + (roster.length === 1 ? '' : 's') + ' · created ' + fmtDate(o.created) + '</div></div>'
-      + '<div class="admin-org-actions"><button class="org-btn-cancel" onclick="adminConsoleOpen(\'' + o.id + '\')">Open</button>'
-      + '<button class="org-btn-cancel" onclick="adminResetOrg(\'' + (o.serverId || o.id) + '\')">Reset data</button>'
-      + '<button class="org-btn-del" onclick="adminConsoleDelete(\'' + o.id + '\')">Delete</button></div></div>';
-    if (roster.length) {
-      h += '<div class="admin-users">';
-      roster.forEach(function (u) {
-        h += '<div class="admin-user-row">' + userAv(u, 26)
-          + '<span class="admin-user-name">' + esc(u.name || 'Unnamed') + '</span>'
-          + '<span class="admin-user-uname">@' + esc(u.username || '—') + '</span>'
-          + '<span class="admin-user-role">' + esc(u.role || '') + '</span></div>';
-      });
-      h += '</div>';
-    }
-    h += '</div>';
-  });
-  h += '</div></div></div>';
-  return h;
-}
+/* renderAdminConsole (the pre-login console list) was replaced on 10 Nov 2026 by the console page in
+   js/features/org-admin.js, which both surfaces now share. */
 
 var currentPage = 'home', currentStep = null, currentPhase = null; var gateArmed = false, _lastGateStep = null;
 var sidebarOpen = true;
@@ -6542,13 +6518,13 @@ function scrubStoredPasswords() {
    each person's browser (key pipeline-org-data::org_sample_local), never in the organization list, never sent
    to the server (see SAMPLE_TAB_ADDR at the top of this file). The sample people have no passwords. -- */
 var SAMPLE_NOTE_TITLE = 'DEMO', SAMPLE_NOTE_TEXT = 'Sample organization. Your changes stay in this browser only.';
-/* AI-Ready Architecture (21 Oct 2026): its build has the same Demo tab and Notes-in-More (Part 3). */
-function sampleAppliesHere() { try { return !!(window.Modules && (Modules.isActive('pipeline') || Modules.isActive('exec-readiness') || Modules.isActive('ai-governance') || Modules.isActive('ai-architecture'))); } catch (e) { return false; } }
+/* AI-Ready Architecture (21 Oct 2026): its build has the same Demo tab and Notes-in-More (Part 3). AI-Ready Culture too (10 Nov 2026). */
+function sampleAppliesHere() { try { return !!(window.Modules && (Modules.isActive('pipeline') || Modules.isActive('exec-readiness') || Modules.isActive('ai-governance') || Modules.isActive('ai-architecture') || Modules.isActive('ai-culture'))); } catch (e) { return false; } }
 /* Part 4 (4.2.3) moved Reset all data out of the More menu into the admin console's Reset data — on the Pipeline (6 Oct 2026)
    Executive Readiness and Responsible AI Governance (7 Oct 2026), whose data that Reset now covers (OrganizationController::reset). Its own test, not
    sampleAppliesHere(): a program that has the sample tab but not yet the console's Reset would keep its menu item. */
-/* AI-Ready Architecture (21 Oct 2026): its data is in the console's Reset (RESET_MODULES). */
-function resetMovedToConsole() { try { return !!(window.Modules && (Modules.isActive('pipeline') || Modules.isActive('exec-readiness') || Modules.isActive('ai-governance') || Modules.isActive('ai-architecture'))); } catch (e) { return false; } }
+/* AI-Ready Architecture (21 Oct 2026): its data is in the console's Reset (RESET_MODULES). AI-Ready Culture too (10 Nov 2026). */
+function resetMovedToConsole() { try { return !!(window.Modules && (Modules.isActive('pipeline') || Modules.isActive('exec-readiness') || Modules.isActive('ai-governance') || Modules.isActive('ai-architecture') || Modules.isActive('ai-culture'))); } catch (e) { return false; } }
 function isSampleTab() { return !!SAMPLE_TAB_ADDR; }
 function openSampleTab() {
   if (!currentUserId || SAMPLE_MODE || !sampleAppliesHere()) return;

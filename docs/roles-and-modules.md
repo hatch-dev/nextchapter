@@ -39,8 +39,8 @@ programs, either way. The twelve old `/apps/{role}/{program}/signup` addresses
         │  executive-readiness    ●│     │  judgment-critical…     ●│
         │  innovation-pipeline    ●│     │  friction-map           ○│
         │  responsible-ai-gov…    ●│     │  connection-practice    ○│
-        │  ai-ready-architecture  ○│     │  conscience-ethical…    ●│
-        │  ai-ready-culture       ○│     │  authorship-studio      ○│
+        │  ai-ready-architecture  ●│     │  conscience-ethical…    ●│
+        │  culture                ●│     │  authorship-studio      ○│
         │  workforce-readiness    ○│     │  narrative-forge        ○│
         └────────────┬─────────────┘     └────────────┬─────────────┘
                      │                                │
@@ -69,8 +69,9 @@ re-describes them makes the reader do the matching:
 | V | AI-Ready Culture | Working with and for humans | The Authorship Studio | Creative & original thinking |
 | VI | Workforce Readiness | Closing the capability gap | The Narrative Forge | Narrative & communication mastery |
 
-Five are live — Executive Readiness, the AI Innovation Pipeline and Responsible
-AI Governance on the Enterprise side, Judgment and Conscience on the Leaders
+Seven are live — Executive Readiness, the AI Innovation Pipeline, Responsible
+AI Governance, AI-Ready Architecture (21 Oct 2026) and AI-Ready Culture
+(10 Nov 2026) on the Enterprise side, Judgment and Conscience on the Leaders
 side. `exec-readiness` and `pipeline` predate roles and their ids are
 **frozen**: they are the `workspaces.module` values every existing workspace is
 stored under.

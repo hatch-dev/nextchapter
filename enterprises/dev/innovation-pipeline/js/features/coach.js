@@ -104,7 +104,7 @@ var coachBusy = false;
 var coachRefocus = false;           /* put the cursor back in the box once an answer arrives */
 var coachScrollTo = '';             /* '' keep | 'bottom' | 'answer' (first line of the newest answer) | 'top' */
 
-var GUIDE_MODULES = ['pipeline', 'exec-readiness', 'ai-governance', 'ai-architecture'];   /* the programs whose Guide asks POST /guide (Pinecone); AI-Ready Architecture added 21 Oct 2026 (assistant `architecture`) */
+var GUIDE_MODULES = ['pipeline', 'exec-readiness', 'ai-governance', 'ai-architecture', 'ai-culture'];   /* the programs whose Guide asks POST /guide (Pinecone); AI-Ready Architecture added 21 Oct 2026 (assistant `architecture`), AI-Ready Culture 10 Nov 2026 (assistant `culture`) */
 function guideModule() { try { if (!window.Modules) return ''; for (var i = 0; i < GUIDE_MODULES.length; i++) if (Modules.isActive(GUIDE_MODULES[i])) return GUIDE_MODULES[i]; } catch (e) { } return ''; }
 function guideUsesPinecone() { return guideModule() !== ''; }
 

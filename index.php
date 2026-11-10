@@ -157,9 +157,12 @@ $MODULE_AUTH = ['login' => 'login'];
    name for these two programs anywhere below the URL. */
 $LEGACY_MODULE_SLUGS = [
     /* 21 Oct 2026: AI-Ready Architecture went live at /apps/enterprises/architecture (user's address); the
-       catalogued placeholder had answered at …/ai-ready-architecture, so that address 301s here. */
+       catalogued placeholder had answered at …/ai-ready-architecture, so that address 301s here.
+       10 Nov 2026: AI-Ready Culture likewise, live at /apps/enterprises/culture (user's address); its earlier
+       …/ai-ready-culture 301s here. */
     'enterprise' => [
         'ai-ready-architecture' => 'ai-architecture',
+        'ai-ready-culture'      => 'ai-culture',
     ],
     'leader' => [
         'decision-lab'  => 'decision-lab',
