@@ -7,6 +7,10 @@ const { test, expect, signIn, serverWorkspace } = require('./fixtures');
 
 const CULTURE = 'enterprises/culture';
 
+/* Signing in counts against each test's time, and with two workers it takes most of the default 30s: the save test
+   took 22-29s across runs and failed once at 30s (11 Nov 2026). */
+test.describe.configure({ timeout: 60_000 });
+
 test.beforeEach(async ({ page, account }) => {
   await signIn(page, CULTURE, account);
 });
@@ -86,4 +90,26 @@ test('Ask Danni asks the Guide for this program', async ({ page }) => {
   await expect(page.locator('#coachPanel')).toContainText('Start with the Assessment Battery.');
   expect(body).toMatchObject({ module: 'ai-culture', question: 'Where do I start?' });
   expect(body.context).toContain('Step 1.1');
+});
+
+/* "+ Add value" did nothing on step 1.1 (reported 11 Nov 2026): culRecAdd called culValueAdd off `window`. A click now
+   opens a new value, and what is typed into it reaches the server. tests/e2e/culture-walk.spec.js checks every other
+   Add button and the culture map's bands. */
+test('Add value and Add commitment open a new record that saves', async ({ page }) => {
+  await page.goto(CULTURE + '/step/1.1');
+  /* A new organization has neither, so each click makes the only record of its kind: its value's name is vl_name_<id>,
+     its commitment's text co_text_<id>. */
+  for (const [label, coll, field0] of [['+ Add value', 'values', 'vl_name_'], ['+ Add commitment', 'commitments', 'co_text_']]) {
+    const add = page.getByRole('button', { name: label, exact: true });
+    await expect(add).toBeVisible();
+    await expect(page.locator(`[id^="${field0}"]`)).toHaveCount(0);
+    await add.click();
+    const field = page.locator(`[id^="${field0}"]`);
+    await expect(field).toHaveCount(1);
+    await expect(field).toBeEditable();
+    const text = 'e2e ' + coll + ' ' + Date.now();
+    await field.fill(text);
+    await field.blur();
+    await expect.poll(async () => JSON.stringify(((await serverWorkspace(page, 'ai-culture')).doc || {})[coll] || []), { timeout: 15_000 }).toContain(text);
+  }
 });

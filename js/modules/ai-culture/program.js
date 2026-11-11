@@ -2825,17 +2825,43 @@
       + '</div>';
   }
 
+  function culAdLocAdd(){var r=culListAdd('publishLocations',{location:'',status:'',retiredRemoved:{}});if(r&&r.id){culFoldOpenNew('pl41_'+r.id);render()}}
+
+  function culBcAdd(){var r=culListAdd('blockerCases',{track:[] /* created with its track, so the first load writes nothing (Sweep 5 item 44, INV-9) */,name:'',position:'',rows:[],evidence:'',behavior:'',visibility:'',noCase:false,noCaseReason:'',stage:'',ledBy:'',nextReview:'',outcome:'inprogress',willSee:'',stageHistory:[]});culFoldOpenNew('bc_'+r.id);render()}
+
+  function culCommitAdd(){var r=culListAdd('commitments',{text:'',madeTo:'',madeToOther:'',published:'',origin:'baseline'});culFoldOpenNew(r.id);render()}
+
+  function culConAdd(){if(lockBlocked('signalChecks'))return;if(!data.signalChecks)data.signalChecks={};data.signalChecks.concernsNone=false;Store.commit('signalChecks');var r=culListAdd('concerns',{concern:'',happened:''});culFoldOpenNew(r.id);render()}
+
+  function culConvAdd(){var r=culListAdd('conversations',{date:'',leader:'',team:'',learned:'',rows:[]});culFoldOpenNew(r.id);render()}
+
   function culCritTick(key,on){return culCoreTick('criteria',CUL_CRIT_CORE,key,on)}
 
+  function culDsAdd(){var r=culListAdd('disclosure',{kind:'',reason:'',reasonOther:''});if(r&&r.id)culFoldOpenNew('ds23_'+r.id)}
+
   function culDutyTick(key,on){return culCoreTick('managerDuties',CUL_DUTY_CORE,key,on)}
+
+  function culExpAdd(){if(lockBlocked('signalChecks'))return;if(!data.signalChecks)data.signalChecks={};data.signalChecks.experimentersNone=false;Store.commit('signalChecks');var r=culListAdd('experimenters',{tried:'',worked:'',happened:''});culFoldOpenNew(r.id);render()}
+
+  function culLsAdd(){var r=culListAdd('listeningSessions',{date:'',team:'',people:'',runBy:'',notes:'',link:''});culFoldOpenNew(r.id);render()}
 
   function culMapBoard(id){UI.mapBoard=String(id);UI.mapPanel=null;UI.mapMenu=null;UI.scrollTo='cmapTop';render()}
 
   function culMapSel(k){UI.mapKind=UI.mapKind===k?null:k;render()}
 
+  function culMsgAdd(){var r=culListAdd('aiMessages',{title:'',date:'',channel:'',audience:'',audienceOther:'',said:''});culFoldOpenNew('msg'+r.id);render()}
+
+  function culNaAdd(){var r=culSessAdd('noAiSessions',{team:'',often:'',owner:'',firstDate:'',skills:''});culFoldOpenNew('na24_'+r.id);render()}
+
   function culNaDel(id){culListDel('noAiSessions',id,'Remove this session without AI? This cannot be undone.')}
 
+  function culObsAdd(){var r=culListAdd('observations',{date:'',setting:'',settingOther:'',observed:'',rows:[]});culFoldOpenNew(r.id);render()}
+
+  function culPolicyAdd(){var r=culListAdd('policies',{name:'',type:'',typeOther:'',says:'',lives:'',year:''});culFoldOpenNew(r.id);render()}
+
   function culProtTick(key,on){return culCoreTick('protections',CUL_PROT_CORE,key,on)}
+
+  function culRcAdd(){var r=culListAdd('recognition',{what:'',how:'',often:''});if(r&&r.id)culFoldOpenNew('rc23_'+r.id)}
 
   function culRiTeam(roleId,teamId,on){culRiMsgClear();if(!culNamed('teams','name').some(function(t){return t.id===teamId}))return false;
     return culRiMut(roleId,function(r){var a=Array.isArray(r.teams)?r.teams.slice():[],at=a.indexOf(teamId);if(on&&at<0)a.push(teamId);if(!on&&at>=0)a.splice(at,1);r.teams=a},false,!!on)}
@@ -2843,13 +2869,31 @@
   function culRiUseTick(roleId,useId,on){culRiMsgClear();var u=(data.aiUses||[]).filter(function(x){return x&&x.id===useId})[0];if(!u||Date.now()<_discardChangeUntil)return false;
     if(culDelBlocked('aiUses',useId,[])){culRefuse();return false}var a=Array.isArray(u.roles)?u.roles.slice():[],at=a.indexOf(roleId);if(on&&at<0)a.push(roleId);if(!on&&at>=0)a.splice(at,1);u.roles=a;culTouch();Store.commit('aiUses',useId);try{refreshGateInPlace()}catch(e){}try{culP5Refresh()}catch(e){}return true}
 
+  function culSwAdd(){var r=culSessAdd('showWork',{team:'',often:'',runBy:'',firstDate:''});culFoldOpenNew('sw24_'+r.id);render()}
+
   function culSwDel(id){culListDel('showWork',id,'Remove this show-the-work session? This cannot be undone.')}
+
+  function culSyAdd(){var r=culListAdd('stories',{title:'',aboutKind:'',aboutTeam:'',aboutPerson:'',rows:[],happened:'',kind:'',kindOther:'',source:'',sourceOther:'',date:'',tellHow:'',tellHowOther:'',tellBy:'',tellDate:'',tellStatus:''});if(r&&r.id){culFoldOpenNew('sy31_'+r.id);render()}}
+
+  function culThemeAdd(k){var q=k?(data.themeQuestions||[]).filter(function(x){return x&&x.id===k})[0]:null;if(q){if(UI.inlineAdd&&UI.inlineAdd.id===q.id)UI.inlineAdd=null;if(q._inlineDraft){delete q._inlineDraft;Store.commit('themeQuestions',q.id)}} /* 25 Oct 2026 (bug hunt B9): a theme added under a question uses it, so the question is no longer an abandoned blank draft: it is released from the blank-draft sweep (culListAdd sweeps the last added record first) and loses its draft flag. It stays blank and shows as Untitled question, with its field to fill */ var r=culListAdd('themes',{theme:'',question:k||'',widespread:'',teams:[],examples:[],uses:[]});culFoldOpenNew(r.id);render()}
 
   function culUrOpenSel(useId){var r=culUrOpen(useId);if(r&&r.id){UI.cmSel={coll:'useReviews',id:r.id};render()}}
 
+  function culUseAdd(ctx){var r=culListAdd('aiUses',{name:'',status:'',sanctioned:'',teams:[],roles:[],changeKind:'',told:'',statusHistory:[]});if(ctx==='3.4'){culFoldOpenNew('ur34a_'+r.id)}else if(ctx==='register'){culFoldOpenNew('rg_'+r.id)}else{culFoldOpenNew('useGrp_none');culFoldOpenNew(r.id)}render()}
+
   function culUseSel(id){UI.cmSel=id?{coll:'aiUses',id:String(id)}:null;try{if(id&&typeof window!=='undefined'&&window.innerWidth<1100)UI.scrollTo='cmapSide'}catch(e){}render()}
 
+  function culValueAdd(){var r=culListAdd('values',{name:'',description:'',published:'',origin:'baseline'});culFoldOpenNew(r.id);render()}
+
+  function culVcAddCommit(){var r=culListAdd('commitments',{text:'',madeTo:'',madeToOther:'',published:'',origin:'new',ethical:false,rows:[]});culFoldOpenNew('vcn_'+r.id);render()}
+
+  function culVcAddValue(){var r=culListAdd('values',{name:'',description:'',published:'',origin:'new',rows:[]});culFoldOpenNew('vcn_'+r.id);render()}
+
+  function culXfAdd(){var r=culListAdd('xfSessions',{name:'',type:'',typeOther:'',functions:[],functionsOther:'',often:'',owner:'',firstDate:''});if(r&&r.id){culFoldOpenNew('xf24_'+r.id);render()}}
+
   function culXfDel(id){culListDel('xfSessions',id,'Remove this cross-functional session? This cannot be undone.')}
+
+  function culXmAdd(){var r=culListAdd('addedManagers',{name:'',team:'',curious:'',curiousEvidence:'',charterCandidate:''});if(r&&r.id)culFoldOpenNew('xm22_'+r.id)}
 
   function culS11a(){var h='';
     h+=culS11aMission();
@@ -4911,11 +4955,17 @@
 
   function culTouch(){try{var _cu=getCurrentUser();if(_cu){if(!data.lastActive)data.lastActive={};data.lastActive[_cu.id]=todayIso();}}catch(e){}}
 
+  function culListAdd(coll,fields){try{sweepBlankInline(true)}catch(e){}var r={id:culNew(coll)};Object.keys(fields).forEach(function(k){r[k]=fields[k]});culEnsure(coll,[]).push(r);culInlineAdded(coll);culTouch();Store.commit(coll,r.id);render();return r}
+
+  function culFoldOpenNew(key){if(!UI.expanded)UI.expanded={};UI.expanded[key]=true}
+
   function culCoreTick(coll,list,key,on){var it=list.filter(function(o){return o.v===key})[0];if(!it)return false;if(Date.now()<_discardChangeUntil)return false;
     var r=culCoreRec(coll,key);if(r&&lockBlocked(coll+'::'+r.id)){render();return false}
     if(!r){if(!on)return true;r={id:culNew(coll),text:it.l,coreKey:key,chosen:true};if(coll==='criteria')r.appliesTo=[];culEnsure(coll,[]).push(r)}
     else r.chosen=!!on;
     culTouch();Store.commit(coll,r.id);render();return true}
+
+  function culSessAdd(coll,fields){var r={id:culNew(coll)};Object.keys(fields).forEach(function(k){r[k]=fields[k]});culEnsure(coll,[]).push(r);culTouch();Store.commit(coll,r.id);render();return r}
 
   function culListDel(coll,id,msg,noAsk){if(!(data[coll]||[]).some(function(r){return r&&r.id===id}))return; /* §23.3: an id that no longer resolves does nothing, and no confirm shows */
     if(lockBlocked(coll+'::'+id))return;
@@ -5391,7 +5441,7 @@
       if(c&&sl)h+='<div class="cul-recbox"><div class="cul-recbox-h"><h4>'+esc(CUL_ST_PLURAL[sv]+' who reach '+c.team.name)+'</h4><div class="cul-recbox-acts">'+btn('Close','CUL.culPmCovPick(\''+escAttr(tid)+'\',\''+escAttr(sv)+'\')','bs')+'</div></div>'+c.by[sv].map(function(p){var r=p.reach==='org'?'organization-wide':p.reach==='several'?'several teams':'their own team',rec=(data.powerMap||[]).filter(function(x){return x&&x.id===p.id})[0],body=rec&&CUL_FORMS.powerMap?culRecDraw(function(){return CUL_FORMS.powerMap.form(rec)},true):'';return culFold('pmcov_'+p.id,String(p.name).trim()+' ('+r+')','',body?'<div class="cul-ro">'+body+'</div>':'')}).join('') /* the family read-only layout, as the record box (Paul, final pass) */+'</div>'} /* each person a fold showing their record; no Open buttons (Paul, 28 Oct 2026) */
     return culSection('Who reaches each team','This table shows how many people of each stance reach each team. A person with reach '+'\u201COrganization-wide\u201D counts for every team, one with '+'\u201CSeveral teams\u201D for each team they reach, and one with '+'\u201CTheir own team\u201D for their own team. The table marks a team when no accelerator or guide reaches it, or when more blockers reach it than accelerators and guides. Choose a number to see who it counts.',h)}
 
-  function culRecAdd(coll,addFn,arg){var dc=CUL_REC_DATA[coll]||coll,before=(data[dc]||[]).map(function(r){return r&&r.id});var f=window[addFn];if(typeof f==='function')f(arg);var L=(data[dc]||[]).filter(function(r){return r&&before.indexOf(r.id)<0});if(L.length){UI.recOpen={coll:coll,id:String(L[L.length-1].id),edit:true};UI.scrollTo='recbox_'+coll}render()}
+  function culRecAdd(coll,addFn,arg){var dc=CUL_REC_DATA[coll]||coll,before=(data[dc]||[]).map(function(r){return r&&r.id});var f=CUL[addFn]||window[addFn];if(typeof f==='function')f(arg);var L=(data[dc]||[]).filter(function(r){return r&&before.indexOf(r.id)<0});if(L.length){UI.recOpen={coll:coll,id:String(L[L.length-1].id),edit:true};UI.scrollTo='recbox_'+coll}render()}
 
   function culPmRow(p){var id=p.id,tms=culNamed('teams','name').map(function(t){return {v:t.id,l:t.name}}),pr=culPriorityRows().map(String),st=culPmOk(CUL_STANCE,p.stance)?p.stance:'',unk=st==='unknown',
       h=''; /* design rule 4 (13 Oct 2026): no sub-headings inside the fold */
@@ -6656,8 +6706,6 @@
 
   function culRvBusy(){try{alert(CUL_RV_COPY['miss.busy'])}catch(e){}}
 
-  function culListAdd(coll,fields){try{sweepBlankInline(true)}catch(e){}var r={id:culNew(coll)};Object.keys(fields).forEach(function(k){r[k]=fields[k]});culEnsure(coll,[]).push(r);culInlineAdded(coll);culTouch();Store.commit(coll,r.id);render();return r}
-
   function culPulseMsg(text){try{var els=document.querySelectorAll('[data-pmsg]');for(var i=0;i<els.length;i++)els[i].textContent=text||''}catch(e){}}
 
   function culRowSet(row,field,value,elId){var rid=Number(row);if(!culRowById(rid)||['targetDescription','targetScore','priority'].indexOf(field)<0)return false;
@@ -6688,8 +6736,6 @@
     return '<details class="cul-fold" data-fold="'+escAttr(key)+'"'+(open?' open':'')+' ontoggle="CUL.culFoldSet(\''+culFoldJs(key)+'\',this.open)"><summary class="cul-fold-sum"><span class="cul-fold-mk" aria-hidden="true"></span>'+(opts.sub?'<span class="cul-fold-tt"><span class="cul-fold-title">'+esc(t)+'</span><span class="cul-fold-sub">'+esc(opts.sub)+'</span></span>':'<span class="cul-fold-title">'+esc(t)+'</span>')+[].concat(chipHtml||[]).filter(Boolean).map(function(c){return '<span class="cul-fold-chip">'+c+'</span>'}).join('')+(opts.headExtra||'')+'</summary><div class="cul-fold-body">'+(bodyHtml||'')+'</div></details>'}
 
   function culDrDel(id){var r=(data.driftDecisions||[]).filter(function(x){return x&&x.id===id})[0];if(!r)return false;var rv=culRvById(r.review);if(rv&&rv.loggedAt)return false;culListDel('driftDecisions',id,CUL_RV_COPY['dr.dec.confirm']);return true}
-
-  function culFoldOpenNew(key){if(!UI.expanded)UI.expanded={};UI.expanded[key]=true}
 
   function culTkRows(){return CUL_ROWS.map(function(r){return culTkRow(r.id)})}
 
@@ -6821,7 +6867,7 @@
     if(foot==null)foot='<button type="button" class="cmap-btn" onclick="CUL.culPanelClose()">Close</button>';
     var _act=(p.t==='form')?(p.fresh?'<button type="button" class="btn bp" onclick="CUL.culBoardFinish()">'+esc(UI.mapBoard&&culRowById(UI.mapBoard)?'Add to '+culMapNames([UI.mapBoard]):'Done')+'</button>':''):(p.t==='role'?foot:((x&&x.foot)?x.foot:'')); var _hd=p.t==='form'?'':((kick&&p.t!=='prog'?'<p class="cul-natcard-k">'+esc(kick)+'</p>':'')+(title?'<h3 class="cul-natcard-h">'+esc(title)+'</h3>':'')); return '<div class="cd cul-natcard" id="cmapCard" tabindex="-1" role="region" aria-label="'+escAttr(title||kick||'')+'"><button type="button" class="cul-natx" aria-label="Close" title="Close" onclick="CUL.culPanelClose()">\u00D7</button>'+_hd+body+(_act?'<div class="cul-natcard-f">'+_act+'</div>':'')+'</div>'}
 
-  function culDbAddType(i){var T=CUL_DB_ADD[i];if(!T||typeof window[T.fn]!=='function')return;var before=(data[T.data]||[]).map(function(r){return r&&r.id});window[T.fn]();var n=(data[T.data]||[]).filter(function(r){return r&&before.indexOf(r.id)<0})[0];UI.dbAdd=false;if(n)culPanelOpen({t:'form',coll:T.coll,id:n.id});else render()}
+  function culDbAddType(i){var T=CUL_DB_ADD[i];var _f=T&&(CUL[T.fn]||window[T.fn]);if(typeof _f!=='function')return;var before=(data[T.data]||[]).map(function(r){return r&&r.id});_f();var n=(data[T.data]||[]).filter(function(r){return r&&before.indexOf(r.id)<0})[0];UI.dbAdd=false;if(n)culPanelOpen({t:'form',coll:T.coll,id:n.id});else render()}
 
   function culOrgName(){var o=null;try{o=getOrg(currentOrgId)}catch(e){}if(o&&String(o.name||'').trim())return String(o.name).trim();return SAMPLE_MODE?'Harbor Ridge Mutual':''}
 
@@ -7022,6 +7068,8 @@
     h.push({date:t,field:field,from:from,to:to});return true}
 
   function culEnsure(k,v){if(!data[k])data[k]=v;return data[k]}
+
+  function culInlineAdded(coll){var L=data[coll];var r=Array.isArray(L)?L[L.length-1]:null;if(!r)return;r._inlineDraft=true;r._draftTab=CUL_TAB_ID;r._draftAt=Date.now();UI.inlineAdd={id:r.id,coll:coll,_ctx:inlineCtx()}}
 
   function culListDelRefs(coll,id){var out=[]; /* 25 Oct 2026 (bug hunt B7, B12): what a removal must also clear. B7: a removed theme leaves the Communication Planning Hub (commsPlan[n].plans). B12: an observation that pointed at a removed meeting goes back to 'A meeting not listed', keeping the meeting's name as its own text — what the page already showed */ if(coll==='themes')(data.commsPlan||[]).forEach(function(c){if(c&&Array.isArray(c.plans)&&c.plans.indexOf(id)>=0)out.push({coll:'commsPlan',rec:c,fix:function(r){r.plans=r.plans.filter(function(x){return x!==id})}})}); if(coll==='meetings'){var mt=(data.meetings||[]).find(function(m){return m&&m.id===id});(data.observations||[]).forEach(function(o){if(o&&o.meeting===id)out.push({coll:'observations',rec:o,fix:function(r){r.meeting='other';if(!String(r.meetingOther||'').trim()&&mt&&mt.name)r.meetingOther=mt.name}})})} var _wks=[coll+'::'+id].concat(coll==='themes'?['themePlans::'+id]:[]);(data.chCommits||[]).forEach(function(ck){if(ck&&Array.isArray(ck.work)&&ck.work.some(function(w){return _wks.indexOf(w)>=0}))out.push({coll:'chCommits',rec:ck,fix:function(r){r.work=(r.work||[]).filter(function(x){return _wks.indexOf(x)<0})}})}); /* a theme's plan is linked as themePlans::<theme id> (Sweep 6 item 1) */ /* a removed item leaves no dead link in a Charter clause's work (Sweep 5 item 6) */ return out}
 
@@ -8251,8 +8299,6 @@
 
   function rcUnitGaps(u){return []}
 
-  function culInlineAdded(coll){var L=data[coll];var r=Array.isArray(L)?L[L.length-1]:null;if(!r)return;r._inlineDraft=true;r._draftTab=CUL_TAB_ID;r._draftAt=Date.now();UI.inlineAdd={id:r.id,coll:coll,_ctx:inlineCtx()}}
-
   function culRsMsg(row,text){try{var el=document.getElementById('rsmsg_'+row);if(el)el.textContent=text||''}catch(e){}}
 
   function culTkT(k,m){return culClT(CUL_TK_COPY[k]==null?k:CUL_TK_COPY[k],m)}
@@ -9151,7 +9197,7 @@
   function culMapGroups(its,clsFor){return CUL_MAP_KINDS.map(function(k){var g=its.filter(function(it){return it.kind===k.k});if(!g.length)return '';
     return '<span class="cmap-grp" style="--c:'+culMapCv(k.k)+'">'+g.map(function(it){return culMapSq(it,clsFor?clsFor(it):'')}).join('')+'</span>'}).join('')}
 
-  function culMapBandClick(ev,el,fn,id){var t=ev&&ev.target,hit=(t&&t.closest)?t.closest('button,a,input,select,textarea,[onclick],[role="button"]'):null;if(hit&&hit!==el)return;if(typeof window[fn]==='function')window[fn](id)}
+  function culMapBandClick(ev,el,fn,id){var t=ev&&ev.target,hit=(t&&t.closest)?t.closest('button,a,input,select,textarea,[onclick],[role="button"]'):null;if(hit&&hit!==el)return;var _n=String(fn).replace(/^CUL\./,''),_f=CUL[_n]||window[_n];if(typeof _f==='function')_f(id)}
 
   function culRvQuarterEnd(period){var e=isoAddDays(culIsoAddMonths(period,3),-1),t=todayIso();return e<t?e:t}
 
@@ -9510,46 +9556,14 @@
 
   function culUrRec(rid){return (data.useReviews||[]).filter(function(x){return x&&x.id===rid})[0]||null}
 
-  function culVcAddValue(){var r=culListAdd('values',{name:'',description:'',published:'',origin:'new',rows:[]});culFoldOpenNew('vcn_'+r.id);render()}
-
-  function culVcAddCommit(){var r=culListAdd('commitments',{text:'',madeTo:'',madeToOther:'',published:'',origin:'new',ethical:false,rows:[]});culFoldOpenNew('vcn_'+r.id);render()}
-
-  function culRcAdd(){var r=culListAdd('recognition',{what:'',how:'',often:''});if(r&&r.id)culFoldOpenNew('rc23_'+r.id)}
-
-  function culDsAdd(){var r=culListAdd('disclosure',{kind:'',reason:'',reasonOther:''});if(r&&r.id)culFoldOpenNew('ds23_'+r.id)}
-
   function culMtAdd(){var r=culListAdd('meetings',{name:'',often:'',oftenOther:'',chair:'',purpose:'',aiDecided:false,observations:[],audit:{},changes:{},added:{},owner:'',start:'',noChange:false,noChangeReason:''});if(r&&r.id){culFoldOpenNew('mt24_'+r.id);render()}}
 
-  function culSwAdd(){var r=culSessAdd('showWork',{team:'',often:'',runBy:'',firstDate:''});culFoldOpenNew('sw24_'+r.id);render()}
-
-  function culNaAdd(){var r=culSessAdd('noAiSessions',{team:'',often:'',owner:'',firstDate:'',skills:''});culFoldOpenNew('na24_'+r.id);render()}
-
-  function culXfAdd(){var r=culListAdd('xfSessions',{name:'',type:'',typeOther:'',functions:[],functionsOther:'',often:'',owner:'',firstDate:''});if(r&&r.id){culFoldOpenNew('xf24_'+r.id);render()}}
-
-  function culConvAdd(){var r=culListAdd('conversations',{date:'',leader:'',team:'',learned:'',rows:[]});culFoldOpenNew(r.id);render()}
-
   function culLcAdd(){var r=culListAdd('leaderComms',{date:'',channel:'',audience:'',audienceOther:'',rows:[],said:'',notes:''});if(r&&r.id){culFoldOpenNew('lc25_'+r.id);render()}}
-
-  function culLsAdd(){var r=culListAdd('listeningSessions',{date:'',team:'',people:'',runBy:'',notes:'',link:''});culFoldOpenNew(r.id);render()}
-
-  function culObsAdd(){var r=culListAdd('observations',{date:'',setting:'',settingOther:'',observed:'',rows:[]});culFoldOpenNew(r.id);render()}
-
-  function culConAdd(){if(lockBlocked('signalChecks'))return;if(!data.signalChecks)data.signalChecks={};data.signalChecks.concernsNone=false;Store.commit('signalChecks');var r=culListAdd('concerns',{concern:'',happened:''});culFoldOpenNew(r.id);render()}
-
-  function culExpAdd(){if(lockBlocked('signalChecks'))return;if(!data.signalChecks)data.signalChecks={};data.signalChecks.experimentersNone=false;Store.commit('signalChecks');var r=culListAdd('experimenters',{tried:'',worked:'',happened:''});culFoldOpenNew(r.id);render()}
-
-  function culThemeAdd(k){var q=k?(data.themeQuestions||[]).filter(function(x){return x&&x.id===k})[0]:null;if(q){if(UI.inlineAdd&&UI.inlineAdd.id===q.id)UI.inlineAdd=null;if(q._inlineDraft){delete q._inlineDraft;Store.commit('themeQuestions',q.id)}} /* 25 Oct 2026 (bug hunt B9): a theme added under a question uses it, so the question is no longer an abandoned blank draft: it is released from the blank-draft sweep (culListAdd sweeps the last added record first) and loses its draft flag. It stays blank and shows as Untitled question, with its field to fill */ var r=culListAdd('themes',{theme:'',question:k||'',widespread:'',teams:[],examples:[],uses:[]});culFoldOpenNew(r.id);render()}
-
-  function culSyAdd(){var r=culListAdd('stories',{title:'',aboutKind:'',aboutTeam:'',aboutPerson:'',rows:[],happened:'',kind:'',kindOther:'',source:'',sourceOther:'',date:'',tellHow:'',tellHowOther:'',tellBy:'',tellDate:'',tellStatus:''});if(r&&r.id){culFoldOpenNew('sy31_'+r.id);render()}}
-
-  function culBcAdd(){var r=culListAdd('blockerCases',{track:[] /* created with its track, so the first load writes nothing (Sweep 5 item 44, INV-9) */,name:'',position:'',rows:[],evidence:'',behavior:'',visibility:'',noCase:false,noCaseReason:'',stage:'',ledBy:'',nextReview:'',outcome:'inprogress',willSee:'',stageHistory:[]});culFoldOpenNew('bc_'+r.id);render()}
 
   function culRcClose(id,findings,action){var r=culRcList().filter(function(x){return x.id===id})[0]; if(!String(findings==null?'':findings).trim()||!String(action==null?'':action).trim())return false; /* 25 Oct 2026 (bug hunt B19): a re-check closes only with what it found and what will be done */ if(Collab.lockedByOther('rechecks::'+id)||Date.now()<_discardChangeUntil||!r||r.status==='done')return false;
     r.status='done';r.closedOn=todayIso();r.findings=String(findings==null?'':findings);r.action=String(action==null?'':action);culTouch();Store.commit('rechecks',id);return true}
 
   function culRcDue(rowId,startIso){return isoAddDays(startIso,7*culThr(rowId).recheckWeeks)}
-
-  function culSessAdd(coll,fields){var r={id:culNew(coll)};Object.keys(fields).forEach(function(k){r[k]=fields[k]});culEnsure(coll,[]).push(r);culTouch();Store.commit(coll,r.id);render();return r}
 
   function baselineReportDoc(){var full=UI.printDepth==='full';return printDocCover('Baseline Report',CUL_BR_LEAD,'')+culCoRender(culBrModel(full),'paper')}
 
@@ -10551,12 +10565,6 @@
 
   function culBcLackC(c){if(!culBcSeeOn(c))return [];return String(c.willSee||'').trim()?[]:['an entry']}
 
-  function culValueAdd(){var r=culListAdd('values',{name:'',description:'',published:'',origin:'baseline'});culFoldOpenNew(r.id);render()}
-
-  function culCommitAdd(){var r=culListAdd('commitments',{text:'',madeTo:'',madeToOther:'',published:'',origin:'baseline'});culFoldOpenNew(r.id);render()}
-
-  function culPolicyAdd(){var r=culListAdd('policies',{name:'',type:'',typeOther:'',says:'',lives:'',year:''});culFoldOpenNew(r.id);render()}
-
   function culBcCard(c,coll){var oc=c.outcome||'',pos=culWord(CUL_BC_POS,c.position),beh=String(c.behavior||'').trim();
     return culCard({coll:coll,id:c.id,title:String(c.name||'').trim()||CUL_BC_COPY.a.noName,meta:[pos,beh?culMapShort(beh,110):''].filter(Boolean).join(' · ')||'Not described yet',c:'var(--p3)',label:oc?culTag(culBcOutcomeWord(c),CUL_BC_TONE[oc]):'',dims:culItemDims('blockerCases',c),foot:'<div class="cmap-wcard-b">'+culBcStageMenu(c)+'</div>'})}
 
@@ -10643,8 +10651,6 @@
   function culThAlertAt(d){var t=culThr(Number(d.id)),cur=d.latest!=null?d.latest:d.base,a=cur!=null?Math.round((cur-t.scoreDrop)*10)/10:null;if(t.belowBaseline&&d.base!=null)a=a==null?d.base:Math.max(a,d.base);return a==null?null:Math.max(1,Math.min(5,a))}
 
   function culUrTileStatus(u){var r=culUrFor(u.id);if(!r)return ['Not reviewed','na'];if(r.decision&&culUrDone(r))return [culWord(CUL_UR_DECISION,r.decision),r.decision==='proceed'?'in':r.decision==='proceedChanges'?'ag':'nc'];if(r.decision)return [culWord(CUL_UR_DECISION,r.decision)+', review not complete','ag'];return ['Review under way','ag']}
-
-  function culUseAdd(ctx){var r=culListAdd('aiUses',{name:'',status:'',sanctioned:'',teams:[],roles:[],changeKind:'',told:'',statusHistory:[]});if(ctx==='3.4'){culFoldOpenNew('ur34a_'+r.id)}else if(ctx==='register'){culFoldOpenNew('rg_'+r.id)}else{culFoldOpenNew('useGrp_none');culFoldOpenNew(r.id)}render()}
 
   function culUrFieldsLeft(r){return culUrMissing(culUrUse(r),r).length}
 
@@ -10735,18 +10741,40 @@
   CUL.confirmStepDone = confirmStepDone;
   CUL.confirmSectionDone = confirmSectionDone;
   CUL.stepAssignBar = stepAssignBar;
+  CUL.culAdLocAdd = culAdLocAdd;
+  CUL.culBcAdd = culBcAdd;
+  CUL.culCommitAdd = culCommitAdd;
+  CUL.culConAdd = culConAdd;
+  CUL.culConvAdd = culConvAdd;
   CUL.culCritTick = culCritTick;
+  CUL.culDsAdd = culDsAdd;
   CUL.culDutyTick = culDutyTick;
+  CUL.culExpAdd = culExpAdd;
+  CUL.culLsAdd = culLsAdd;
   CUL.culMapBoard = culMapBoard;
   CUL.culMapSel = culMapSel;
+  CUL.culMsgAdd = culMsgAdd;
+  CUL.culNaAdd = culNaAdd;
   CUL.culNaDel = culNaDel;
+  CUL.culObsAdd = culObsAdd;
+  CUL.culPolicyAdd = culPolicyAdd;
   CUL.culProtTick = culProtTick;
+  CUL.culRcAdd = culRcAdd;
   CUL.culRiTeam = culRiTeam;
   CUL.culRiUseTick = culRiUseTick;
+  CUL.culSwAdd = culSwAdd;
   CUL.culSwDel = culSwDel;
+  CUL.culSyAdd = culSyAdd;
+  CUL.culThemeAdd = culThemeAdd;
   CUL.culUrOpenSel = culUrOpenSel;
+  CUL.culUseAdd = culUseAdd;
   CUL.culUseSel = culUseSel;
+  CUL.culValueAdd = culValueAdd;
+  CUL.culVcAddCommit = culVcAddCommit;
+  CUL.culVcAddValue = culVcAddValue;
+  CUL.culXfAdd = culXfAdd;
   CUL.culXfDel = culXfDel;
+  CUL.culXmAdd = culXmAdd;
   CUL.culS11a = culS11a;
   CUL.culMissing11a = culMissing11a;
   CUL.culS11b = culS11b;
@@ -11064,7 +11092,10 @@
   CUL.culCoerce = culCoerce;
   CUL.culStated = culStated;
   CUL.culTouch = culTouch;
+  CUL.culListAdd = culListAdd;
+  CUL.culFoldOpenNew = culFoldOpenNew;
   CUL.culCoreTick = culCoreTick;
+  CUL.culSessAdd = culSessAdd;
   CUL.culListDel = culListDel;
   CUL.culNamed = culNamed;
   CUL.culRiMut = culRiMut;
@@ -11532,7 +11563,6 @@
   CUL._btnKeep = _btnKeep;
   CUL.culNcProposed = culNcProposed;
   CUL.culRvBusy = culRvBusy;
-  CUL.culListAdd = culListAdd;
   CUL.culPulseMsg = culPulseMsg;
   CUL.culRowSet = culRowSet;
   CUL.culVcChoosable = culVcChoosable;
@@ -11542,7 +11572,6 @@
   CUL.culDrJudgedBefore = culDrJudgedBefore;
   CUL.culFold = culFold;
   CUL.culDrDel = culDrDel;
-  CUL.culFoldOpenNew = culFoldOpenNew;
   CUL.culTkRows = culTkRows;
   CUL.culTkRadarData = culTkRadarData;
   CUL.culTkRadar = culTkRadar;
@@ -11641,6 +11670,7 @@
   CUL.offscreenStep = offscreenStep;
   CUL.culHistPush = culHistPush;
   CUL.culEnsure = culEnsure;
+  CUL.culInlineAdded = culInlineAdded;
   CUL.culListDelRefs = culListDelRefs;
   CUL.culRebindIds = culRebindIds;
   CUL.culUrStart = culUrStart;
@@ -11998,7 +12028,6 @@
   CUL.rcUnitIx = rcUnitIx;
   CUL.rcSection = rcSection;
   CUL.rcUnitGaps = rcUnitGaps;
-  CUL.culInlineAdded = culInlineAdded;
   CUL.culRsMsg = culRsMsg;
   CUL.culTkT = culTkT;
   CUL.culTkRadarSeries = culTkRadarSeries;
@@ -12343,26 +12372,10 @@
   CUL.culTkCloseRecheck = culTkCloseRecheck;
   CUL.culRcStart = culRcStart;
   CUL.culUrRec = culUrRec;
-  CUL.culVcAddValue = culVcAddValue;
-  CUL.culVcAddCommit = culVcAddCommit;
-  CUL.culRcAdd = culRcAdd;
-  CUL.culDsAdd = culDsAdd;
   CUL.culMtAdd = culMtAdd;
-  CUL.culSwAdd = culSwAdd;
-  CUL.culNaAdd = culNaAdd;
-  CUL.culXfAdd = culXfAdd;
-  CUL.culConvAdd = culConvAdd;
   CUL.culLcAdd = culLcAdd;
-  CUL.culLsAdd = culLsAdd;
-  CUL.culObsAdd = culObsAdd;
-  CUL.culConAdd = culConAdd;
-  CUL.culExpAdd = culExpAdd;
-  CUL.culThemeAdd = culThemeAdd;
-  CUL.culSyAdd = culSyAdd;
-  CUL.culBcAdd = culBcAdd;
   CUL.culRcClose = culRcClose;
   CUL.culRcDue = culRcDue;
-  CUL.culSessAdd = culSessAdd;
   CUL.baselineReportDoc = baselineReportDoc;
   CUL.aiUseInventoryDoc = aiUseInventoryDoc;
   CUL.targetCultureDoc = targetCultureDoc;
@@ -12602,9 +12615,6 @@
   CUL.culMtChange = culMtChange;
   CUL.culMtAddedRowsBox = culMtAddedRowsBox;
   CUL.culBcLackC = culBcLackC;
-  CUL.culValueAdd = culValueAdd;
-  CUL.culCommitAdd = culCommitAdd;
-  CUL.culPolicyAdd = culPolicyAdd;
   CUL.culBcCard = culBcCard;
   CUL.culBcStageCounts = culBcStageCounts;
   CUL.culEvOpen = culEvOpen;
@@ -12628,7 +12638,6 @@
   CUL.culThChip = culThChip;
   CUL.culThAlertAt = culThAlertAt;
   CUL.culUrTileStatus = culUrTileStatus;
-  CUL.culUseAdd = culUseAdd;
   CUL.culUrFieldsLeft = culUrFieldsLeft;
   CUL.culMtTilesRec = culMtTilesRec;
   CUL.culMtAudited = culMtAudited;

@@ -232,6 +232,27 @@ const PATCHES = [{
   in: 'culBackBtn',
   replace: "return navHistory.length?backBtn():",
   with: "return (UI.navStack&&UI.navStack.length)?backBtn():"
+}, {
+  /* The reference's functions were globals, so its dispatchers called them off
+     `window`; here they are the module's and live on NS (see LOOKUP_KEYS).
+     `window` stays as the fallback for a shell function passed by name. */
+  name: 'culRecAdd calls the program\'s own add function',
+  in: 'culRecAdd',
+  replace: "var f=window[addFn];",
+  with: "var f=" + NS + "[addFn]||window[addFn];"
+}, {
+  name: 'culDbAddType calls the program\'s own add function',
+  in: 'culDbAddType',
+  replace: "if(!T||typeof window[T.fn]!=='function')return;var before=(data[T.data]||[]).map(function(r){return r&&r.id});window[T.fn]();",
+  with: "var _f=T&&(" + NS + "[T.fn]||window[T.fn]);if(typeof _f!=='function')return;var before=(data[T.data]||[]).map(function(r){return r&&r.id});_f();"
+}, {
+  /* Its name arrives as o.open, which rewritePropHandlers has already made
+     'CUL.culMapBoard' (the same value also feeds an onclick string), so the
+     prefix comes off before the lookup. */
+  name: 'culMapBandClick calls the program\'s own handler',
+  in: 'culMapBandClick',
+  replace: "if(typeof window[fn]==='function')window[fn](id)",
+  with: "var _n=String(fn).replace(/^" + NS + "\\./,''),_f=" + NS + "[_n]||window[_n];if(typeof _f==='function')_f(id)"
 }];
 
 /* ── A declaration the extractor cannot see ────────────────────
@@ -608,7 +629,33 @@ function rewritePropHandlers(code, names) {
   return code.replace(propRe(), (m, key, q, n) => fns.has(n) ? key + ':' + q + NS + '.' + n + q : m);
 }
 
-const splitDeps = [...new Set([...splitNames, ...paramHandlers.names, ...valueNames, ...propNames])]
+/* ── A handler whose name is LOOKED UP by string ───────────────
+   The fifth shape (11 Nov 2026): the name is a property value that is never
+   concatenated into markup at all — it is handed to a dispatcher that calls
+   it by name.
+
+       culRecList({coll:'aiMessages', …, addFn:'culMsgAdd'})
+         → onclick="CUL.culRecAdd('aiMessages','culMsgAdd')"
+         → function culRecAdd(coll,addFn){var f=window[addFn]; …}
+       CUL_DB_ADD = [{l:'A value', …, fn:'culVcAddValue'}, …]
+         → culDbAddType(i){ … window[T.fn]() … }
+
+   Two things went wrong. The functions named only this way (culAdLocAdd,
+   culMsgAdd, culXmAdd) were never ported, because nothing names them in
+   code; and the dispatchers looked on `window`, where no ported function
+   lives, so every "+ Add …" button on a step and every entry in the
+   Dashboard's Add menu did nothing at all, with no error to see. The names
+   are carried here as dependencies (not rewritten: the dispatcher wants the
+   bare name), and the PATCHES below point the three dispatchers at NS. */
+const LOOKUP_KEYS = ['addFn'];   /* CUL_DB_ADD's fn names are all reached in code already; 'fn' also keys a handler→record table (66 entries) that would drag in dead code */
+const lookupNames = (() => {
+  const out = new Set();
+  const re = new RegExp('(?<![\\w$])(?:' + LOOKUP_KEYS.join('|') + ')\\s*:\\s*([\'"])([A-Za-z_$][\\w$]*)\\1', 'g');
+  for (const m of src.matchAll(re)) if (topLevelFuncs.has(m[2])) out.add(m[2]);
+  return out;
+})();
+
+const splitDeps = [...new Set([...splitNames, ...paramHandlers.names, ...valueNames, ...propNames, ...lookupNames])]
   .filter(n => topLevelFuncs.has(n) && !PORT.includes(n) && !SHELL_GLOBALS.has(n)).sort();
 if (splitDeps.length) console.log('split-handler entry points found:', splitDeps.join(', '));
 
