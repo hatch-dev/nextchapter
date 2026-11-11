@@ -186,6 +186,7 @@ $DEV_DOORS = [
     'enterprises/executive-readiness'       => 'executive-readiness',
     'enterprises/responsible-ai-governance' => 'responsible-ai-governance',
     'enterprises/ai-ready-architecture'     => 'architecture',   /* 21 Oct 2026: this door's folder is not the slug */
+    'enterprises/ai-ready-culture'          => 'culture',        /* 6 Nov 2026: nor is this one's */
 ];
 $doorUrls  = [];
 foreach ($DEV_DOORS as $key => $folder) {

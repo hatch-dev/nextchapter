@@ -145,7 +145,10 @@ var HELP_GUIDE_LINES = {
   'ai-governance': 'Teal button, bottom-right corner. It knows which step you are on and draws on Faisal Hoque’s writing on AI risk and accountability and a guide to this program. Ask it how to complete a step, what comes next, or for ideas. It can’t see the data you have entered.',
   /* AI-Ready Architecture (21 Oct 2026): slate button; its assistant holds Faisal Hoque's articles on enterprise
      architecture for AI and a guide to this program. */
-  'ai-architecture': 'Slate button, bottom-right corner. It knows which step you are on and draws on Faisal Hoque’s writing on enterprise architecture for AI and a guide to this program. Ask it how to complete a step, what comes next, or for ideas. It can’t see the data you have entered.'
+  'ai-architecture': 'Slate button, bottom-right corner. It knows which step you are on and draws on Faisal Hoque’s writing on enterprise architecture for AI and a guide to this program. Ask it how to complete a step, what comes next, or for ideas. It can’t see the data you have entered.',
+  /* AI-Ready Culture (10 Nov 2026): garnet button; its assistant holds Faisal Hoque's articles on AI and
+     organizational culture and a guide to this program. */
+  'ai-culture': 'Garnet button, bottom-right corner. It knows which step you are on and draws on Faisal Hoque’s writing on AI and organizational culture and a guide to this program. Ask it how to complete a step, what comes next, or for ideas. It can’t see the data you have entered.'
 };
 var HELP_PRIVACY_OLD = 'The AI Guide sends only your question and the current step context to the Anthropic API, routed through the program’s server rather than directly from your browser.';
 var HELP_PRIVACY_NEW = 'The AI Guide sends your question, your recent messages in the Guide panel, and the name of the step you are on to Pinecone, an AI service, routed through the program’s server rather than directly from your browser. Pinecone adds relevant passages from the program’s reference material and has a Claude model, made by Anthropic, write the answer.';

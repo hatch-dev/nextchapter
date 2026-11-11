@@ -17,8 +17,8 @@
    reaches the other members through the change poll, and is kept by Reset all data (ORG_LEVEL_KEYS).
    Every other program keeps today's behaviour (both on) until its own directive is applied. -- */
 /* AI-Ready Architecture (21 Oct 2026): its build carries the same switches (Spec §25.2: both start off) — without it here
-   its Guide and Voice were always on, with no switch for an administrator. */
-function aiSwitchesApply() { try { return !!(window.Modules && (Modules.isActive('pipeline') || Modules.isActive('exec-readiness') || Modules.isActive('ai-governance') || Modules.isActive('ai-architecture'))); } catch (e) { return false; } }
+   its Guide and Voice were always on, with no switch for an administrator. */ /* AI-Ready Culture (10 Nov 2026): the same, from its build (Spec §25.2). */
+function aiSwitchesApply() { try { return !!(window.Modules && (Modules.isActive('pipeline') || Modules.isActive('exec-readiness') || Modules.isActive('ai-governance') || Modules.isActive('ai-architecture') || Modules.isActive('ai-culture'))); } catch (e) { return false; } }
 function aiGuideOn() { if (window.SAMPLE_MODE) return false; if (!aiSwitchesApply()) return true; return !!(typeof data !== 'undefined' && data && data.settings && data.settings.aiGuide); }
 function voiceOn() { if (window.SAMPLE_MODE) return false; if (!aiSwitchesApply()) return true; return !!(typeof data !== 'undefined' && data && data.settings && data.settings.voice); }
 function canSetAiFeatures() { return aiSwitchesApply() && typeof canManageOrg === 'function' && canManageOrg(); }

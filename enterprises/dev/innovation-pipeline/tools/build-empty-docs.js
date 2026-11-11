@@ -24,11 +24,11 @@ const vm = require('vm');
 
 const ROOT = path.resolve(__dirname, '..');
 const OUT = path.join(ROOT, 'api', 'config', 'empty-docs.json');
-const PROGRAMS = ['pipeline', 'exec-readiness', 'ai-governance', 'ai-architecture'];   // the programs whose document the server may write (Part 4: the Pipeline, 6 Oct 2026; Executive Readiness and Responsible AI Governance, 7 Oct 2026; AI-Ready Architecture, 21 Oct 2026)
+const PROGRAMS = ['pipeline', 'exec-readiness', 'ai-governance', 'ai-architecture', 'ai-culture'];   // the programs whose document the server may write (Part 4: the Pipeline, 6 Oct 2026; Executive Readiness and Responsible AI Governance, 7 Oct 2026; AI-Ready Architecture, 21 Oct 2026; AI-Ready Culture, 6 Nov 2026)
 /* AI-Ready Architecture's module.js takes its empty document from program.js (ARC.emptyData, handed over at
    port time — tools/port-ai-architecture.js), so that file runs first. It wires a few listeners at load, hence
    the inert document/window methods below. */
-const BEFORE = { 'ai-architecture': ['program.js'] };
+const BEFORE = { 'ai-architecture': ['program.js'], 'ai-culture': ['program.js'] };   /* Culture: same arrangement (tools/port-ai-culture.js) */
 
 const defs = {};
 const inert = { addEventListener() { }, removeEventListener() { } };

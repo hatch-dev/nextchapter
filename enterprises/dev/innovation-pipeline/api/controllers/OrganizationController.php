@@ -117,8 +117,10 @@ class OrganizationController extends Controller
      * One transaction: either all of it happens or none of it does. The admin console only — the app
      * administrator's session.
      */
-    /* AI-Ready Architecture joined 21 Oct 2026: its build carries the same reset law (Rollout item 68, as amended). */
-    private const RESET_MODULES = ['pipeline', 'exec-readiness', 'ai-governance', 'ai-architecture'];
+    /* AI-Ready Architecture joined 21 Oct 2026: its build carries the same reset law (Rollout item 68, as amended).
+       AI-Ready Culture joined 6 Nov 2026: its clearData() is Governance's ruled model (reset clears program data
+       and the roster down to administrators). */
+    private const RESET_MODULES = ['pipeline', 'exec-readiness', 'ai-governance', 'ai-architecture', 'ai-culture'];
 
     public function reset(): void
     {

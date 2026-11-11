@@ -70,6 +70,14 @@
      Readiness, served by this same install. BOOT.doors ("<role>/<module>" => its address, no trailing slash) comes
      from index.php, so every link to such a program, from either door, goes to its own address. */
   function doorOf(m) { var d = BOOT.doors; return (d && m && d[m.roleSlug + '/' + m.slug]) || ''; }
+  /* 6 Nov 2026: the program whose DOOR this page was reached through (BOOT.pinned), and that door's address.
+     Known on every screen at a door — the root screens too (…/culture/admin, …/culture/signup), where no module
+     is loaded — so sign-in, sign-up and the admin console can stay at, and land back in, the door they began at. */
+  function pinnedModule() {
+    var p = BOOT.pinned;
+    return (p && window.Modules && Modules.bySlug && Modules.bySlug(p.role, p.module)) || null;
+  }
+  function homeDoor() { var m = pinnedModule(); return m ? doorOf(m) : ''; }
 
   /** /apps/<role>/<module>[/<page>[/<step>]] — the canonical address of a
       screen. Falls back to ?module= when nothing served the page. */
@@ -105,8 +113,10 @@
       program's sign-in screen goes to the same one shared page. */
   function authUrl(screen, moduleId) {
     screen = screen || 'login';
-    if (screen === 'admin' || screen === 'admin-login') return base() + 'admin';
-    if (screen === 'signup' || screen === 'setup') return base() + 'signup';
+    /* At a program's own door the root screens stay on it (…/culture/admin), so the program is still known
+       when the account lands (landingUrl). The install's own door gives the same address as before. */
+    if (screen === 'admin' || screen === 'admin-login') return (homeDoor() ? homeDoor() + '/' : base()) + 'admin';
+    if (screen === 'signup' || screen === 'setup') return (homeDoor() ? homeDoor() + '/' : base()) + 'signup';
     var m = (window.Modules && (Modules.byId(moduleId) || Modules.active())) || null;
     if (!m || !m.roleSlug || !served()) return base() + seg(screen);
     if (doorOf(m)) return doorOf(m) + '/' + seg(screen);
@@ -217,7 +227,9 @@
     function first(id) { return id ? (open.filter(function (m) { return m.id === id; })[0] || null) : null; }
     var last = null;
     try { last = localStorage.getItem('pipeline-module'); } catch (e) { }
+    var pin = pinnedModule();
     var pick = first(BOOT.moduleId)
+      || first(pin && pin.id)          /* 6 Nov 2026: the door this sign-in began at (…/culture/admin → Culture) */
       || first(last)
       || first(window.Modules && Modules.DEFAULT_ID)
       || open.filter(function (m) { return m.status === 'live'; })[0]
