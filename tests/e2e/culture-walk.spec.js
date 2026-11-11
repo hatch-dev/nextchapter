@@ -12,7 +12,8 @@
      4. every page at phone width (390px) — no sideways scroll. */
 const { test, expect, signIn, serverWorkspace } = require('./fixtures');
 
-const CULTURE = 'enterprises/culture';
+/* PW_CULTURE_PATH runs these against the dev install's door: PW_BASE_URL=http://localhost/apps/enterprises/dev/innovation-pipeline/ PW_CULTURE_PATH=../culture */
+const CULTURE = process.env.PW_CULTURE_PATH || 'enterprises/culture';
 const NOISE = [/ws:\/\/localhost:8090/, /\/api\/chat\/ticket/, /status of 503/];   /* the team-chat server is not part of this test */
 
 /** Every address inside the program, read from the program itself. */
@@ -145,7 +146,7 @@ test('the Demo tab: every page opens and every button on it works', async ({ pag
       if (what == null) continue;
       clicked++;
       await demo.waitForTimeout(60);
-      if (!/\/enterprises\/culture/.test(demo.url())) {   /* the button left the program: come back */
+      if (!/\/enterprises\/(dev\/)?culture/.test(demo.url())) {   /* the button left the program: come back */
         await demo.goBack().catch(() => { });
         await expect(demo.locator('#app')).not.toBeEmpty();
       }

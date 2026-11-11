@@ -30,6 +30,10 @@ node_modules/
 # Local before-edit backups (index.php.pre-arch, program.js.pre-kbfix19 ...).
 *.pre-*
 
+# Database dumps left at the top (pipeline-backup.sql ...). They hold people's data;
+# the schema and migrations that ARE committed live in api/sql/.
+/*.sql
+
 # Claude Code's per-machine settings.
 .claude/
 

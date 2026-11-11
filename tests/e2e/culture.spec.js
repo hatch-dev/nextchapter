@@ -5,7 +5,8 @@
    test never reaches Pinecone. */
 const { test, expect, signIn, serverWorkspace } = require('./fixtures');
 
-const CULTURE = 'enterprises/culture';
+/* PW_CULTURE_PATH runs these against the dev install's door: PW_BASE_URL=http://localhost/apps/enterprises/dev/innovation-pipeline/ PW_CULTURE_PATH=../culture */
+const CULTURE = process.env.PW_CULTURE_PATH || 'enterprises/culture';
 
 /* Signing in counts against each test's time, and with two workers it takes most of the default 30s: the save test
    took 22-29s across runs and failed once at 30s (11 Nov 2026). */
