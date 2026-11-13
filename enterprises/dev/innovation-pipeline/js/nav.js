@@ -222,6 +222,29 @@
     }
     var mm = nr.querySelector('[data-slot="more-menu"]');
     if (mm) mm.innerHTML = UI.navMore ? moreMenuHtml() : '';
+    fitNavMenus(nr);
+  }
+
+  /* The header is position:fixed, so its menus do not move when the page
+     scrolls: whatever hangs below the bottom of the window cannot be reached
+     at all. In a window under ~570px tall the More menu's last four items —
+     Seed sample data, Report Manager, Export state, Import state — were out of
+     reach (live test 13 Nov 2026, F-05). Each open menu is held to the room
+     left below it and scrolls inside that (styles.css); below 820px wide the
+     drawer, which scrolls on its own, carries all of this instead. */
+  function fitNavMenus(root) {
+    try {
+      var menus = (root || document).querySelectorAll('.nav-more-menu, .nav-module-menu');
+      for (var i = 0; i < menus.length; i++) {
+        var m = menus[i];
+        m.style.maxHeight = '';
+        var room = Math.floor(window.innerHeight - m.getBoundingClientRect().top - 12);
+        if (m.scrollHeight > room) m.style.maxHeight = Math.max(room, 120) + 'px';
+      }
+    } catch (e) { }
+  }
+  if (typeof window !== 'undefined') {
+    window.addEventListener('resize', function () { var n = document.querySelector('nav'); if (n) fitNavMenus(n); });
   }
 
   /* The account menu behind the chip. Three items, and each one is offered only

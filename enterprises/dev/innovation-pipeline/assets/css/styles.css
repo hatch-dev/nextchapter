@@ -2956,6 +2956,21 @@ select option {
   gap: 2px
 }
 
+/* The header is fixed, so a menu taller than the room below it cannot be
+   scrolled into view with the page. fitNavMenus (js/nav.js) gives an open menu
+   a max-height that fits the window, and it scrolls inside that; its rows keep
+   their height rather than being squeezed to fit (live test 13 Nov 2026, F-05). */
+.nav-more-menu,
+.nav-module-menu {
+  overflow-y: auto;
+  overscroll-behavior: contain
+}
+
+.nav-more-menu > *,
+.nav-module-menu > * {
+  flex-shrink: 0
+}
+
 .nav-more-item {
   display: flex;
   align-items: center;
