@@ -309,6 +309,44 @@ class WorkspaceController extends Controller
             }
         }
 
+        /* List sections sent as the rows that changed (js/app.js recordDelta),
+           section => { upsert: [rows with an id], remove: [ids] }. */
+        $records = [];
+        if (is_object($body) && isset($body->records) && is_object($body->records)) {
+            foreach ($body->records as $key => $delta) {
+                if (!is_string($key) || $key === '' || !is_object($delta) || isset($sections->$key)) {
+                    continue;
+                }
+                $upsert = [];
+                foreach ((isset($delta->upsert) && is_array($delta->upsert)) ? $delta->upsert : [] as $row) {
+                    if (is_object($row) && isset($row->id) && is_scalar($row->id)) {
+                        $upsert[] = $row;
+                    }
+                }
+                $remove = [];
+                foreach ((isset($delta->remove) && is_array($delta->remove)) ? $delta->remove : [] as $id) {
+                    if (is_scalar($id)) {
+                        $remove[] = (string) $id;
+                    }
+                }
+                /* Rows that were already there, as the fields that changed: { id, set: {field: value}, unset: [field] }. */
+                $patch = [];
+                foreach ((isset($delta->patch) && is_array($delta->patch)) ? $delta->patch : [] as $p) {
+                    if (!is_object($p) || !isset($p->id) || !is_scalar($p->id)) {
+                        continue;
+                    }
+                    $unset = [];
+                    foreach ((isset($p->unset) && is_array($p->unset)) ? $p->unset : [] as $f) {
+                        if (is_string($f) && $f !== 'id') {
+                            $unset[] = $f;
+                        }
+                    }
+                    $patch[] = ['id' => (string) $p->id, 'set' => (isset($p->set) && is_object($p->set)) ? $p->set : new \stdClass(), 'unset' => $unset];
+                }
+                $records[$key] = ['upsert' => $upsert, 'patch' => $patch, 'remove' => $remove];
+            }
+        }
+
         $schemaVersion = isset($input['schema_version']) ? (int) $input['schema_version'] : 1;
         $privacy       = $this->privacy($module, $actor);
         $removed       = $privacy->removable($removed);   /* Sweep 4R item 3: nor deleted by anyone else */
@@ -325,7 +363,11 @@ class WorkspaceController extends Controller
             $actor['public_id'],
             $schemaVersion,
             $module,
-            static function (object $sections, ?object $stored) use ($privacy, $module): object {
+            static function (object $sections, ?object $stored) use ($privacy, $module, $records): object {
+                /* Row deltas become whole lists here, against the document as stored at
+                   this instant, so the privacy filter and everything after see what they
+                   always saw. */
+                $sections = self::withRecords($sections, $records, $stored);
                 $out = $privacy->forPatch($sections, $stored);
                 return $stored === null ? self::withAiDefaults($out, $module) : $out;
             }
@@ -636,6 +678,73 @@ class WorkspaceController extends Controller
      * The browser's first save is often a patch of only the sections that differ from its empty document — and since
      * the empty document has both on, `settings` was left out, and a document without it reads as both off.
      */
+    /**
+     * Lay row deltas over the lists as stored (live test 13 Nov 2026, F-01).
+     *
+     * A list is one section, so a patch that sent the whole list also sent the
+     * sender's stale copy of every row they had not touched, and the second of
+     * two people editing different rows erased the first one's save. A delta
+     * names only the rows the sender changed: those replace their stored rows
+     * in place, removed ids go, rows new to the list are added at the end, and
+     * every row nobody here touched stays exactly as stored. The same rules as
+     * the client's mergeRows / applyRecordDelta (js/app.js); keep them alike.
+     *
+     * @param array<string, array{upsert: array<int, object>, patch?: array<int, array{id: string, set: object, unset: array<int, string>}>, remove: array<int, string>}> $records
+     */
+    private static function withRecords(object $sections, array $records, ?object $stored): object
+    {
+        if ($records === []) {
+            return $sections;
+        }
+        $out = clone $sections;
+        foreach ($records as $key => $delta) {
+            $list   = ($stored !== null && isset($stored->$key) && is_array($stored->$key)) ? $stored->$key : [];
+            $remove = array_fill_keys($delta['remove'], true);
+            $upsert = [];
+            foreach ($delta['upsert'] as $row) {
+                $upsert[(string) $row->id] = $row;
+            }
+            /* Field patches (F-12, 13 Nov 2026): a row that was already there changes field by field, so two
+               people editing different fields of one record both land. A patch for a row no longer stored
+               (someone removed it) is dropped — never a half row. */
+            $patch = [];
+            foreach ($delta['patch'] ?? [] as $p) {
+                $patch[$p['id']] = $p;
+            }
+            $merged = [];
+            foreach ($list as $row) {
+                $id = (is_object($row) && isset($row->id) && is_scalar($row->id)) ? (string) $row->id : null;
+                if ($id !== null && isset($remove[$id])) {
+                    continue;
+                }
+                if ($id !== null && array_key_exists($id, $upsert)) {
+                    $merged[] = $upsert[$id];
+                    unset($upsert[$id]);
+                    continue;
+                }
+                if ($id !== null && array_key_exists($id, $patch)) {
+                    $next = clone $row;
+                    foreach ($patch[$id]['set'] as $field => $value) {
+                        if ($field !== 'id') {
+                            $next->$field = $value;
+                        }
+                    }
+                    foreach ($patch[$id]['unset'] as $field) {
+                        unset($next->$field);
+                    }
+                    $merged[] = $next;
+                    continue;
+                }
+                $merged[] = $row;
+            }
+            foreach ($upsert as $row) {
+                $merged[] = $row;
+            }
+            $out->$key = $merged;
+        }
+        return $out;
+    }
+
     private static function withAiDefaults(object $doc, string $module): object
     {
         if (in_array($module, self::AI_SWITCH_MODULES, true) && !(isset($doc->settings) && is_object($doc->settings))) {

@@ -122,7 +122,7 @@
     notes:        {kind:'list',  family:true, prefix:'nt', label:'Notes panel', fields:{text:'text', date:'ISO timestamp'}},
     chatMsgs:     {kind:'list',  family:true, prefix:'cm', label:'Team Chat thread. Real members only, and demo messages come only from the seed', fields:{who:'roster id', name:'text', at:'epoch milliseconds', text:'text'}},
     notifications:{kind:'list',  family:true, label:'Email outbox (capped at 50, Spec §12)', fields:{kind:'step-complete or deadline-reminder', subject:'text', to:'emails', stepId:'step id', sentAt:'ISO timestamp'}},
-    remind7:      {kind:'map',   family:true, label:'Deadline reminders already queued', key:'step id', value:'true'},
+    remind7:      {kind:'map',   family:true, label:'Deadline reminders already queued', key:'step id', value:'the due date the reminder was sent for (was true before 13 Nov 2026)'},
     roster:       {kind:'list',  family:true, prefix:'u', label:'Team roster', fields:{name:'text', username:'text, unique in the installation ignoring capitals and spaces', passcode:'the password, held in the browser record until deployment (the local sign-in, Spec §25.5) and never displayed', mustChange:'boolean, a temporary password to be replaced at the next sign-in', role:'text', email:'text', admin:'boolean'}},
     enterprise:   {kind:'record',family:true, label:'Organization profile (Org & Team modal)', fields:{name:'text'}},
     orgSetup:     {kind:'value', family:true, label:'Setup wizard finished', empty:false},
@@ -2716,12 +2716,17 @@
 
   function mgSteps(){var out=[];PH.forEach(function(p){if(p.days==='Ongoing')return;p.steps.forEach(function(st){out.push({id:st.id,name:st.name,icon:st.icon,ph:p})})});return out}
 
+  /* A field whose prefix is not a schema prefix may still name its record: the 2.1 targets, priorities and
+     descriptions (rs21s_/rs21p_/rs21d_…), the 4.2 cadences and others carry data-lock="<coll>::<id>", the same
+     key their save guards ask Collab.lockedByOther() about. Unread until 13 Nov 2026, so those fields took no
+     lock on focus and painted none for anyone else, and two people typed into one target box (live test F-03). */
+  function culLockAttr(id){try{var el=document.getElementById(id),k=el&&el.getAttribute('data-lock');return k?String(k):null}catch(e){return null}}
   function idToRecordKey(id){
     if(!id) return null;
-    var s=String(id), i=s.indexOf('_'); if(i<0) return null;
+    var s=String(id), i=s.indexOf('_'); if(i<0) return culLockAttr(s);
     var pre=s.slice(0,i), rest=s.slice(i+1);
     var fam={ru:'roster',ent:'enterprise'}; if(fam[pre]) return fam[pre];
-    var coll=CUL_PREFIX[pre]; if(!coll) return null;
+    var coll=CUL_PREFIX[pre]; if(!coll) return culLockAttr(s);
     var c=CUL_SCHEMA[coll];
     if(c.kind==='list'){ var j=rest.indexOf('_'); if(j<0) return null; var rid=rest.slice(j+1); return rid?(coll+'::'+rid):null; }
     if(c.kind==='map'){ var k=rest.indexOf('_'); var key=k<0?rest:rest.slice(0,k); return key?(coll+'::'+key):coll; }

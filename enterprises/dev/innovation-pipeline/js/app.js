@@ -657,16 +657,92 @@ var Store = (function () {
      document. `removed` are sections that were there at the baseline and are
      gone now, which a patch has to state explicitly or they would live on. */
   function changedSections(base, doc) {
-    var sections = {}, removed = [], n = 0, k;
+    var sections = {}, records = {}, removed = [], n = 0, k;
     for (k in doc) {
       if (!has(doc, k) || MERGE_SKIP[k]) continue;
-      if (!has(base, k) || !deepEq(base[k], doc[k])) { sections[k] = doc[k]; n++; }
+      if (!has(base, k) || !deepEq(base[k], doc[k])) {
+        var rd = has(base, k) ? recordDelta(base[k], doc[k]) : null;
+        if (rd) records[k] = rd; else sections[k] = doc[k];
+        n++;
+      }
     }
     for (k in base) {
       if (!has(base, k) || MERGE_SKIP[k]) continue;
       if (!has(doc, k)) { removed.push(k); n++; }
     }
-    return { sections: sections, removed: removed, count: n };
+    return { sections: sections, records: records, removed: removed, count: n };
+  }
+
+  /* ── A list section goes up as the rows this browser changed ──────
+     A section is the unit of a patch, and a list is ONE section: every target
+     on Culture's 2.1, every row of a register. Sending the whole list sent this
+     browser's copy of everybody else's rows with it, so the second of two
+     people editing different rows of one list put the first one's row back as
+     it was before — saved, then silently gone for everyone (live test,
+     13 Nov 2026, F-01; the plan's drill D3). The edit locks are per row, so
+     nothing stopped the two of them; nothing should have.
+
+     So a record array (recordArray: every row has an id) goes as
+     { upsert: rows added or changed here, remove: ids deleted here }, and the
+     server lays that over the list as it stands at the moment of writing
+     (WorkspaceController::withRecords), the same way mergeRows lays a
+     colleague's list over ours: stored order, rows new here at the end.
+
+     Whenever that could say something different from the whole list, the whole
+     list goes as before: rows with duplicate ids, rows reordered here, or a row
+     inserted anywhere but the end. */
+  function recordDelta(b, d) {
+    if (!Array.isArray(b) || !Array.isArray(d) || !recordArray(b) || !recordArray(d)) return null;
+    var bi = indexById(b), di = indexById(d);
+    if (Object.keys(bi).length !== b.length || Object.keys(di).length !== d.length) return null;
+    var shared = [], seenNew = false, i, id;
+    for (i = 0; i < d.length; i++) {
+      id = String(d[i].id);
+      if (has(bi, id)) { if (seenNew) return null; shared.push(id); } else seenNew = true;
+    }
+    var was = b.map(function (r) { return String(r.id); }).filter(function (x) { return has(di, x); });
+    if (was.join('\u0000') !== shared.join('\u0000')) return null;
+    /* A row new here goes whole (upsert). A row that was already there goes as the FIELDS that changed
+       (patch: set / unset), never as the whole row: two people editing different fields of one record a
+       moment apart — the plan's drill D2 — each sent the whole row, so the second put back the first one's
+       field as it was before (live test, 13 Nov 2026, F-12: lost in 5 of 6 trials). */
+    var upsert = [], patch = [];
+    d.forEach(function (r) {
+      var x = String(r.id);
+      if (!has(bi, x)) { upsert.push(r); return; }
+      var o = bi[x];
+      if (deepEq(o, r)) return;
+      var set = {}, unset = [], k, n = 0;
+      for (k in r) { if (has(r, k) && k !== 'id' && (!has(o, k) || !deepEq(o[k], r[k]))) { set[k] = r[k]; n++; } }
+      for (k in o) { if (has(o, k) && !has(r, k)) { unset.push(k); n++; } }
+      if (n) patch.push({ id: r.id, set: set, unset: unset });
+    });
+    var remove = b.filter(function (r) { return !has(di, String(r.id)); }).map(function (r) { return String(r.id); });
+    return { upsert: upsert, patch: patch, remove: remove };
+  }
+  /* What the server makes of a row delta (WorkspaceController::withRecords), so the
+     baseline can say what the server holds after one. Keep the two the same: a
+     patch lands field by field on the row as stored, and a patch for a row that
+     is no longer there (someone removed it) is dropped, never a half row. */
+  function applyRecordDelta(stored, delta) {
+    var src = Array.isArray(stored) ? stored : [], up = {}, order = [], rm = {}, pt = {}, out = [];
+    (delta.remove || []).forEach(function (x) { rm[String(x)] = 1; });
+    (delta.upsert || []).forEach(function (r) { var x = String(r.id); if (!has(up, x)) order.push(x); up[x] = r; });
+    (delta.patch || []).forEach(function (p) { pt[String(p.id)] = p; });
+    src.forEach(function (r) {
+      var x = (isPlainObj(r) && r.id != null) ? String(r.id) : null;
+      if (x !== null && rm[x]) return;
+      if (x !== null && has(up, x)) { out.push(cloneDoc(up[x])); delete up[x]; return; }
+      if (x !== null && has(pt, x)) {
+        var row = cloneDoc(r) || {}, p = pt[x], k;
+        for (k in (p.set || {})) { if (has(p.set, k)) row[k] = cloneDoc(p.set[k]); }
+        (p.unset || []).forEach(function (u) { delete row[u]; });
+        out.push(row); return;
+      }
+      out.push(r);
+    });
+    order.forEach(function (x) { if (has(up, x)) out.push(cloneDoc(up[x])); });
+    return out;
   }
 
   /* Save one org's document. The rev we loaded at goes up as `base_rev`, so
@@ -765,7 +841,7 @@ var Store = (function () {
     var patch = confirmedNow && !server.noPatch ? changedSections(confirmedNow, doc) : null;
     var usePatch = !!(patch && patch.count);
     var body = usePatch
-      ? { org: orgServer, module: moduleId(id), actor_id: actor, sections: patch.sections, removed: patch.removed, schema_version: SCHEMA_VERSION }
+      ? { org: orgServer, module: moduleId(id), actor_id: actor, sections: patch.sections, records: patch.records, removed: patch.removed, schema_version: SCHEMA_VERSION }
       /* moduleId(id), not moduleId(). Which module a document belongs to depends
          on the ORG, because the fallback inside moduleId() reads the account's
          role — and every READ path here passes it (orgKey, modQ). A write that
@@ -827,6 +903,7 @@ var Store = (function () {
             var nb = cloneDoc(getBase(id) || confirmedNow) || {};
             var beforeNb = cloneDoc(nb) || {};   // nb is written in place below
             for (var sk in patch.sections) { if (has(patch.sections, sk)) nb[sk] = cloneDoc(patch.sections[sk]); }
+            for (var rsk in patch.records) { if (has(patch.records, rsk)) nb[rsk] = applyRecordDelta(nb[rsk], patch.records[rsk]); }
             for (var ri = 0; ri < patch.removed.length; ri++) delete nb[patch.removed[ri]];
             /* Remember these as OURS before the baseline moves: the difference
                between the two is exactly what this request wrote, and it is what
@@ -1083,7 +1160,16 @@ var Store = (function () {
     for (i = 0; i < parts.length - 1; i++) { if (o[parts[i]] == null || typeof o[parts[i]] !== 'object') o[parts[i]] = {}; o = o[parts[i]]; }
     o[parts[parts.length - 1]] = value; commit(parts[0], parts.length > 1 ? parts[1] : null);
   }
-  function removeRec(collection, id) { if (data[collection]) delete data[collection][id]; commit(collection, id); }
+  /* A collection is a map (the Pipeline's records by key) or a list (every list in AI-Ready Culture: values,
+     commitments, AI uses, the Power Map…). `delete list[id]` does nothing to a list, so Remove in Culture
+     confirmed "This cannot be undone" and then left the record where it was (live test, 13 Nov 2026, F-10). */
+  function removeRec(collection, id) {
+    var c = data[collection];
+    if (Array.isArray(c)) {
+      for (var i = c.length - 1; i >= 0; i--) { if (c[i] && c[i].id != null && String(c[i].id) === String(id)) c.splice(i, 1); }
+    } else if (c) delete c[id];
+    commit(collection, id);
+  }
 
   /* -- multi-user client machinery (July 8) ---------------------------
      refreshOrg(): adopt a newer stored blob for the active org without
@@ -3878,6 +3964,83 @@ function bankOpenPage() {
    from the document, so there is nothing on it that the document does not
    already have. Leaving it set would let a later harvest write the values this
    page happens to be showing back over a colleague's change. */
+/* ── The repaint must not commit what the reader is typing ────────
+   render() replaces the page wholesale (app.innerHTML), and when the box the
+   caret is in is taken off the page with a changed value, the browser fires
+   `change` (and `blur`) on it there and then. A box that saves on change then
+   saves the half-typed text as if the reader had finished — Culture's 2.1
+   target box took "4" as 4, rewrote it "4.0" under the caret, and the ".5"
+   the reader went on to type made "4.5.0" (live test, 13 Nov 2026, F-02).
+
+   So while a sync repaints, those events are held back before any handler
+   sees them. The reader's text and caret come back below, as they always
+   did, and the change is only made when they really leave the box: by the
+   browser, if they typed on; by us, if they left without typing (the box was
+   new, so the browser no longer counts the text as a change). Only when the
+   box still holds what was held — if the repaint did not put it back, there
+   is nothing of theirs to commit. */
+var _syncPainting = false, _heldChange = null;
+if (typeof document !== 'undefined') {
+  document.addEventListener('change', function (e) {
+    var t = e.target;
+    if (_syncPainting) {
+      if (t && t.id && isValueField(t)) _heldChange = { id: t.id, value: t.value };
+      e.stopImmediatePropagation(); e.stopPropagation();
+      return;
+    }
+    if (_heldChange && t && t.id === _heldChange.id) _heldChange = null;   // it committed on its own
+  }, true);
+  /* `blur` only, never `focusout`: the inline onblur handlers commit too, so they are held back like
+     `change`; but Collab releases the edit lock on focusout (after checking where focus went), and a
+     repaint that cannot put the caret back must still let go of the lock, or the heartbeat keeps it
+     for as long as the tab stays open. */
+  document.addEventListener('blur', function (e) {
+    if (_syncPainting) { e.stopImmediatePropagation(); e.stopPropagation(); }
+  }, true);
+  document.addEventListener('focusout', function (e) {
+    var h = _heldChange, t = e.target;
+    if (!h || _syncPainting || !t || t.id !== h.id) return;
+    _heldChange = null;
+    if (t.isConnected && t.value === h.value) {
+      try { t.dispatchEvent(new Event('change', { bubbles: true })); } catch (x) { }
+    }
+  });
+
+  /* ── A committed change is banked, whoever's handler saved it ─────
+     _bankedEdits is how a sync repaint tells "text only on this screen" (put it
+     back) from "text already saved" (let the stored value show). The shell's
+     fldSave notes it; the programs that save through their own handlers
+     (AI-Ready Culture: CUL.fldSave, culRowSet…) never did, so after two people
+     wrote one box the overruled person's box kept showing their own text, the
+     report beside it saying it had been replaced (live test, 13 Nov 2026,
+     F-13). A change event that reached its handler (bubbling, so after it) has
+     been committed or refused; either way the box now holds what the program
+     decided, and it is not unsaved work. */
+  document.addEventListener('change', function (e) {
+    var t = e.target;
+    if (!_syncPainting && t && t.id && isValueField(t)) _bankedEdits[t.id] = t.value;
+  });
+
+  /* ── Leaving the page commits the box being typed in ──────────────
+     A box that saves when it is left (Culture's 2.1 targets, any onchange
+     field) was never left on a reload or the browser's Back button: the page
+     went away first and the typing with it (live test, 13 Nov 2026, F-06).
+     Committing it here writes it into this browser's mirror at once
+     (Store.persistActive), and the next load sends what the mirror holds that
+     the server does not. Only text typed since the last paint and not yet
+     banked — anything else is already where it belongs. */
+  var commitOnLeave = function () {
+    try {
+      var a = document.activeElement;
+      if (!a || !a.id || !isValueField(a) || a.disabled) return;
+      if (!ownKey(_liveEdits, a.id) || (ownKey(_bankedEdits, a.id) && _bankedEdits[a.id] === a.value)) return;
+      a.dispatchEvent(new Event('change', { bubbles: true }));
+      try { if (window.Store && Store.flushNow) Store.flushNow(); } catch (x) { }
+    } catch (x) { }
+  };
+  window.addEventListener('pagehide', commitOnLeave);
+  window.addEventListener('beforeunload', commitOnLeave);
+}
 function repaintAfterSync() {
   var edits = _liveEdits, banked = _bankedEdits, f = null;
   try {
@@ -3898,7 +4061,8 @@ function repaintAfterSync() {
       if (ownKey(edits, a.id)) edits[a.id] = a.value;
     }
   } catch (e) { }
-  try { loadData(); applyTeamRoster(); render(); } catch (e) { }
+  _syncPainting = true;
+  try { loadData(); applyTeamRoster(); render(); } catch (e) { } finally { _syncPainting = false; }
   try {
     Object.keys(edits).forEach(function (id) {
       var el = document.getElementById(id);
