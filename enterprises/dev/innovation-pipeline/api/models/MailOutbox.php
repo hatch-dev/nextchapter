@@ -106,6 +106,54 @@ class MailOutbox extends Model
         );
     }
 
+    /**
+     * A MySQL named lock, so two requests asking to send the same notification at the same moment take turns
+     * at "has this already been queued?" (live test, 13 Nov 2026, F-15: two people completing a step together
+     * mailed everyone twice). Held only around the check and the queueing, never around the sending.
+     */
+    public function lock(string $name, int $timeoutSeconds = 20): bool
+    {
+        $row = $this->selectOne('SELECT GET_LOCK(:n, :t) AS got', [':n' => mb_substr($name, 0, 64), ':t' => $timeoutSeconds]);
+        return (int) ($row['got'] ?? 0) === 1;
+    }
+
+    public function unlock(string $name): void
+    {
+        $this->selectOne('SELECT RELEASE_LOCK(:n) AS released', [':n' => mb_substr($name, 0, 64)]);
+    }
+
+    /** Has this exact message (organization, kind family, recipient, subject) been queued in the last $seconds? */
+    public function queuedRecently(int $orgId, string $kindPrefix, string $toEmail, string $subject, int $seconds): bool
+    {
+        $row = $this->selectOne(
+            'SELECT 1 AS hit FROM mail_outbox
+              WHERE organization_id = :org AND kind LIKE :kind AND to_email = :to AND subject = :subject
+                AND created_at >= (NOW() - INTERVAL ' . max(1, $seconds) . ' SECOND)
+              LIMIT 1',
+            [':org' => $orgId, ':kind' => $kindPrefix . '%', ':to' => $toEmail, ':subject' => $subject]
+        );
+        return $row !== null;
+    }
+
+    /**
+     * Messages a retry may still send: queued, tried fewer than $maxAttempts times, not older than $days, and
+     * at least $minAgeSeconds old (a younger one may still be in its first send). Ages are measured by the
+     * database's own clock, the one created_at was written with — PHP's may be in another time zone.
+     */
+    public function retryable(int $limit = 25, int $maxAttempts = 5, int $days = 7, ?int $orgId = null, int $minAgeSeconds = 60): array
+    {
+        $limit = max(1, min(200, $limit));
+        return $this->select(
+            "SELECT public_id, kind, to_email, to_name, subject, body_html, body_text, attempts, organization_id, created_at
+               FROM mail_outbox
+              WHERE status = 'queued' AND attempts < " . max(1, $maxAttempts) . '
+                AND created_at >= (NOW() - INTERVAL ' . max(1, $days) . ' DAY)
+                AND created_at <= (NOW() - INTERVAL ' . max(0, $minAgeSeconds) . ' SECOND)'
+                . ($orgId !== null ? ' AND organization_id = ' . (int) $orgId : '') . "
+              ORDER BY id ASC LIMIT $limit"
+        );
+    }
+
     /** Everything still waiting to go out, oldest first. */
     public function queued(int $limit = 25): array
     {

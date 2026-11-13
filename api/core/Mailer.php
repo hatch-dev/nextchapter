@@ -94,6 +94,21 @@ class Mailer
             $enc = $port === 465 ? 'ssl' : 'tls';
         }
 
+        /* One more try, a moment later, for a failure that is not the message's fault: a dropped socket, a
+           server that answers "530 Authentication Required" to an AUTH it accepted a second earlier (seen live,
+           13 Nov 2026: 2 of 18 assignment emails). The outbox row stays queued for a later retry if this
+           fails too (tools/mail-retry.php). */
+        $result = $this->attempt($host, $port, $enc, $toEmail, $toName, $subject, $html, $text, $attachments);
+        if (empty($result['ok']) && !empty($result['retryable'])) {
+            usleep(1500000);
+            $result = $this->attempt($host, $port, $enc, $toEmail, $toName, $subject, $html, $text, $attachments);
+        }
+        return $result;
+    }
+
+    /** @return array{ok:bool, error?:string, retryable?:bool} */
+    private function attempt(string $host, int $port, string $enc, string $toEmail, string $toName, string $subject, string $html, string $text, array $attachments): array
+    {
         try {
             $this->connect($host, $port, $enc);
             $this->handshake($host, $enc);
@@ -104,6 +119,12 @@ class Mailer
             return ['ok' => true];
         } catch (\RuntimeException $e) {
             return ['ok' => false, 'error' => $e->getMessage(), 'retryable' => $this->retryable($e->getMessage())];
+        } catch (\Throwable $e) {
+            /* Not only RuntimeException: api/index.php turns every PHP warning into an ErrorException, the
+               ones this class silences with @ included, so a socket or TLS hiccup arrived here as an
+               ErrorException, escaped, and left its outbox row `queued` with no attempt and no error,
+               never to be sent (live test, 13 Nov 2026, F-17: 3 of 18). Anything unexpected is temporary. */
+            return ['ok' => false, 'error' => get_class($e) . ': ' . $e->getMessage(), 'retryable' => true];
         } finally {
             $this->disconnect();
         }
@@ -174,8 +195,13 @@ class Mailer
 
     private function disconnect(): void
     {
-        if (is_resource($this->socket)) {
-            @fclose($this->socket);
+        /* Guarded as well as silenced: api/index.php's error handler throws even for a warning @ silences, and
+           this runs in send's `finally`, where a throw would escape past every catch. */
+        try {
+            if (is_resource($this->socket)) {
+                @fclose($this->socket);
+            }
+        } catch (\Throwable $e) {
         }
         $this->socket = null;
     }
@@ -231,6 +257,11 @@ class Mailer
      */
     private function retryable(string $error): bool
     {
+        /* 530 "Authentication Required" (RFC 4954 5.7.0) is about this session, not the message: the same
+           message goes through on the next connection. */
+        if (preg_match('/refused: 530\b/', $error) === 1) {
+            return true;
+        }
         return preg_match('/refused: 5\d\d/', $error) !== 1;
     }
 

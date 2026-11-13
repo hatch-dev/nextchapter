@@ -4,6 +4,7 @@ namespace Controllers;
 use Core\Catalogue;
 use Core\Controller;
 use Core\Mailer;
+use Core\MailRetry;
 use Core\ReportDocument;
 use Core\ReportMail;
 use Core\ReportPdf;
@@ -78,6 +79,8 @@ class NotifyController extends Controller
     /** Generous, but an email is not a file transfer. */
     private const MAX_HTML       = 2000000;
     private const MAX_RECIPIENTS = 200;
+    /** The same notification to the same person within this window is a duplicate (F-15, 13 Nov 2026). */
+    private const DEDUPE_SECONDS = 900;
 
     public function store(): void
     {
@@ -156,26 +159,54 @@ class NotifyController extends Controller
         $sent = 0;
         $failed = 0;
         $queued = 0;
-        foreach (array_slice($recipients, 0, self::MAX_RECIPIENTS, true) as $email => $name) {
-            /* Queued BEFORE the attempt, like every other message this app
-               sends — see Models\MailOutbox for why. */
-            try {
-                $id = $outbox->queue([
-                    'kind'            => $mailKind,
-                    'to_email'        => $email,
-                    'to_name'         => $name,
-                    'subject'         => $subject,
-                    'body_html'       => $body,
-                    'body_text'       => $composed['text'],
-                    'organization_id' => (int) $org['id'],
-                ]);
-            } catch (\Throwable $e) {
-                error_log('notification could not be queued: ' . $e->getMessage());
-                $failed++;
-                continue;
-            }
-            $queued++;
+        $duplicates = 0;
 
+        /* ── Once per person, however many browsers ask ────────────
+           A step-complete notice and a deadline reminder are sent by the
+           members' browsers, and two browsers can ask for the same one at the
+           same moment: two people pressing Mark step complete together mailed
+           every member twice (live test, 13 Nov 2026, F-15). The same message
+           (organization, kind, recipient, subject) queued within DEDUPE_SECONDS
+           is not queued again. The check and the queueing happen under a named
+           lock so two requests cannot both pass the check; the sending, which
+           is slow, happens after the lock is released. */
+        $lockName = 'notify:' . md5($org['id'] . '|' . $kind . '|' . $subject);
+        $locked = false;
+        try { $locked = $outbox->lock($lockName); } catch (\Throwable $e) { $locked = false; }
+        $toSend = [];
+        try {
+            foreach (array_slice($recipients, 0, self::MAX_RECIPIENTS, true) as $email => $name) {
+                try {
+                    if ($outbox->queuedRecently((int) $org['id'], 'notify-' . $kind, $email, $subject, self::DEDUPE_SECONDS)) {
+                        $duplicates++;
+                        continue;
+                    }
+                    /* Queued BEFORE the attempt, like every other message this app
+                       sends — see Models\MailOutbox for why. */
+                    $id = $outbox->queue([
+                        'kind'            => $mailKind,
+                        'to_email'        => $email,
+                        'to_name'         => $name,
+                        'subject'         => $subject,
+                        'body_html'       => $body,
+                        'body_text'       => $composed['text'],
+                        'organization_id' => (int) $org['id'],
+                    ]);
+                } catch (\Throwable $e) {
+                    error_log('notification could not be queued: ' . $e->getMessage());
+                    $failed++;
+                    continue;
+                }
+                $queued++;
+                $toSend[] = [$id, $email, $name];
+            }
+        } finally {
+            if ($locked) {
+                try { $outbox->unlock($lockName); } catch (\Throwable $e) { }
+            }
+        }
+
+        foreach ($toSend as [$id, $email, $name]) {
             if (!$configured) {
                 continue;
             }
@@ -190,6 +221,17 @@ class NotifyController extends Controller
             $failed++;
         }
 
+        /* Mail this organization still owes from earlier (a few rows, at least two minutes old): so a failed
+           send recovers even where tools/mail-retry.php has not been scheduled (F-17, 13 Nov 2026). This
+           request is fire-and-forget for the browser, so the extra seconds cost nobody a wait. */
+        if ($configured) {
+            try {
+                MailRetry::run(3, (int) $org['id'], 120);
+            } catch (\Throwable $e) {
+                error_log('mail retry after a notification failed: ' . $e->getMessage());
+            }
+        }
+
         /* 2xx means ACCEPTED, which is what the app records as 'sent' (Part 3
            point 2). With no MAIL_HOST configured every message stays queued and
            readable in the outbox — a pending deployment step, not a failure, so
@@ -201,6 +243,7 @@ class NotifyController extends Controller
             'queued'     => $queued,
             'sent'       => $sent,
             'failed'     => $failed,
+            'duplicates' => $duplicates,   /* already queued for that person moments ago (F-15) */
             'configured' => $configured,
             /* Kept for the app, which has read it since the endpoint existed —
                now answering the question it always asked: is the report still

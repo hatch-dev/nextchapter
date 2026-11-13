@@ -130,7 +130,12 @@ function notifySweepDeadlines() {
     if (!data.remind7) data.remind7 = {};
     var today = new Date(); today.setHours(0, 0, 0, 0);
     Object.keys(due).forEach(function (id) {
-      if (!due[id] || co[id] || data.remind7[id]) return;
+      /* remind7[id] holds the due date the reminder was sent FOR (it used to be `true`, set once and never
+         cleared), so a step whose date moves is reminded again for its new date, and one moved away and back
+         to a different date within the week is not silently dropped (live test, 13 Nov 2026, F-16). A `true`
+         left by the old rule is read as "reminded for the date it has now" — no second reminder on upgrade. */
+      if (data.remind7[id] === true) { data.remind7[id] = due[id]; Store.commit('remind7'); }
+      if (!due[id] || co[id] || data.remind7[id] === due[id]) return;
       var who = assigns[id] || []; if (!who.length) return; /* reminders are for ASSIGNED deadlines */
       var d = new Date(due[id] + 'T00:00:00'); var days = Math.round((d - today) / 86400000);
       if (days < 0 || days > 7) return;
@@ -139,7 +144,7 @@ function notifySweepDeadlines() {
       if (!to.length) return;
       var n = notifyQueue('deadline-reminder', notifyStepName(id) + ' due ' + due[id], to, id, false);
       if (n && !admins.length) n.status += ' \u00b7 no administrator on the roster';
-      data.remind7[id] = true; Store.commit('remind7')
+      data.remind7[id] = due[id]; Store.commit('remind7')
     })
   } catch (e) { }
 }
