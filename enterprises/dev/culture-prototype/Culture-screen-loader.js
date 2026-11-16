@@ -114,9 +114,20 @@
       if (typeof window.getCurrentUser === 'function' && !window.getCurrentUser()) return;
       var z = (window.UI && window.UI.zoom) || 1;
       var zs = (z && z !== 1) ? (' style="zoom:' + z + '"') : '';
+      // User testing (4 Nov 2026, Paul): remounting the screen already showing
+      // (a click on the theme, for example) keeps its videos playing and its
+      // fade-ins in place, so the click does not look like a page reload.
+      var same = container.getAttribute('data-screen') === name, oldV = {};
+      if (same) container.querySelectorAll('video').forEach(function (v) { var s = v.querySelector('source'), k = s ? s.getAttribute('src') : v.getAttribute('src'); if (k && !oldV[k]) oldV[k] = v; });
       container.innerHTML = '<div class="zoom-wrap" id="zoomWrap"' + zs + '>' + html + '</div>';
+      container.setAttribute('data-screen', name);
+      if (same) container.querySelectorAll('video').forEach(function (nv) { var s = nv.querySelector('source'), k = s ? s.getAttribute('src') : nv.getAttribute('src'), ov = k && oldV[k]; if (ov && nv.parentNode) { nv.parentNode.replaceChild(ov, nv); delete oldV[k]; } });
       wire(container);
-      reveal(container);
+      if (same) {
+        container.classList.add('cul-still');
+        container.querySelectorAll('.reveal').forEach(function (el) { el.classList.add('visible'); });
+        requestAnimationFrame(function () { requestAnimationFrame(function () { container.classList.remove('cul-still'); }); });
+      } else reveal(container);
       if (typeof opts.afterMount === 'function') opts.afterMount(container);
     }).catch(function (err) {
       if (window.currentPage !== pageId) return;

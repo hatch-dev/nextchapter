@@ -323,6 +323,11 @@ select {
   transform: translateY(0)
 }
 
+/* User testing (4 Nov 2026, Paul): a repaint of the page already showing (the More menu, the theme, Minimize) sets its fade-ins at once, without the animation, so the click does not look like a reload. render() and the screen loader add .cul-still for two frames; arriving at a page still plays the fade-ins. */
+#app.cul-still .reveal {
+  transition: none !important
+}
+
 /* ─── NAV ───────────────────────────────────────────────────── */
 nav {
   position: fixed;

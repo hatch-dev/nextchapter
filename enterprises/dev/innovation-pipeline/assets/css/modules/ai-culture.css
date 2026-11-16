@@ -477,8 +477,7 @@ svg [fill="rgba(245,242,236,.08)"] {fill:rgba(var(--fg-rgb),.08)
 }
 .cul-stair-hit:hover .cul-stair-tip,.cul-stair-hit:focus .cul-stair-tip {visibility:visible;opacity:1
 }
-input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button {-webkit-appearance:none;margin:0
-}
+/* User testing (4 Nov 2026, Paul): the app has no number fields, so the rules that hid their up/down buttons are gone */
 .cul-bell-scale {display:grid;grid-template-columns:minmax(180px,34%) 1fr 150px;gap:12px;margin:0 0 4px
 }
 .cul-bell-ticks {position:relative;height:14px;font-size:11px;color:var(--stone)
@@ -3723,3 +3722,8 @@ button.cmap-wcard-t:hover {text-decoration:underline
   .co-pmscroll {overflow:visible
   }
 }
+
+/* User testing (4 Nov 2026): the rule that sets a repainted page's fade-ins at once (#app.cul-still .reveal) is the shell's, in assets/css/styles.css, since every module repaints the same way */
+
+/* User testing (4 Nov 2026, Paul): the questionnaire grid's boxes in 1.2, 3.3 and the Pulse Round page are wide enough for their placeholders and for longer numbers. The general input rule (padding 12px) outranked .score-mini, leaving 54px for text. */
+#app input.score-mini{width:88px;padding:6px}

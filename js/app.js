@@ -4138,6 +4138,10 @@ function renderAfterInteraction(now) {
    not from inside the transition that is still moving focus. It had no
    definition, so every one of those blurs threw. */
 function deferRender() { renderAfterInteraction(false); }
+/* User testing (4 Nov 2026, Paul): the page last painted, so a repaint of it (the More menu, the theme, Minimize, a sync)
+   keeps its videos playing and its fade-ins in place instead of looking like a reload. The key names the module too, so
+   switching programs on a page of the same id still counts as arriving. */
+var _culLastPaint = '', _culRepaintSame = false;
 function render() {
   try { if (currentOrgId && currentUserId && window.chatWatch) chatWatch(); } catch (e) { }   /* Sweep 4R item 5: Team Chat listens from sign-in, so the badge can rise */
   /* Held: a live commit or a bank is running, and rebuilding the page from
@@ -4282,6 +4286,9 @@ function render() {
     else if (currentPage === 'review') h = renderReviewPage(); /* 17 Sep 2026: the Quarterly Review page */
     else if (currentPage === 'portfolio') h = renderPortfolioPage(); /* 17 Sep 2026: a live portfolio page */
     else if (currentPage === 'mgmt-hub') h = renderMgmtHub();
+    /* after the route chain, never inside it: an `if` placed between its branches would start a new chain */
+    var _culPKey = ((window.Modules && Modules.activeId) ? Modules.activeId() : '') + '|' + currentPage + '|' + (currentStep || '') + '|' + ((currentPhase && currentPhase.id) || currentPhase || '');
+    if (screenFn) { _culLastPaint = _culPKey; _culRepaintSame = false; } /* Home, Learn and Insights mount through the screen loader, which leaves a screen already showing in place itself (29 Oct 2026) */
     if (!screenFn) {
       if (h.indexOf('id="zoomWrap"') < 0) { var _zs = (UI.zoom && UI.zoom !== 1) ? (' style="zoom:' + UI.zoom + '"') : ''; h = '<div class="zoom-wrap" id="zoomWrap"' + _zs + '>' + h + '</div>'; }
       /* A module may paint its own modals. The Pipeline and Executive
@@ -4290,7 +4297,13 @@ function render() {
          zoom wrapper on purpose — a modal is chrome, and zooming the page
          should not move the dialog off centre. */
       var _mm = window.Modules && Modules.hook('renderModal');
+      /* User testing (4 Nov 2026, Paul): repainting the page already showing hands its existing <video> elements back to the
+         new markup, matched by source, so playback is not reset. The swap is synchronous, so the browser never pauses them. */
+      var _culSame = (_culPKey === _culLastPaint), _culOldV = {};
+      if (_culSame) { Array.prototype.forEach.call(app.querySelectorAll('video'), function (v) { var s = v.querySelector('source'), k = s ? s.getAttribute('src') : v.getAttribute('src'); if (k && !_culOldV[k]) _culOldV[k] = v; }); }
       app.innerHTML = h + (_mm ? _mm() : '') + chartZoomOverlay();
+      if (_culSame) { Array.prototype.forEach.call(app.querySelectorAll('video'), function (nv) { var s = nv.querySelector('source'), k = s ? s.getAttribute('src') : nv.getAttribute('src'), ov = k && _culOldV[k]; if (ov && nv.parentNode) { nv.parentNode.replaceChild(ov, nv); delete _culOldV[k]; } }); }
+      _culRepaintSame = _culSame; _culLastPaint = _culPKey;
     }
     if (_fid) { setTimeout(function () { try { var _fe2 = document.getElementById(_fid); if (_fe2 && typeof _fe2.focus === 'function') { _fe2.focus(); if (_fsel != null && typeof _fe2.setSelectionRange === 'function') _fe2.setSelectionRange(_fsel, _fsel) } } catch (_e) { } }, 0) }
     /* #modalRoot sits outside #app, so the paint above does not touch an open
@@ -4303,7 +4316,11 @@ function render() {
     try { if (currentModal === 'assignments') renderAssignmentsModal(); } catch (e) { }
     renderSidebar();
     syncNavHeight();
-    setTimeout(function () { var els = document.querySelectorAll('.reveal'); for (var i = 0; i < els.length; i++) { (function (el, d) { setTimeout(function () { el.classList.add('visible') }, d) })(els[i], i * 60) } }, 50);
+    /* The fade-ins play on arriving at a page, not on a repaint of it (user testing, 4 Nov 2026): a repaint shows them at once,
+       with .cul-still (assets/css/styles.css) holding the transition off for two frames. */
+    if (_culRepaintSame) { app.classList.add('cul-still'); var _rels = app.querySelectorAll('.reveal'); for (var _ri = 0; _ri < _rels.length; _ri++) _rels[_ri].classList.add('visible'); requestAnimationFrame(function () { requestAnimationFrame(function () { var _ra = $('app'); if (_ra) _ra.classList.remove('cul-still'); }); }); }
+    else setTimeout(function () { var els = document.querySelectorAll('.reveal'); for (var i = 0; i < els.length; i++) { (function (el, d) { setTimeout(function () { el.classList.add('visible') }, d) })(els[i], i * 60) } }, 50);
+    _culRepaintSame = false;
     carouselInit();
     if (coachOpen) renderCoachPanel();
     if (notesOpen) renderNotesPanel();
@@ -7703,11 +7720,21 @@ var RV_WORDS={buy:'Buy',hold:'Hold',sell:'Sell'};
 
   function paint(el, justDropped) {
     if (!wantsCounter(el)) return;
-    var c = counterFor(el);
-    if (!c) return;
     var len = typeof el.value === 'string' ? el.value.length : 0;
     var CAP = capOf(el), WARN_FROM = Math.round(CAP * 0.9);
     var full = len >= CAP;
+    /* User testing (Paul, Nov 2026): no running count under the fields, in any app. "124 / 10,000" under every box,
+       number fields included, read as confusing. The cap itself stays (the GLOBAL INPUT LENGTH CAP block above), and so
+       does the explanation when it bites: the line appears only once a field is at its limit or a paste was cut, so text
+       is still never lost without a word. Screen readers still hear "N characters remaining" near the limit. */
+    if (!full && !(justDropped > 0)) {
+      var was = el.nextElementSibling;
+      if (was && was.classList && was.classList.contains('nc-cc') && was.__ncFor === el) { clearTimeout(was.__ncTimer); was.remove(); }
+      if (len >= WARN_FROM) announce(n(CAP - len) + ' characters remaining.'); else lastAnnounced = '';
+      return;
+    }
+    var c = counterFor(el);
+    if (!c) return;
 
     c.lastChild.textContent = n(len) + ' / ' + n(CAP);
     c.classList.toggle('is-warn', !full && len >= WARN_FROM);

@@ -4550,9 +4550,10 @@ var h=vp('V-2.2','Ownership & Structure','3\u20135 min');
 h+='<h2 class="h-section">Step 2.2: Ownership & Structure</h2><p class="t-lead">This step records the people side of governance in four tabs: who owns the work, what the organization actually rewards and where the skills are missing, how concerns are raised and answered, and how the people affected by your AI are heard. Each tab is marked complete in its own right, and the step-level Mark Complete & Continue button opens only when all four are done.</p>';
 h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:24px">';
 tabs.forEach(function(s){h+='<button onclick="harvestOpenFields();UI.s22Tab=\''+s.id+'\';render();scrollToSection()" style="padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--sans,Helvetica Neue,sans-serif);border:'+(tab===s.id?'2px solid #8B4513':'1px solid rgba(var(--fg-rgb),.12)')+';background:'+(s.c?'rgba(139,69,19,.08)':'rgba(var(--fg-rgb),.03)')+';color:'+(tab===s.id||s.c?'#8B4513':'var(--text-faint)')+'">'+(s.c?'\u2713':'\u25cb')+' '+s.l+'</button>'});h+='</div>';
-if(tab==='is')return h+incentivesSkillsBody();
-if(tab==='cul')return h+cultureTabBody();
-if(tab==='sk')return h+stakeholderBody();
+var stepBtn=(['2.2a','2.2b','2.2c','2.2d'].every(function(k){return !!comp[k]}))?doneBtn('completeStepGated(\'2.2\')',false,'\u2713 Mark Step 2.2 Complete & Continue \u2192','2.2'):''; /* user testing (4 Nov 2026, Paul): the step button shows on every tab once all four are complete, as on the other steps with tabs */
+if(tab==='is')return h+incentivesSkillsBody()+stepBtn;
+if(tab==='cul')return h+cultureTabBody()+stepBtn;
+if(tab==='sk')return h+stakeholderBody()+stepBtn;
 var os=data.ownership||{};
 h+='<h3 id="sec-title" style="font-size:17px;font-weight:700;margin:0 0 4px">Governance Model</h3><p style="color:var(--paper);font-size:14px;margin:0 0 20px;line-height:1.5">This tab settles where authority for AI governance lives: a named owner with genuine authority and time for the work, the structure and responsibilities your organization actually runs, and your rules for the AI you buy rather than build.</p>';
 h+=card('<h3 style="font-size:16px;font-weight:700;margin:0 0 12px">Governance Owner</h3>'+inp('Owner','os_governanceOwner',os.governanceOwner,'e.g., Tamsin Doyle, CEO')+ta('What authority does this person have?','os_ownerAuthority',os.ownerAuthority,'e.g., Can pause a system, approve deployment gates, and commit budget up to a set limit',2)+ta('How much of their role is dedicated to AI governance?','os_ownerDedication',os.ownerDedication,'e.g., 20% initially, moving to 50% as AI footprint grows / Full-time dedicated role...',2));
@@ -4561,7 +4562,7 @@ h+=card('<h3 style="font-size:16px;font-weight:700;margin:0 0 6px">Third-party /
 // RACI \u2014 the donor grid (O-6)
 h+=card('<h3 style="font-size:16px;font-weight:700;margin:0 0 12px">RACI Matrix</h3><p style="font-size:13px;color:var(--text-faint);margin-bottom:12px">\u201cR\u201d indicates that this individual is responsible for the activity and does the work. \u201cA\u201d means the person is accountable and owns the outcome (with exactly one \u201cA\u201d per activity). \u201cC\u201d means the person is consulted before decisions. \u201cI\u201d means the person is informed after decisions. Assign a letter for each activity and person. A printable version lives under Phase 2 outputs.</p>'+raciTeamEditor()+govRaciGrid(false));
 h+=doneBtn('saveOS2a()',false,null,!!comp['2.2a']);
-if(['2.2a','2.2b','2.2c','2.2d'].every(function(k){return !!comp[k]}))h+=doneBtn('completeStepGated(\'2.2\')',false,'\u2713 Mark Step 2.2 Complete & Continue \u2192','2.2');/* item 60: ruled \u00a711 label exception \u2014 no carousel separates this from the tab buttons *//* R-12 (Paul, 21 July): opens at all four chips */
+h+=stepBtn;/* item 60: ruled \u00a711 label exception \u2014 no carousel separates this from the tab buttons *//* R-12 (Paul, 21 July): opens at all four chips */
 return h}
 
 function saveOS2a(){if(!confirmSectionDone('2.2a'))return;if(!data.completed)data.completed={};data.completed['2.2a']=true;UI.s22Tab='is';saveOS();scrollToSection()}

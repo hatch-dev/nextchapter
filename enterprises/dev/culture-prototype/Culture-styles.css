@@ -2698,8 +2698,7 @@ select{background:var(--bg-elev);color:var(--paper)}
 .cul-stair-hit:hover .cul-stair-tip,.cul-stair-hit:focus .cul-stair-tip{visibility:visible;opacity:1}
 
 /* Paul (12 Oct 2026): number boxes take typed numbers, with no up and down arrows, everywhere */
-input[type=number]{-moz-appearance:textfield;appearance:textfield}
-input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+/* User testing (4 Nov 2026, Paul): the app has no number fields, so the rules that hid their up/down buttons are gone */
 
 /* Paul (12 Oct 2026): the questionnaire Results dashboard */
 .cul-bell-scale{display:grid;grid-template-columns:minmax(180px,34%) 1fr 150px;gap:12px;margin:0 0 4px}
@@ -4314,3 +4313,10 @@ button.cmap-wcard-t:hover{text-decoration:underline}
 .co-pmscroll{overflow-x:auto}
 @media screen and (max-width:700px){.co-pmscroll .co-pmgrid{min-width:620px}}
 @media print{.co-pmscroll{overflow:visible}}
+
+/* User testing (4 Nov 2026): a repaint of the page already showing sets its fade-ins at once, without the animation */
+#app.cul-still .reveal{transition:none!important}
+
+/* User testing (4 Nov 2026, Paul): the questionnaire grid's boxes in 1.2, 3.3 and the Pulse Round page are wide enough for their placeholders and for longer numbers. The general input rule (padding 12px) outranked .score-mini, leaving 54px for text. */
+#app input.score-mini{width:88px;padding:6px}
+

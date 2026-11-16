@@ -48,8 +48,10 @@ function orgDetailFields() {
    to be added to both of these — its backdrop covers the other triggers, so two
    open at once is only reachable from script, but a dropdown that stays open
    behind another one is still a bug waiting for the next trigger. */
-function toggleNavMore(e) { if (e && e.stopPropagation) e.stopPropagation(); UI.navMore = !UI.navMore; if (UI.navMore) { UI.navModules = false; UI.userMenu = false; } render(); }
-function closeNavMore() { if (UI.navMore) { UI.navMore = false; render(); } }
+/* User testing (4 Nov 2026, Paul): opening or closing the More menu repaints the header only (Nav.render paints all three
+   dropdowns), so the page under it is not redrawn and does not look as if it reloaded. */
+function toggleNavMore(e) { if (e && e.stopPropagation) e.stopPropagation(); UI.navMore = !UI.navMore; if (UI.navMore) { UI.navModules = false; UI.userMenu = false; } if (window.Nav) Nav.render(); else render(); }
+function closeNavMore() { if (UI.navMore) { UI.navMore = false; if (window.Nav) Nav.render(); else render(); } }
 // Module switcher (registry in js/features/modules.js, markup in nav.js)
 function toggleNavModules(e) { if (e && e.stopPropagation) e.stopPropagation(); UI.navModules = !UI.navModules; if (UI.navModules) { UI.navMore = false; UI.userMenu = false; } render(); }
 function closeNavModules() { if (UI.navModules) { UI.navModules = false; render(); } }
