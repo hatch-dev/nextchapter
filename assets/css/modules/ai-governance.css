@@ -190,3 +190,108 @@
   .ap-seg.on { background: #444 !important; border: 2px solid #000; -webkit-print-color-adjust: exact; print-color-adjust: exact;
   }
 }
+
+/* ── Prototype parity (by hand, 17 Nov 2026) ───────────────────
+   The generator above only ADDS rules; it never overrides a shared
+   one. So wherever the reference build styled a shared class its own
+   way, this program fell back to the shell's look. A side-by-side
+   sweep of every page in both themes (computed colour, background,
+   weight and border of every text element) found these, each copied
+   from enterprises/dev/responsible-ai-governance-prototype/
+   Governance-styles.css. Loaded only while this program is active,
+   so no other program changes. If tools/module-css-delta.js is ever
+   re-run, carry this block across. */
+
+/* Secondary buttons: transparent, not the shell's tinted fill (l.528) */
+.bs {
+  background: transparent;
+  color: var(--ok-t);
+  border: 1px solid #1B6B5A
+}
+
+/* Gold buttons read in ink, not white (l.98, l.535) */
+.btn-gold,
+.bd {
+  color: var(--ink)
+}
+
+/* Overview stat figures in the program's teal, not the shell's blue */
+.viz-stat-num {
+  color: var(--gold-text)
+}
+
+/* Remove (✕) buttons (l.642) */
+.no-btn {
+  color: var(--text-muted);
+  font-weight: 600
+}
+
+/* Likert end labels (l.2502) */
+.lk-cap {
+  color: var(--text-body)
+}
+
+/* The video label over a phase landing reads in paper. The markup
+   carries an inline color:var(--accent), which the reference never
+   defined, so that label fell back to this colour. Labels tinted
+   with a phase colour keep it, as they do in the reference. */
+.overview-video-label[style*="var(--accent)"] {
+  color: var(--paper) !important
+}
+
+/* Header and sidebar, same sweep (17 Nov 2026) */
+
+/* Header buttons: the reference's 26px chips at 10.5px (l.485). Desktop
+   header only; the phone/tablet header (≤820px) keeps the shell's. */
+@media (min-width: 821px) {
+  .btn-ghost.nav-action {
+    height: 26px;
+    font-size: 10.5px
+  }
+}
+
+/* Sidebar wordmark: "AI Governance" with the second word in the
+   program's teal (l.402), not the header's blue */
+.sidebar-logo span {
+  color: var(--gold-text)
+}
+
+/* Active sidebar rows — Overview, and the step open — and Overview on hover:
+   the reference's wash (l.408, l.417) */
+.sidebar-home:hover,
+.sidebar-home.active,
+.sidebar-step.active {
+  background: rgba(196, 96, 48, .15)
+}
+
+/* Dark mode keeps --gold-pale at the reference's #D8F0E9 (Governance-
+   styles.css root block; its dark block never changes it). themes.css
+   moves it to the accent's soft tint for every program ("DELIBERATE
+   DELTA #3"); this restores the reference here only. Consumers: the
+   sidebar's Overview label and the italic intro in Help. */
+@media screen {
+  [data-theme="dark"] {
+    --gold-pale: #D8F0E9
+  }
+}
+
+/* Step tab strip (17 Nov 2026). This program lays its step tabs out as a
+   grid of equal columns (inline on .step-nav in program.js). The shell's
+   strip is a wrapping flex row: each button has min-width:190px and draws
+   its own bottom edge, and the strip clips (overflow:hidden) with no right
+   or bottom border. Under a five-column grid that pushed every button
+   past its column, clipped the last one, and broke the frame. The
+   reference's strip (l.219-221): one border round the strip, a divider
+   between tabs, no minimum width. Desktop only; at ≤960px both builds
+   stack the tabs the same way. */
+@media (min-width: 961px) {
+  .step-nav {
+    border: 1px solid var(--rule);
+    overflow: visible
+  }
+
+  .step-nav-btn {
+    min-width: 0;
+    border-bottom: 0
+  }
+}

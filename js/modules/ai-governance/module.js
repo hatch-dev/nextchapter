@@ -343,6 +343,15 @@
        does move view state, cannot be used for it. */
     harvestOpenPage: function () { ready(); RG.harvestOpenFields(); },
 
+    /* Called by the shell's render() once a page is painted (17 Nov 2026). The
+       reference's own render() ran refreshGates() after every paint, which is
+       what greys out "Mark step complete" and shows the reason underneath
+       (1.2's "Add at least one AI system…", 4.4's "Hold the review first…").
+       Without it the button opened enabled with the reason hidden, until the
+       reader typed in a gated field. The click was still refused by
+       completeStepGated; this restores the prototype's look of it. */
+    afterPaint: function () { ready(); RG.refreshGates(); },
+
     /* ── The AI Guide ─────────────────────────────────────────
        All three verbatim from the reference build's coach panel. The shell
        supplies the panel, the transport and the history; what the guide KNOWS

@@ -132,15 +132,18 @@
             "lead": "Responsible AI",
             "accent": "Governance",
             "mini": "RG",
-            "side": "Responsible",
-            "sideAccent": "Governance"
+            "side": "AI",
+            "sideAccent": "Governance",
+            "sideMini": "AI",
+            "sideTitle": "AI Governance"
           },
+          "sidebarOnePhase": true,
           "title": "90-Day Responsible AI Governance — NextChapter",
           "tabs": {
             "home": "Home",
             "learn": "Learn",
             "pipeline": "Framework",
-            "phase5": "Governance",
+            "phase5": "Governance Dashboard",
             "insights": "Insights"
           },
           "scripts": [
@@ -179,6 +182,7 @@
             "insights": "Insights"
           },
           "scripts": [
+            "js/modules/ai-architecture/worldgeo.js",
             "js/modules/ai-architecture/program.js",
             "js/modules/ai-architecture/module.js",
             "js/modules/ai-architecture/help.js"

@@ -4329,7 +4329,11 @@ function render() {
     updateAdminBar();
     var _ss2 = document.querySelector('.sidebar-scroll'); if (_ss2 && _ssTop) _ss2.scrollTop = _ssTop;
     var _mc2 = document.querySelector('.main-content'); if (_mc2 && _mcTop) _mc2.scrollTop = _mcTop;
-    var _gk = currentStep + '/' + (UI.sec || ''); if (_gk !== _lastGateStep) { gateArmed = false; _lastGateStep = _gk; } if (gateArmed) paintGates(); applyLockUI(true);
+    var _gk = currentStep + '/' + (UI.sec || ''); if (_gk !== _lastGateStep) { gateArmed = false; _lastGateStep = _gk; } if (gateArmed) paintGates();
+    /* 17 Nov 2026: a program may finish the paint itself — Responsible AI Governance re-checks its completion gates
+       here, as its reference build's render() did, so "Mark step complete" opens disabled with its reason showing. */
+    try { var _afterPaint = window.Modules && Modules.hook('afterPaint'); if (_afterPaint) _afterPaint(); } catch (e) { }
+    applyLockUI(true);
     ensureSampleNote();
   } catch (e) { $('app').innerHTML = '<div class="u-d829b04"><h2>Error</h2><pre>' + e.message + '</pre></div>'; console.error(e) }
 }

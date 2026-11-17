@@ -198,7 +198,12 @@ function renderModal() {
   var h = '<div class="modal-bg" onclick="if(event.target===this)closeModal()">';
   h += '<div class="modal">';
 
-  if (!doc) {
+  /* A program may hand over its guide as finished markup, Got It button included (17 Nov 2026: Responsible AI
+     Governance, whose guide reads exactly as its reference build's, js/modules/ai-governance/help.js). */
+  var own = doc && typeof doc.html === 'function';
+  if (own) {
+    h += doc.html();
+  } else if (!doc) {
     // A module without a help document still gets a usable overlay rather than
     // an empty box: the shared blocks alone describe the whole shell.
     h += '<h3>' + esc((window.Modules && Modules.active().name) || 'Help') + '</h3>';
@@ -211,7 +216,7 @@ function renderModal() {
     for (var i = 0; i < (doc.sections || []).length; i++) h += helpSectionHtml(doc.sections[i]);
   }
 
-  h += '<div class="u-ea28b89"><button class="btn-gold" onclick="closeModal()">Got It</button></div>';
+  if (!own) h += '<div class="u-ea28b89"><button class="btn-gold" onclick="closeModal()">Got It</button></div>';
   h += '</div></div>';
   mr.innerHTML = h;
 }

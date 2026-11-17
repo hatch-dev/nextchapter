@@ -2767,12 +2767,14 @@ select option {
   margin-right: 6px
 }
 
+/* 17 Nov 2026: 200px, not 260px. At 260 the header came to ~1924px in a 1920px window and wrapped onto two
+   rows; the prototypes, which have no switcher, sit on one. The name is truncated with an ellipsis either way. */
 .nav-module-btn {
   display: flex;
   align-items: center;
   gap: 10px;
   height: 40px;
-  max-width: 260px;
+  max-width: 200px;
   padding: 0 12px;
   background: rgba(var(--fg-rgb), .04);
   border: 1px solid var(--rule);

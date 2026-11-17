@@ -1518,7 +1518,7 @@
         + '</div>'
         + '<h3 class="vp-slide-headline">'+esc(s.headline)+'</h3>'
         + '<p class="vp-slide-body">'+richInline(s.body)+'</p>'
-        + (s.bullets && s.bullets.length ? '<ul class="vp-slide-bullets">'+s.bullets.map(function(b){return '<li>'+(b.label?'<span class="vp-bullet-label">'+esc(b.label)+':</span> ':'')+richInline(b.text)+'</li>';}).join('')+'</ul>' : '')
+        + (s.bullets && s.bullets.length ? '<ul class="vp-slide-bullets">'+s.bullets.map(function(b){/* By hand, 17 Nov 2026: this program's slides write each bullet as one 'Label: text' string, which this renderer (written for {label,text}) drew as an empty <li> on all ten bulleted slides, in the reference build too. A string is split at its first ': ' into the same two parts. */if(typeof b==='string'){var _bk=b.indexOf(': ');b=(_bk>0&&_bk<90)?{label:b.slice(0,_bk),text:b.slice(_bk+2)}:{text:b};}return '<li>'+(b.label?'<span class="vp-bullet-label">'+esc(b.label)+':</span> ':'')+richInline(b.text)+'</li>';}).join('')+'</ul>' : '')
         + (s.body2 ? '<p class="vp-slide-body vp-slide-body2">'+richInline(s.body2)+'</p>' : '')
         + (s.example ? '<div class="vp-slide-example"><div class="vp-example-text">'+richInline(s.example)+'</div></div>' : '')
         + '</div>';
@@ -1844,7 +1844,10 @@
   saveData();render();
   }
 
-  function refreshGates(){try{var fieldsOk=gateFieldsClear();var dataOk=dataGateOK(currentStep);var btns=document.querySelectorAll('#app .done-btn');for(var i=0;i<btns.length;i++){var b=btns[i];if(b.classList.contains('done-btn-complete'))continue;var isStep=String(b.getAttribute('onclick')||'').indexOf('completeStepGated')>=0;b.disabled=isStep?!(fieldsOk&&dataOk):!fieldsOk}}catch(e){}}
+  /* By hand, 17 Nov 2026: a step assigned to someone else stays disabled whatever the gates say. doneBtn
+     draws it disabled for that reason (stepCompleteLock), and this runs after every paint (module.js afterPaint)
+     and on every gated keystroke (gateRepaint), so without the lock check it switched that button back on. */
+  function refreshGates(){try{var fieldsOk=gateFieldsClear();var dataOk=dataGateOK(currentStep);var _lock=(typeof stepCompleteLock==='function')?stepCompleteLock(currentStep):'';var btns=document.querySelectorAll('#app .done-btn');for(var i=0;i<btns.length;i++){var b=btns[i];if(b.classList.contains('done-btn-complete'))continue;var isStep=String(b.getAttribute('onclick')||'').indexOf('completeStepGated')>=0;b.disabled=_lock?true:(isStep?!(fieldsOk&&dataOk):!fieldsOk)}}catch(e){}}
 
   function stampStepDone(id){try{if(!data.stepDoneAt)data.stepDoneAt={};if(!data.stepDoneAt[id]){data.stepDoneAt[id]=new Date().toISOString().split('T')[0];if(!data.stepDoneBy)data.stepDoneBy={};var _cu=(typeof getCurrentUser==='function'&&getCurrentUser())||null;data.stepDoneBy[id]=_cu?(_cu.name||''):'';/* ATTRIB@stepDoneBy fix (R2 triage, 25 Aug 2026, ruled family law): step completion records the completing user alongside the date, matching action-level attribution; written only inside the first-stamp guard, so re-saves never rewrite it */Store.commit('stepDoneAt');notifyStepComplete(id)}}catch(e){}}
 

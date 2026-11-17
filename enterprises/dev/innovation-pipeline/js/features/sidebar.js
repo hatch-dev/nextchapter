@@ -78,9 +78,12 @@ function renderSidebar() {
   var togTitle = sidebarMinimized ? 'Maximize sidebar' : 'Minimize sidebar';
   // The wordmark names whichever program is running (js/modules/registry.js).
   var _lg = (window.Modules ? Modules.active().logo : null) || { side: 'AI', sideAccent: 'Pipeline', mini: 'AI' };
-  var _lgTitle = (window.Modules ? Modules.active().name : 'AI Pipeline');
+  /* sideMini / sideTitle (17 Nov 2026): the collapsed sidebar's badge and tooltip, when a program's reference build
+     read differently from its launchpad badge (`mini`) and its name — Responsible AI Governance's says "AI" /
+     "AI Governance" where its launchpad card says "RG". Optional; without them nothing changes. */
+  var _lgTitle = _lg.sideTitle || (window.Modules ? Modules.active().name : 'AI Pipeline');
   var headerHtml = '<div class="sidebar-header">'
-    + (sidebarMinimized ? '<div class="sidebar-logo-mini" title="' + esc(_lgTitle) + '">' + esc(_lg.mini || 'AI') + '</div>'
+    + (sidebarMinimized ? '<div class="sidebar-logo-mini" title="' + esc(_lgTitle) + '">' + esc(_lg.sideMini || _lg.mini || 'AI') + '</div>'
       : '<div class="sidebar-logo">' + esc(_lg.side || '') + ' <span>' + esc(_lg.sideAccent || '') + '</span></div>')
     + '<button class="sidebar-size-tog" onclick="toggleSidebarSize()" title="' + togTitle + '" aria-label="' + togTitle + '">' + togContent + '</button>'
     + '</div>';
@@ -115,14 +118,15 @@ function renderSidebar() {
   // Maximized (full) view
   // Multi-open sections: any number of phases can show their steps + outputs
   // at once. Selecting a phase (or any step within it) opens that phase and
-  // does not collapse the others.
+  // does not collapse the others — unless the program asks for one open phase
+  // at a time (sidebarOnePhase, see navOpenPhase below).
   // - On navigation (page/step change) the open phase follows the selection.
   // - The chevron opens/collapses a phase in place without navigating; that
   //   choice holds until the next navigation.
   var actId = activeNavPhaseId();
   var pageKey = currentPage + ':' + currentStep;
   if (!UI.navOpenSet) { UI.navOpenSet = {}; if (actId != null) UI.navOpenSet[String(actId)] = true; }
-  if (UI._navPageKey !== pageKey) { UI._navPageKey = pageKey; if (actId != null) UI.navOpenSet[String(actId)] = true; }
+  if (UI._navPageKey !== pageKey) { UI._navPageKey = pageKey; if (actId != null) navOpenPhase(actId); }
   var h = '<div class="sidebar-inner">';
   h += headerHtml;
   h += '<div class="sidebar-scroll">';
@@ -228,9 +232,22 @@ function navOutputsOpen(ph) {
 
 // Chevron handler: open this phase (collapsing the others) or, if it's the
 // open one, collapse everything. Holds until the next navigation.
+/* One open phase at a time (17 Nov 2026). A program whose catalogue entry sets
+   "sidebarOnePhase": true (Responsible AI Governance) gets an accordion: opening a
+   phase — by navigating into it, by its heading or by its chevron — closes the
+   others. Every other program keeps the multi-open sidebar unchanged. */
+function navOnePhase() {
+  try { return !!(window.Modules && Modules.active().sidebarOnePhase); } catch (e) { return false; }
+}
+function navOpenPhase(id) {
+  var k = String(id);
+  if (!UI.navOpenSet || navOnePhase()) UI.navOpenSet = {};
+  UI.navOpenSet[k] = true;
+}
+
 function toggleNavPhase(id) {
   var k = String(id); if (!UI.navOpenSet) UI.navOpenSet = {};
-  UI.navOpenSet[k] = !UI.navOpenSet[k];
+  if (UI.navOpenSet[k]) delete UI.navOpenSet[k]; else navOpenPhase(k);
   var ss = document.querySelector('.sidebar-scroll'); var top = ss ? ss.scrollTop : 0;
   renderSidebar();
   var ss2 = document.querySelector('.sidebar-scroll'); if (ss2) ss2.scrollTop = top;
@@ -248,7 +265,7 @@ function goPhase(id) {
     renderSidebar();
     var ss2 = document.querySelector('.sidebar-scroll'); if (ss2) ss2.scrollTop = top;
   } else {
-    UI.navOpenSet[k] = true;  // collapsed → open this phase (others stay open) and navigate to it
+    navOpenPhase(k);  // collapsed → open this phase (others stay open, unless sidebarOnePhase) and navigate to it
     /* A program may send a phase heading somewhere other than its landing (21 Oct 2026: AI-Ready Architecture's
        "5. Manage" opens its Manage page, as in its build). The hook returns go()'s arguments, or nothing. */
     var to = null;

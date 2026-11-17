@@ -46,6 +46,26 @@ function showVoiceToast(msg, sub) {
   voiceTimeout = setTimeout(function () { t.classList.remove('show') }, 6000);
 }
 
+/* "Say a tab name" (Help), for every program's own tab names (17 Nov 2026). The fixed words above are the
+   Pipeline's; Responsible AI Governance's tabs read Framework, Governance and Insights, and its reference build
+   understood "framework" and "govern", which reached nothing here. Tried only after every fixed word, so nothing
+   that already worked changes. A spoken word matches a word of a tab label outright, or as the start of one when
+   it is five letters or more ("govern" → Governance). It clicks the tab itself, so it goes where a click goes. */
+function voiceTab(text) {
+  var labels = (window.Modules && Modules.active && Modules.active().tabs) || {};
+  var said = String(text || '').toLowerCase().split(/[^a-z]+/).filter(function (w) { return w.length >= 4; });
+  for (var id in labels) {
+    if (!Object.prototype.hasOwnProperty.call(labels, id)) continue;
+    var words = String(labels[id]).toLowerCase().split(/[^a-z]+/).filter(function (w) { return w.length >= 4; });
+    var hit = said.some(function (w) { return words.some(function (l) { return l === w || (w.length >= 5 && l.indexOf(w) === 0); }); });
+    if (!hit) continue;
+    var b = document.querySelector('.nav-tab[data-tab="' + id + '"]');
+    if (b) b.click(); else go(id);
+    return true;
+  }
+  return false;
+}
+
 function processVoice(text) {
   var matched = true;
   if (text.match(/\b(overview|home|go home|main|start)\b/)) go('home');
@@ -56,6 +76,7 @@ function processVoice(text) {
   else if (aiGuideOn() && text.match(/\b(coach|guide)\b|ask.*(coach|guide)|open.*(coach|guide)/)) { if (!coachOpen) toggleCoach(); showVoiceToast('\u2713 Opening AI Guide', '') }
   else if (text.match(/\b(notes?)\b|open.*note/)) { if (!notesOpen) toggleNotes(); showVoiceToast('\u2713 Opening notes', '') }
   else if (text.match(/\b(close|stop|cancel|never mind|dismiss)\b/)) { closeModal(); if (coachOpen) toggleCoach(); if (notesOpen) toggleNotes(); showVoiceToast('Closed', '') }
+  else if (voiceTab(text)) { }
   else { matched = false; showVoiceToast('Didn\u2019t catch that', 'Try: "learn" \u00b7 "pipeline" \u00b7 "guide" \u00b7 "navigate"') }
   if (matched && !text.match(/close|stop|cancel/)) showVoiceToast('\u2713 ' + text, '');
 }
