@@ -295,3 +295,17 @@
     border-bottom: 0
   }
 }
+
+/* Chart amber (17 Nov 2026). The shell's SVG theme remap turns a chart's
+   #D4A017 stroke into --warn-text, a darker amber in light mode. The
+   reference has no such remap: the Governance Dashboard's trend line and
+   the Analytics bars and dots keep #D4A017 in both themes. A chart-by-chart sweep
+   found this the only graphic colour that differed. */
+svg [stroke="#D4A017"] {
+  stroke: #D4A017
+}
+
+svg circle[fill="#D4A017"],
+svg text[fill="#D4A017"] {
+  fill: #D4A017
+}
