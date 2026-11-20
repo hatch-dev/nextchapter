@@ -15,7 +15,10 @@
    Profile; data without settings counts as both off, and while the AI Guide is off nothing is sent to the AI
    service. The setting lives in the Pipeline's workspace document (data.settings), so it is per organization,
    reaches the other members through the change poll, and is kept by Reset all data (ORG_LEVEL_KEYS).
-   Every other program keeps today's behaviour (both on) until its own directive is applied. -- */
+   Every other program keeps today's behaviour (both on) until its own directive is applied.
+   29 Oct 2026: a NEW organization's workspace starts with both on (each program's emptyData(), and the admin
+   console's Add organization goes through the same createOrg); an administrator can still switch either off.
+   Existing organizations keep what they have. -- */
 /* AI-Ready Architecture (21 Oct 2026): its build carries the same switches (Spec §25.2: both start off) — without it here
    its Guide and Voice were always on, with no switch for an administrator. */ /* AI-Ready Culture (10 Nov 2026): the same, from its build (Spec §25.2). */
 function aiSwitchesApply() { try { return !!(window.Modules && (Modules.isActive('pipeline') || Modules.isActive('exec-readiness') || Modules.isActive('ai-governance') || Modules.isActive('ai-architecture') || Modules.isActive('ai-culture'))); } catch (e) { return false; } }
@@ -28,17 +31,33 @@ function stopVoiceIfOff() {
 }
 function setAiFeature(key, on) {
   if (!canSetAiFeatures() || (key !== 'aiGuide' && key !== 'voice')) return;
+  /* The switches are one record, 'settings' (idToRecordKey), locked like any field (18 Nov 2026). Held by a
+     colleague: the change is refused and the switch shows what is stored again. */
+  try {
+    var held = Collab.lockedByOther('settings');
+    if (held) {
+      try { if (typeof showLockBanner === 'function') showLockBanner([{ key: 'settings', name: held.name, settling: !!held.settling }]); } catch (e) { }
+      if (currentModal === 'org') renderOrgModal();
+      try { applyLockUI(true); } catch (e) { }
+      return;
+    }
+  } catch (e) { }
   if (!data.settings) data.settings = { aiGuide: false, voice: false };
   data.settings[key] = !!on;
   saveData();
   render();              /* render -> setCoachVisible: the button follows the switch, and an open panel closes */
   stopVoiceIfOff();
-  if (currentModal === 'org') renderOrgModal();
+  if (currentModal === 'org') {
+    renderOrgModal();
+    /* Back on the switch, so this tab keeps the lock it took on focus (a redraw drops focus, which would let
+       it go at once), and takes it here if the browser does not focus a checkbox on click. */
+    var sw = $('aiSet_' + key); if (sw && sw.focus) sw.focus();
+  }
 }
 function aiFeaturesFold() {
   var s = (data && data.settings) || {};
   function sw(key, label, note) { return '<label class="ai-switch"><input type="checkbox" role="switch" id="aiSet_' + key + '"' + (s[key] ? ' checked' : '') + ' onchange="setAiFeature(\'' + key + '\',this.checked)"/> <span>' + label + '</span></label><div class="ai-fold-note">' + note + '</div>'; }
-  return '<details class="ai-fold" ontoggle="UI.aiFoldOpen=this.open"' + (UI.aiFoldOpen ? ' open' : '') + '><summary>AI Features (off by default)</summary><div class="ai-fold-body">'
+  return '<details class="ai-fold" ontoggle="UI.aiFoldOpen=this.open"' + (UI.aiFoldOpen ? ' open' : '') + '><summary>AI Features (on by default)</summary><div class="ai-fold-body">'
     + sw('aiGuide', 'AI Guide', 'When this is switched on, the AI Guide is live, and whatever users type here is sent to our AI provider.')
     + sw('voice', 'Voice', 'When this is on, Voice uses the browser\'s own speech recognition. Some browsers send the recording to the browser maker to turn it into text.')
     + '</div></details>';

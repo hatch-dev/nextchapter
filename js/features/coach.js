@@ -31,12 +31,28 @@ function stopVoiceIfOff() {
 }
 function setAiFeature(key, on) {
   if (!canSetAiFeatures() || (key !== 'aiGuide' && key !== 'voice')) return;
+  /* The switches are one record, 'settings' (idToRecordKey), locked like any field (18 Nov 2026). Held by a
+     colleague: the change is refused and the switch shows what is stored again. */
+  try {
+    var held = Collab.lockedByOther('settings');
+    if (held) {
+      try { if (typeof showLockBanner === 'function') showLockBanner([{ key: 'settings', name: held.name, settling: !!held.settling }]); } catch (e) { }
+      if (currentModal === 'org') renderOrgModal();
+      try { applyLockUI(true); } catch (e) { }
+      return;
+    }
+  } catch (e) { }
   if (!data.settings) data.settings = { aiGuide: false, voice: false };
   data.settings[key] = !!on;
   saveData();
   render();              /* render -> setCoachVisible: the button follows the switch, and an open panel closes */
   stopVoiceIfOff();
-  if (currentModal === 'org') renderOrgModal();
+  if (currentModal === 'org') {
+    renderOrgModal();
+    /* Back on the switch, so this tab keeps the lock it took on focus (a redraw drops focus, which would let
+       it go at once), and takes it here if the browser does not focus a checkbox on click. */
+    var sw = $('aiSet_' + key); if (sw && sw.focus) sw.focus();
+  }
 }
 function aiFeaturesFold() {
   var s = (data && data.settings) || {};

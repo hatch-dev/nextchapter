@@ -506,6 +506,7 @@
   var DOMAIN_COL = { ontological: '#6B4C8A', epistemological: '#2D5A8E', ethical: '#9B2D3F' };
 
   var _orgTaggedValues = null;
+  var _orgTagKey = null;   /* which role form the ticks above belong to: a role's id, or 'new' (19 Nov 2026) */
 
   var ORG_LEVEL_LABELS={0:'Cross-Functional',1:'Board & Governance',2:'C-Suite & Transformation',3:'Senior Leadership',4:'Middle Management'};
 
@@ -797,15 +798,26 @@
 
   function confirmSectionDone(s) { if ((data.completedSections || {})[s]) return true; if (typeof completeBlocked === 'function' && completeBlocked(/^[A-E]$/.test(String(s)) ? '1.1' : s)) return false; return confirm('Mark this section complete? This can\u2019t be undone.') }
 
-  function resetSessionBuffers() { _orgTaggedValues = null; }
+  function resetSessionBuffers() { _orgTaggedValues = null; _orgTagKey = null; }
 
   function ta(label, id, v, ph, rows, ro) { var _g = (!ro && /\*/.test(label)) ? ' gate-field' : ''; var _lbl = ro ? String(label).replace(/\s*\*\s*$/, '') : label; var _hnd = ro ? '' : ' oninput="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\';ER.gateRepaint()"'; return '<div class="mb-4"><label class="form-label">' + esc(_lbl) + '</label><textarea id="' + id + '" rows="' + (rows || 3) + '" class="ta-helper' + _g + '"' + _hnd + (ro ? ' readonly' : '') + ' placeholder="' + esc(ph || '') + '">' + esc(v || '') + '</textarea></div>' }
 
   function sel(label, id, v, opts, gloss, extraChange) { var h = '<div class="mb-4"><label class="form-label">' + esc(label) + '</label>' + (gloss ? '<p class="t-faint-sm" style="margin:-2px 0 8px">' + esc(gloss) + '</p>' : '') + '<select id="' + id + '" class="sel-helper' + (/\*/.test(label) ? ' gate-field' : '') + '" onchange="ER.gateRepaint()' + (extraChange ? ';' + extraChange : '') + '">'; opts.forEach(function (o) { h += '<option value="' + esc(o.v) + '"' + (v === o.v ? ' selected' : '') + '>' + esc(o.l) + '</option>' }); return h + '</select></div>' }
 
-  function likert(label, id, val, lo, hi, help) { var h = '<div class="mb-5"><label class="form-label-md">' + esc(label) + '</label>' + (help ? '<p class="t-faint-sm" style="margin:-4px 0 8px">' + esc(help) + '</p>' : '') + '<div class="flx-center gap-2' + (/\*/.test(label) ? ' gate-field gate-likert' : '') + '"><span class="lk-cap">' + esc(lo) + '</span>'; for (var n = 1; n <= 5; n++) { var s = val === n; h += '<button onclick="ER.likSet(\'' + id + '\',' + n + ')" class="lk-btn' + (s ? ' sel' : '') + '">' + n + '</button>' } return h + '<span class="lk-cap lk-cap-r">' + esc(hi) + '</span></div></div>' }
+  /* The record a 1-5 score belongs to, for its edit lock (19 Nov 2026): the five assessment sections are one record;
+     every other scale takes the record its id maps to (idToRecordKey: risk_<scenario>_* is the risk map, 'risks',
+     as 1.3's notes and saveRisks already have it). '' where nothing maps, as for each leader's own review. */
+  /* The record a 1-5 score writes, for its lock. Dotted paths are not field ids, so idToRecordKey cannot read them:
+     the 1.1 battery locks 'assessments'; the 2.3 leader-by-competency scores lock 'competencyFramework', as its
+     definition boxes do (user report, 19 Nov 2026); a leader's 6.x review scores lock that leader's review, as
+     their rv_<leader>_<field> boxes do. Anything else (the risk map's risk_<id>_<field>) is a field id already. */
+  function erLikLock(id) { var s = String(id || ''), p = s.split('.'); if (p[0] === 'assessments') return 'assessments'; if (p[0] === 'competencyFramework') return 'competencyFramework'; if (p[0] === 'leadershipReview') return (p[1] === 'leaders' && p[2]) ? 'leadershipReview::' + p[2] : 'leadershipReview'; try { return (typeof idToRecordKey === 'function' && idToRecordKey(s)) || ''; } catch (e) { return ''; } }
+  function likert(label, id, val, lo, hi, help) { var h = '<div class="mb-5"><label class="form-label-md">' + esc(label) + '</label>' + (help ? '<p class="t-faint-sm" style="margin:-4px 0 8px">' + esc(help) + '</p>' : '') + '<div class="flx-center gap-2' + (/\*/.test(label) ? ' gate-field gate-likert' : '') + '"><span class="lk-cap">' + esc(lo) + '</span>'; for (var n = 1; n <= 5; n++) { var s = val === n; h += '<button' + (erLikLock(id) ? ' data-lock="' + esc(erLikLock(id)) + '"' : '') + ' onclick="ER.likSet(\'' + id + '\',' + n + ')" class="lk-btn' + (s ? ' sel' : '') + '">' + n + '</button>' } return h + '<span class="lk-cap lk-cap-r">' + esc(hi) + '</span></div></div>' }
 
-  function likSet(path, n) { if (path.split('.')[0] === 'assessments' && lockBlocked('assessments')) return; harvestFields(); var parts = path.split('.'); var obj = data; for (var i = 0; i < parts.length - 1; i++) { if (!obj[parts[i]]) obj[parts[i]] = {}; obj = obj[parts[i]] } obj[parts[parts.length - 1]] = n; saveData(); render() }
+  /* A button that opens a form over a shared record names that record (data-lock), so a click takes its lock and a
+     colleague's copy is held while it is taken: the Add Role / Add New Leader buttons (19 Nov 2026). */
+  function lockBtn(rk, html) { return String(html).replace('<button ', '<button data-lock="' + rk + '" '); }
+  function likSet(path, n) { var _lk = erLikLock(path); if (_lk && lockBlocked(_lk)) return; harvestFields(); var parts = path.split('.'); var obj = data; for (var i = 0; i < parts.length - 1; i++) { if (!obj[parts[i]]) obj[parts[i]] = {}; obj = obj[parts[i]] } obj[parts[parts.length - 1]] = n; saveData(); render() }
 
   function isStepDone(id) {
     var cs = data.completedSteps || {};
@@ -1386,7 +1398,7 @@
         h += renderOrgChartInteractive(data.orgChart || [], data.leaders || []);
         h += card(''
           + '<div>'
-          + btn('+ Add New Leader', 'UI.addLeaderOpen=true;UI.editIdx=null;UI.scrollTo=\'addLeaderPanelCard\';render()', 'bg2', 'font-size:12px;padding:8px 14px')
+          + lockBtn('leaders', btn('+ Add New Leader', 'UI.addLeaderOpen=true;UI.editIdx=null;UI.scrollTo=\'addLeaderPanelCard\';render()', 'bg2', 'font-size:12px;padding:8px 14px'))
           + '<div style="font-size:12px;color:var(--text-body);margin-top:8px;line-height:1.5">Need to add a person to assign to this role? Add them right here. They join the Leadership Inventory and appear throughout the module, and you can then assign them to the role by clicking its box above.</div>'
           + '</div>');
         if (UI.addLeaderOpen) h += '<div id="addLeaderPanelCard">' + addLeaderPanel() + '</div>';
@@ -3610,7 +3622,7 @@
   }
 
   function addLeaderPanel() {
-    return card('<h3 class="h-sub-lg">Add Leader</h3>' + leaderFormFields({}) + '<div style="display:flex;gap:12px;margin-top:12px">' + btn('Save', 'ER.saveLeader()', 'bp') + btn('Cancel', 'UI.addLeaderOpen=false;render()', 'bg2') + '</div>');
+    return card('<h3 class="h-sub-lg" data-lock-hold="leaders">Add Leader</h3>' + leaderFormFields({}) + '<div style="display:flex;gap:12px;margin-top:12px">' + btn('Save', 'ER.saveLeader()', 'bp') + btn('Cancel', 'UI.addLeaderOpen=false;render()', 'bg2') + '</div>');
   }
 
   function memberStaffingBlock(roleId, opts) {
@@ -4004,8 +4016,8 @@
     h+='</div>';
     // Toolbar
     h+='<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;justify-content:center">';
-    h+=btn('+ Add Role','UI.orgAddForm=true;UI.orgEditId=null;UI.orgSelected=null;UI.scrollTo=\'orgAddCard\';render()','bp','font-size:12px;padding:8px 14px');
-    h+=btn('+ Add New Leader','UI.addLeaderOpen=true;UI.editIdx=null;UI.scrollTo=\'addLeaderPanelCard\';render()','bp','font-size:12px;padding:8px 14px');
+    h+=lockBtn('orgChart',btn('+ Add Role','UI.orgAddForm=true;UI.orgEditId=null;UI.orgSelected=null;UI.scrollTo=\'orgAddCard\';render()','bp','font-size:12px;padding:8px 14px'));
+    h+=lockBtn('leaders',btn('+ Add New Leader','UI.addLeaderOpen=true;UI.editIdx=null;UI.scrollTo=\'addLeaderPanelCard\';render()','bp','font-size:12px;padding:8px 14px'));
     h+=btn('\u2193 Save','ER.saveOrgState()','bp','font-size:12px;padding:8px 14px');
     h+=lyDepthCtl()+btn('\u25BE Save as PDF','ER.printCurrentPage()','bg2','font-size:12px;padding:8px 14px'); /* 16 Sep 2026 (Paul's ruling): the legacy print button gives way to the family's PDF control, with the Summary / Full toggle the document reads */
     h+='</div>';
@@ -4344,11 +4356,11 @@
   '*{-webkit-print-color-adjust:exact;print-color-adjust:exact}[style*="#F5F2EC"],[style*="#8A8278"],[style*="rgba(245,242,236"],[style*="rgba(138,130,120"],[style*="color:var(--paper)"]{color:#1e2530 !important}[style*="color:var(--stone)"],[style*="color:var(--text-muted)"],[style*="color:var(--text-faint)"]{color:#555 !important}@media print{body{margin:0;padding:0}}'+
   '@page{margin:16mm 14mm 20mm 14mm;@top-left{content:""}@top-center{content:""}@top-right{content:""}@bottom-center{content:""}@bottom-left{content:"'+printFooterText()+'";font:9px "DM Mono",monospace;color:#666}@bottom-right{content:counter(page) " / " counter(pages);font:9px "DM Mono",monospace;color:#666}}'+ /* PRINT MARGINS (Paul's ruling, 12 Sep 2026; family): the document owns all six page corners — the top three empty, the copyright line bottom left, the page number bottom right — so the browser's own date, title, address, and count never print, whatever the user's Headers and footers setting */
   '.print-footer{display:none}@media screen{.print-footer{display:block;margin-top:40px;padding-top:10px;border-top:1px solid #ddd;font-family:"DM Mono",monospace;font-size:9px;letter-spacing:.06em;color:#666}}'+ /* on screen, before printing, the copyright line ends the document */
-  (extraCss||'')+'</style></head><body>'+((opts&&opts.preview)?'<div class="preview-note" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;font:12px/1.5 var(--sans,sans-serif);color:#333;background:#FBF6EC;border:1px solid #E8D9B8;padding:8px 12px;margin:0 0 24px"><button onclick="window.print()" style="font:12px var(--sans,sans-serif);font-weight:600;padding:6px 14px;border:1px solid #333;border-radius:6px;background:#fff;color:#111;cursor:pointer;white-space:nowrap">Show as pages</button><span style="flex:1;min-width:240px">Preview. Dashed rules below mark where the document forces a page break; where the printer breaks a long section in the middle is set when it prints. Show as pages opens your browser\u2019s print preview, where the pages are exact, and Cancel returns here.</span></div>'+'<style>@media print{.preview-note{display:none}}@media screen{html{background:#e6e6e6}body{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.12),0 8px 32px rgba(0,0,0,.08);padding:56px 64px !important;margin:24px auto !important}[style*="break-before:page"]::before,[style*="page-break-after:always"]:not([style*="display:flex"])::after,[style*="min-height:85vh"]+*::before{content:"page break";display:block;text-align:center;font:10px "DM Mono",monospace;letter-spacing:.14em;text-transform:uppercase;color:#999;border-top:1px dashed #bbb;padding-top:6px;margin:28px 0 24px}[style*="page-break-after:always"]+[style*="break-before:page"]::before{display:none}}</style>':'')+content+'<div class="print-footer">'+printFooterText()+'</div></body></html>');
+  (extraCss||'')+'</style></head><body>'+((opts&&opts.preview)?'<div class="preview-note" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;font:12px/1.5 var(--sans,sans-serif);color:#333;background:#FBF6EC;border:1px solid #E8D9B8;padding:8px 12px;margin:0 0 24px"><button onclick="window.print()" style="font:12px var(--sans,sans-serif);font-weight:600;padding:6px 14px;border:1px solid #333;border-radius:6px;background:#fff;color:#111;cursor:pointer;white-space:nowrap">Show as pages</button><span style="flex:1;min-width:240px">Preview. Dashed rules below mark where the document forces a page break; where the printer breaks a long section in the middle is set when it prints. Show as pages opens your browser\u2019s print preview, where the pages are exact, and Cancel returns here.</span></div>'+'<style>@media print{.preview-note{display:none}}@media screen{html{background:#e6e6e6}body{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.12),0 8px 32px rgba(0,0,0,.08);padding:56px 64px !important;margin:24px auto !important}[style*="break-before:page"]::before,[style*="page-break-after:always"]:not([style*="display:flex"])::after,[style*="padding-top:75mm"]+*::before{content:"page break";display:block;text-align:center;font:10px "DM Mono",monospace;letter-spacing:.14em;text-transform:uppercase;color:#999;border-top:1px dashed #bbb;padding-top:6px;margin:28px 0 24px}[style*="page-break-after:always"]+[style*="break-before:page"]::before{display:none}}</style>':'')+content+'<div class="print-footer">'+printFooterText()+'</div></body></html>');
   w.document.close();if(!(opts&&opts.preview))setTimeout(function(){w.print()},500)}
 
   function printDocCover(title,lead,countLine){var org=(function(){var ent=(data&&data.enterprise&&String(data.enterprise.name||'').trim())||'';if(ent)return ent;var o=null;try{o=getOrg(currentOrgId)}catch(e){}return (o&&o.name)||''})(); /* 13 Sep 2026 (Paul's ruling; family): the cover names the organization as Organization Details (the Organization & Team panel) records it; the sign-in organization's label is the fallback only when that name is blank — ported to Executive Readiness 16 Sep 2026 (Paul's ruling: the cover as Governance has it) */
-  return '<div style="page-break-after:always;display:flex;flex-direction:column;justify-content:center;min-height:85vh">'
+  return '<div style="page-break-after:always;break-after:page;padding-top:75mm">'
   +'<div style="font-family:var(--mono,monospace);font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#555;margin:0 0 18px">NextChapter \u00b7 '+esc(PRINT_MODULE_NAME)+'</div>'
   +'<div style="font-family:var(--serif,Georgia,serif);font-size:40px;font-weight:600;line-height:1.15;color:#111;margin:0 0 14px">'+esc(title)+'</div>'
   +(lead?'<div style="font-size:14px;color:#444;line-height:1.6;max-width:520px;margin:0 0 26px">'+esc(lead)+'</div>':'')
@@ -4471,7 +4483,7 @@
       });
     }
     // Add Role (vacant) — same creation path as the dashboard.
-    h+='<div style="margin-top:4px">'+btn('+ Add Role','UI.orgAddForm=true;UI.orgEditId=null;UI.orgSelected=null;UI.scrollTo=\'orgAddCard\';render()','bp')+'</div>';
+    h+='<div style="margin-top:4px">'+lockBtn('orgChart',btn('+ Add Role','UI.orgAddForm=true;UI.orgEditId=null;UI.orgSelected=null;UI.scrollTo=\'orgAddCard\';render()','bp'))+'</div>';
     // Ruled 25 July: the Add Role form opens in the button's slot, below it, not above the chart.
     if(UI.orgAddForm&&!UI.orgEditId){h+='<div id="orgAddCard">'+renderOrgForm(null,roles,leaders)+'</div>';}
   
@@ -4499,7 +4511,7 @@
   function leaderEditCard() {
     var leaders = data.leaders || [];
     var ed = UI.editIdx !== null ? (leaders[UI.editIdx] || {}) : { name: '', role: '', fluency: '', changeExp: '', bandwidth: '', engagement: '', scope: '' };
-    return card('<h3 class="h-sub-lg">' + (UI.editIdx !== null ? 'Edit' : 'Add') + ' Leader</h3>' + leaderFormFields(ed) + '<div style="display:flex;gap:12px;margin-top:12px">' + btn('Save', 'ER.saveLeader()', 'bp') + btn('Cancel', 'UI.addForm=false;UI.editIdx=null;render()', 'bg2') + '</div>');
+    return card('<h3 class="h-sub-lg" data-lock-hold="leaders">' + (UI.editIdx !== null ? 'Edit' : 'Add') + ' Leader</h3>' + leaderFormFields(ed) + '<div style="display:flex;gap:12px;margin-top:12px">' + btn('Save', 'ER.saveLeader()', 'bp') + btn('Cancel', 'UI.addForm=false;UI.editIdx=null;render()', 'bg2') + '</div>');
   }
 
   function saveLandscapeNotes() { if (!data.landscapeNotes) data.landscapeNotes = {}; var e1 = $('ll_ownershipGap'), e2 = $('ll_mmAssessment'); if (e1) data.landscapeNotes.ownershipGap = e1.value; if (e2) data.landscapeNotes.mmAssessment = e2.value; saveData() }
@@ -4783,8 +4795,21 @@
   function renderOrgForm(role, roles, leaders) {
     var isEdit = role && role.id;
     var ed = role || { name: '', level: 2, parentId: '', occupantLeaderId: null, guidingConcepts: '', taggedValues: [], members: [] };
+    /* The form is redrawn while it is open (ticking a principle redraws the page, and so does anything else), and it
+       was drawn from the saved role each time, so what had been typed went and a new role's ticks never showed
+       (user report, 19 Nov 2026). When this same form is already on the page, what is in its boxes is kept; a form
+       opened afresh starts from the saved role, and from no ticks of an earlier, cancelled form. */
+    var _fk = isEdit ? String(ed.id) : 'new', _open = null, _leaderSel;
+    try { _open = (typeof document !== 'undefined' && !UI._printing) ? document.querySelector('[data-org-form="' + _fk + '"]') : null; } catch (e) { _open = null; }
+    if (!_open && !UI._printing) { _orgTaggedValues = null; _orgTagKey = null; }
+    else {
+      var _lv = function (id, v) { var el = document.getElementById(id); return (el && _open.contains(el)) ? el.value : v; };
+      ed = Object.assign({}, ed, { name: _lv('org_name', ed.name), parentId: _lv('org_parent', ed.parentId), guidingConcepts: _lv('org_concepts', ed.guidingConcepts) });
+      var _ls = document.getElementById('org_leader'); if (_ls && _open.contains(_ls)) _leaderSel = _ls.value;
+    }
+    var _tags = (_orgTagKey === _fk && _orgTaggedValues) ? _orgTaggedValues : (ed.taggedValues || []);
     var isBoard = (isEdit ? ed.level : 2) === 1;
-    var h = '<div style="padding:24px;border:2px solid var(--gold);background:rgba(var(--fg-rgb),.03);margin:24px 0">';
+    var h = '<div data-lock-hold="orgChart" data-org-form="' + esc(_fk) + '" style="padding:24px;border:2px solid var(--gold);background:rgba(var(--fg-rgb),.03);margin:24px 0">';
     h += '<h3 class="h-sub-lg">' + (isEdit ? 'Edit: ' + esc(ed.name) : 'Add New Role') + '</h3>';
     h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">';
     h += ta('Role title *', 'org_name', ed.name, 'e.g. Chief AI Officer', 1);
@@ -4798,7 +4823,7 @@
       return true;                                     // non-leader roles may sit anywhere
     }).map(function (r) { return { v: r.id, l: r.name }; });
     if (!isBoard) h += sel('Reports to', 'org_parent', ed.parentId || '', [{ v: '', l: _isLeaderBox ? 'Board (top level)' : 'None (top level)' }].concat(_parentOpts));
-    if (!isBoard) h += sel('Assigned leader', 'org_leader', (ed.occupantLeaderId || (roleOccupant(ed) || {}).id || ''), [{ v: '', l: 'Unassigned' }].concat(leaders.map(function (l, i) { return { v: l.id, l: l.name || 'Leader ' + (i + 1) } })));
+    if (!isBoard) h += sel('Assigned leader', 'org_leader', (_leaderSel !== undefined ? _leaderSel : (ed.occupantLeaderId || (roleOccupant(ed) || {}).id || '')), [{ v: '', l: 'Unassigned' }].concat(leaders.map(function (l, i) { return { v: l.id, l: l.name || 'Leader ' + (i + 1) } })));
     h += '</div>';
     h += ta('Guiding concepts', 'org_concepts', ed.guidingConcepts, 'Decision rights, collaboration model\u2026', 3);
     // Values tagging — draws on the principles defined in the Values Architecture step (3.4).
@@ -4808,9 +4833,9 @@
       h += '<div style="font-size:12px;color:var(--text-body);line-height:1.6;padding:10px 12px;background:rgba(var(--fg-rgb),.03);border:1px solid rgba(var(--fg-rgb),.06);border-radius:6px">No organizational principles defined yet. Build them in the Values Architecture step (Phase 3), then return here to tag the ones relevant to this role.</div>';
     } else {
       _ovList.forEach(function (v) {
-        var on = (ed.taggedValues || []).indexOf(v.id) >= 0;
+        var on = _tags.indexOf(v.id) >= 0;
         var _dc = DOMAIN_COL[v.domain] || '#888';
-        h += '<div onclick="ER.toggleOrgValue(\'' + v.id + '\')" style="display:flex;align-items:center;gap:10px;padding:8px 12px;margin-bottom:4px;background:' + (on ? 'rgba(107,76,138,.1)' : 'transparent') + ';border:1px solid ' + (on ? _dc : 'rgba(var(--fg-rgb),.08)') + ';cursor:pointer">';
+        h += '<div data-lock="orgChart" onclick="ER.toggleOrgValue(\'' + v.id + '\',\'' + esc(_fk) + '\')" style="display:flex;align-items:center;gap:10px;padding:8px 12px;margin-bottom:4px;background:' + (on ? 'rgba(107,76,138,.1)' : 'transparent') + ';border:1px solid ' + (on ? _dc : 'rgba(var(--fg-rgb),.08)') + ';cursor:pointer">';
         h += '<div style="width:18px;height:18px;border-radius:3px;border:2px solid ' + (on ? _dc : 'rgba(var(--fg-rgb),.15)') + ';background:' + (on ? _dc : 'transparent') + ';color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">' + (on ? '\u2713' : '') + '</div>';
         h += '<div><div style="font-size:12px;color:var(--paper)">' + esc(v.principle) + '</div>' + (v.domain ? '<div style="font-size:10px;color:' + _dc + ';text-transform:uppercase;font-family:var(--mono);letter-spacing:.1em">' + esc(v.domain) + '</div>' : '') + '</div></div>';
       });
@@ -5469,18 +5494,18 @@
     wrap.innerHTML = orgChartInnerSvg(roles, leaders, !!(wrap.classList && wrap.classList.contains('org-board-canvas'))) + orgFullscreenOverlay(roles, leaders);
   }
 
-  function toggleOrgValue(vid) {
-    if (!_orgTaggedValues) {
-      var role = UI.orgEditId ? (data.orgChart || []).find(function (r) { return r.id === UI.orgEditId }) : null;
+  function toggleOrgValue(vid, key) {
+    if (lockBlocked('orgChart')) return;   /* a colleague is editing the chart (19 Nov 2026) */
+    key = key || UI.orgEditId || 'new';
+    /* The ticks are the form's until it is saved (19 Nov 2026): they were written straight into an edited role, so
+       Cancel kept them, and for a new role they were never drawn at all. The form draws them from here. */
+    if (_orgTagKey !== key || !_orgTaggedValues) {
+      var role = key !== 'new' ? (data.orgChart || []).find(function (r) { return String(r.id) === String(key) }) : null;
       _orgTaggedValues = (role && role.taggedValues) ? role.taggedValues.slice() : [];
+      _orgTagKey = key;
     }
     var idx = _orgTaggedValues.indexOf(vid);
     if (idx >= 0) _orgTaggedValues.splice(idx, 1); else _orgTaggedValues.push(vid);
-    // Update the role in data immediately for re-render
-    if (UI.orgEditId) {
-      var r = (data.orgChart || []).find(function (x) { return x.id === UI.orgEditId });
-      if (r) r.taggedValues = _orgTaggedValues.slice();
-    }
     render();
   }
 
@@ -5495,7 +5520,7 @@
       parentId: val('org_parent') || '',
       occupantLeaderId: val('org_leader') !== '' ? val('org_leader') : null,
       guidingConcepts: val('org_concepts') || '',
-      taggedValues: _orgTaggedValues || [],
+      taggedValues: (_orgTaggedValues && _orgTagKey === String(existingId || 'new')) ? _orgTaggedValues : (prev.taggedValues || []),   /* an edit that touched no tick keeps the role's own (19 Nov 2026) */
       members: existingId ? (prev.members || []) : [],
       source: prev.source || (/^ldr_/.test(existingId || '') ? 'leader' : undefined)
     };
@@ -5519,7 +5544,7 @@
     if (/^ldr_/.test(r.id)) {
       syncPhase1Chart();
     }
-    _orgTaggedValues = null;
+    _orgTaggedValues = null; _orgTagKey = null;
     UI.orgAddForm = false; UI.orgEditId = null; saveData(); render();
   }
 
@@ -5795,7 +5820,7 @@
 
   function lyRowHtml(label,value,indent){var t=(typeof value==='string')?value:lyText(value);var parts=t.split('<br>').map(function(x){return esc(lyCap(x))});return '<tr><td style="width:34%;padding:5px 10px 5px '+(indent?'26px':'10px')+';vertical-align:top;font-size:11.5px;color:#555;border-bottom:1px solid #eee">'+esc(label)+'</td><td style="padding:5px 10px;vertical-align:top;font-size:12.5px;color:#111;line-height:1.5;border-bottom:1px solid #eee">'+(t?parts.join('<br>'):'<span style="color:#999">Not recorded</span>')+'</td></tr>'}
 
-  function _rcStripCover(doc){var i=doc.indexOf('min-height:85vh');if(i<0)return doc;var end=doc.indexOf('</div></div>',i);return end>0?doc.slice(end+12):doc}
+  function _rcStripCover(doc){var i=doc.indexOf('padding-top:75mm');if(i<0)return doc;var end=doc.indexOf('</div></div>',i);return end>0?doc.slice(end+12):doc}
 
   function rcFirstRecordStays(body){var a=body.indexOf('<table class="ly-rec"');if(a<0)return body;var b=body.indexOf('<table class="ly-rec"',a+10);var first=b>0?body.slice(a,b):body.slice(a);var fixed=first.replace('break-inside:auto;page-break-inside:auto;break-before:page;page-break-before:always;','break-inside:auto;page-break-inside:auto;');return body.slice(0,a)+fixed+(b>0?body.slice(b):'')}
 

@@ -309,3 +309,15 @@ svg circle[fill="#D4A017"],
 svg text[fill="#D4A017"] {
   fill: #D4A017
 }
+
+/* Step tab strip on phones and narrow windows (18 Nov 2026). Governance writes its strip as an inline grid,
+   one column per step (program.js, repeat(n,minmax(0,1fr))), so on a phone four or five tabs were squeezed
+   into one row: their labels ran into each other and the last ran off the screen. The shared stylesheet
+   stacks the strip at <=960px, as every other program shows it, but an inline display:grid outranks it.
+   This puts the stack back at that width; from 961px up the grid row stands as before. */
+@media (max-width: 960px) {
+  .step-nav[style*="grid-template-columns"] {
+    display: flex !important;
+    flex-direction: column
+  }
+}

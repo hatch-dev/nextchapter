@@ -204,7 +204,7 @@
       if (!d.stepDue) d.stepDue = {};
       if (!d.completedSteps) d.completedSteps = {};
       if (!d.reportDefs) d.reportDefs = [];
-      if (!d.settings) d.settings = { aiGuide: false, voice: false };
+      if (!d.settings) d.settings = { aiGuide: true, voice: true };
       return d;
     },
 

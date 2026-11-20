@@ -1,6 +1,6 @@
 // @ts-check
 /* Sign-in at a program's door, the session, the nav, and sign-out (js/auth.js, js/nav.js, signOut in js/app.js). */
-const { test, expect, signIn, visibleErrors } = require('./fixtures');
+const { test, expect, signIn, acceptTermsIfShown, visibleErrors } = require('./fixtures');
 
 const ER = 'enterprises/executive-readiness';
 
@@ -64,6 +64,7 @@ test.describe('signed in', () => {
     await expect(pick).toContainText('AI Innovation Pipeline');
     await pick.click();
     await expect(page).toHaveURL(/\/enterprises\/innovation-pipeline/);
+    await acceptTermsIfShown(page);   // each program asks for the Terms of Use once (18 Nov 2026)
     await expect(page.locator('.nav-tab[data-tab="pipeline"]')).toHaveText('Pipeline');
   });
 

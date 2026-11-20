@@ -106,7 +106,25 @@ async function signIn(page, programPath, acct) {
   await page.locator('#loginUser').fill(acct.username);
   await page.locator('#loginPassword').fill(acct.password);
   await page.locator('[data-submit]').click();
+  await acceptTermsIfShown(page);
   await expect(page.locator('.nav-tab[data-tab="home"]')).toBeVisible({ timeout: 20_000 });   // slow when two devices sign in at once
+}
+
+/* Terms of Use (directive of 18 Nov 2026): every program asks once, after sign-in, before the workspace opens.
+   Suites that are about something else accept them here and carry on; terms.spec.js tests the screen itself. */
+async function acceptTermsIfShown(page) {
+  const home = page.locator('.nav-tab[data-tab="home"]'), terms = page.locator('#termsAgree');
+  await expect(home.or(terms)).toBeVisible({ timeout: 20_000 });
+  if (!(await terms.isVisible())) return;
+  /* The organization's box can appear a moment later (it follows the roster's admin flag), so tick whatever is
+     shown until Continue is enabled. */
+  const go = page.locator('#termsContinue'), org = page.locator('#termsOrg');
+  for (let i = 0; i < 20 && !(await go.isEnabled().catch(() => false)); i++) {
+    if (await terms.count()) await terms.check().catch(() => {});
+    if (await org.count()) await org.check().catch(() => {});
+    if (!(await go.isEnabled().catch(() => false))) await page.waitForTimeout(250);
+  }
+  await go.click();
 }
 
 /** Who this page is signed in as: { organization, user } from GET /api/session. */
@@ -180,6 +198,6 @@ async function visibleErrors(page) {
 }
 
 module.exports = {
-  test, expect, newAccount, signIn, whoAmI, serverAnswers, serverWorkspace, serverValue, recordUploads, blockLocks, caret, nextSave,
+  test, expect, newAccount, signIn, acceptTermsIfShown, whoAmI, serverAnswers, serverWorkspace, serverValue, recordUploads, blockLocks, caret, nextSave,
   visibleErrors, SETUP_CODE,
 };

@@ -64,6 +64,8 @@ $router->post('/organizations/update', [OrganizationController::class, 'update']
 $router->post('/organizations/delete', [OrganizationController::class, 'delete']);
 // Reset an organization's data — the Pipeline's work, every member but the administrators (Directive 2 Oct 2026, Part 4). Admin console only.
 $router->post('/organizations/reset', [OrganizationController::class, 'reset']);
+// The AI Guide and Voice for an organization, across all its programs. Admin console only.
+$router->post('/organizations/ai-features', [OrganizationController::class, 'aiFeatures']);
 
 // The organization's workspace: the 90-day program's whole working state
 // (every phase's answers, ideas, portfolio, capital, progress) as one document,

@@ -879,7 +879,7 @@
   if((bd.escalationList||[]).length)h+=_pdRow('Escalation criteria',bd.escalationList.map(function(x,i){return (i+1)+'. '+(x.text||x)}).join('  '));
   }
   return h},
-  'out-raci2':function(){return printDocCover('RACI Matrix','AI Governance Responsibilities','')+'<div style="page:raci;break-before:page;display:flex;flex-direction:column;justify-content:center;min-height:85vh">'+_pdStripHeader(renderOutRaci2())+'</div>'+'<style>@page raci{size:landscape}body{max-width:1040px!important}table{font-size:12px}th,td{padding:5px 6px}</style>'}, /* 12 Sep 2026 (Paul's print pass): the cover stays portrait; the matrix alone takes a landscape page, named, and sits centered on it */
+  'out-raci2':function(){return printDocCover('RACI Matrix','AI Governance Responsibilities','')+'<div style="page:raci;break-before:page;page-break-before:always">'+_pdStripHeader(renderOutRaci2())+'</div>'+'<style>@page raci{size:landscape}body{max-width:1040px!important}table{font-size:12px}th,td{padding:5px 6px}</style>'}, /* 12 Sep 2026 (Paul's print pass): the cover stays portrait; the matrix alone takes a landscape page, named, and sits centered on it */
   'out-compliance':function(){var regs=data.regimes||[];return printDocCover('Compliance Obligations','Every regime with its obligations, their status, and their evidence.','')+lyRegister('regime',regs,'full',null)}, /* Round 2 (12 Sep 2026): the regime record at full depth for every regime */
   'out-testing':function(){var sys=(data.systems||[]).filter(function(x){return((x.testingPlan||{}).tests||[]).length||(x.testEvidence||[]).length});return printDocCover('Testing & Evidence','Every system with a testing plan: its tests and the evidence they produced.','')+lyRegister('system',sys,'full',null)}, /* Round 2: the system record at full depth */
   'out-govfw':function(){return printDocFromScreen(renderOutGovFW,'Governance Framework','Your complete AI governance framework from Phases 1–4','').replace(/border-left:4px solid [^;"']+;?/g,'')} /* 14 Sep 2026 (Paul's ruling): the boxes' left bars are a screen device; on paper, where the boxes do not print, they distract */
@@ -1300,7 +1300,25 @@
   if(document.getElementById('gr_firstMeeting')){if(!data.govRhythm)data.govRhythm={};harvestGrLists();['meetingDuration','firstMeeting','govFrequency'].forEach(function(f){var v=val('gr_'+f);if(v)data.govRhythm[f]=v});hit=true}
   if(document.getElementById('eo_deploymentGate')){if(!data.embedOps)data.embedOps={};['deploymentGate','lightGate','projectMgmt','hr','procurement'].forEach(function(f){var v=val('eo_'+f);if(v)data.embedOps[f]=v});hit=true}
   if(document.getElementById('fr_working')){if(!data.firstReview)data.firstReview={};['working','bottlenecks','nextIteration'].forEach(function(f){var v=val('fr_'+f);if(v)data.firstReview[f]=v});hit=true}
+  if(document.getElementById('rc_reviewFrequency')){bankRC();hit=true}
+  if(bankRegimeDraft())hit=true;
   if(hit)saveData()}catch(e){}}
+
+  /* ── Shared while it is typed (18 Nov 2026) ─────────────────────────
+     This program's fields carry no save of their own: what is on screen is harvested when the reader moves
+     on (beforeNavigate) and before a colleague's save is merged in (harvestOpenPage). So a colleague saw
+     nothing of it until the writer left the page. Now a beat after typing stops in a field that belongs to a
+     record, the same harvest runs and saves; the colleague's poll brings it in and their page repaints with
+     it. Never for a record somebody else holds (their copy is the one that counts), nor a field that saves
+     itself (data-live), nor anything in a window over the page. saveData() does not repaint, so the writer's
+     caret is not disturbed. */
+  var _liveHarvestT=null;
+  function liveHarvestSoon(e){try{var t=e&&e.target;if(!t||!t.id||!/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName||''))return;
+  if(!(window.Modules&&Modules.activeId&&Modules.activeId()==='ai-governance'))return;
+  if(t.getAttribute('data-live')||(t.closest&&t.closest('#modalRoot')))return;
+  var rk=idToRecordKey(t.id);if(!rk)return;if(typeof Collab!=='undefined'&&Collab.lockedByOther(rk))return;
+  if(_liveHarvestT)clearTimeout(_liveHarvestT);_liveHarvestT=setTimeout(function(){_liveHarvestT=null;harvestOpenFields()},700)}catch(x){}}
+  try{document.addEventListener('input',liveHarvestSoon,true);document.addEventListener('change',liveHarvestSoon,true)}catch(e){}
 
   function isStepDone(sid){
   var co=data.completedSteps||{};var comp=data.completed||{};
@@ -1345,6 +1363,17 @@
     if((pre==='sys'||pre==='ex')&&UI.eoSysOpen)return 'systems::'+UI.eoSysOpen;
     if((pre==='sys'||pre==='ex')&&currentPage==='system'&&currentStep)return 'systems::'+currentStep;
     if((pre==='pe'||pre==='rg'||pre==='ob')&&UI.regOpen)return 'regimes::'+UI.regOpen;
+    /* 18 Nov 2026: forms that took no lock, so a colleague was neither told nor kept out. Editing a record takes
+       that record's lock (saveSystem, saveRisk and saveErPlan already refused on it, but nothing ever held it);
+       adding one takes the register's '::new' lock, so a colleague opening the same Add form sees who is at it. */
+    if(pre==='sf')return 'systems::'+(UI.editSys||'new');
+    if(pre==='rf')return 'risks::'+(UI.editRisk||'new');
+    if(pre==='ng')return 'regimes::new';
+    if(pre==='pr')return 'ethicalFramework';
+    if(pre==='fr')return 'firstReview';
+    if(pre==='er'&&UI.erOpen)return 'risks::'+UI.erOpen;
+    if(pre==='gp'&&UI.eoSysOpen)return 'systems::'+UI.eoSysOpen;
+    if(pre==='gp'&&currentPage==='system'&&currentStep)return 'systems::'+currentStep;
     return null;
   }
 
@@ -1713,9 +1742,14 @@
     return'<div class="done-wrap" onclick="gatePeek(event)"><button class="btn bd done-btn"'+(disabled?' disabled':'')+' onclick="'+esc(onclick||'')+'">'+(label||(_step?'\u2713 Mark step complete and continue \u2192':'\u2713 Mark section complete and continue \u2192'))+'</button><p class="done-helper">'+((!_lock&&typeof taskId==='string'&&!dataGateOK(taskId))?dataGateMsg(taskId):helperMsg)+'</p></div>';
   }
 
-  function likert(label,id,val,lo,hi,help){var h='<div class="mb-5"><label class="form-label-md">'+esc(label)+'</label>'+(help?'<p style="font-size:13px;color:var(--paper);margin:-4px 0 8px;line-height:1.5">'+esc(help)+'</p>':'')+'<div class="flx-center gap-2'+(/\*/.test(label)?' gate-field gate-likert':'')+'"><span class="lk-cap">'+esc(lo)+'</span>';for(var n=1;n<=5;n++){var s=val===n;h+='<button onclick="RG.likSet(\''+id+'\','+n+')" class="lk-btn'+(s?' sel':'')+'">'+n+'</button>'}return h+'<span class="lk-cap lk-cap-r">'+esc(hi)+'</span></div></div>'}
+  function likert(label,id,val,lo,hi,help){var h='<div class="mb-5"><label class="form-label-md">'+esc(label)+'</label>'+(help?'<p style="font-size:13px;color:var(--paper);margin:-4px 0 8px;line-height:1.5">'+esc(help)+'</p>':'')+'<div class="flx-center gap-2'+(/\*/.test(label)?' gate-field gate-likert':'')+'"><span class="lk-cap">'+esc(lo)+'</span>';for(var n=1;n<=5;n++){var s=val===n;h+='<button data-lock="'+esc(likLockKey(id))+'" onclick="RG.likSet(\''+id+'\','+n+')" class="lk-btn'+(s?' sel':'')+'">'+n+'</button>'}return h+'<span class="lk-cap lk-cap-r">'+esc(hi)+'</span></div></div>'}
 
+  /* The record a 1-5 score writes, for its lock (19 Nov 2026): a risk's own scores lock that risk, as its fields do
+     (idToRecordKey); everything else locks its section. likSet had no lock check at all, so a score could be set
+     over a colleague who held the section. */
+  function likLockKey(path){var p=String(path||'').split('.');return (p[0]==='risks'&&p[1])?'risks::'+p[1]:p[0]}
   function likSet(path,n) {
+  if(lockBlocked(likLockKey(path)))return;
   var parts=path.split('.');
   if(parts.length===3){
   if(parts[0]==='risks'){var risks=data.risks||[];risks.forEach(function(r){if(r.id===parts[1])r[parts[2]]=n});data.risks=risks;saveData();render();return}
@@ -1891,7 +1925,7 @@
   '@media print{body{margin:0 auto;padding:0}}'+
   '@page{margin:16mm 14mm 20mm 14mm;@top-left{content:""}@top-center{content:""}@top-right{content:""}@bottom-center{content:""}@bottom-left{content:"'+printFooterText()+'";font:9px "DM Mono",monospace;color:#666}@bottom-right{content:counter(page) " / " counter(pages);font:9px "DM Mono",monospace;color:#666}}'+ /* PRINT MARGINS (Paul's ruling, 12 Sep 2026; family): the document owns all six page corners — the top three empty, the copyright line bottom left, the page number bottom right — so the browser's own date, title, address, and count never print, whatever the user's Headers and footers setting */
   '.print-footer{display:none}@media screen{.print-footer{display:block;margin-top:40px;padding-top:10px;border-top:1px solid #ddd;font-family:"DM Mono",monospace;font-size:9px;letter-spacing:.06em;color:#666}}'+ /* on screen, before printing, the copyright line ends the document */
-  '<\/style></head><body>'+((opts&&opts.preview)?'<div class="preview-note" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;font:12px/1.5 var(--sans,sans-serif);color:#333;background:#FBF6EC;border:1px solid #E8D9B8;padding:8px 12px;margin:0 0 24px"><button onclick="window.print()" style="font:12px var(--sans,sans-serif);font-weight:600;padding:6px 14px;border:1px solid #333;border-radius:6px;background:#fff;color:#111;cursor:pointer;white-space:nowrap">Show as pages</button><span style="flex:1;min-width:240px">Preview. Dashed rules below mark where the document forces a page break; where the printer breaks a long section in the middle is set when it prints. Show as pages opens your browser\u2019s print preview, where the pages are exact, and Cancel returns here.</span></div>'+'<style>@media print{.preview-note{display:none}}@media screen{html{background:#e6e6e6}body{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.12),0 8px 32px rgba(0,0,0,.08);padding:56px 64px !important;margin:24px auto !important}[style*="break-before:page"]::before,[style*="page-break-after:always"]:not([style*="display:flex"])::after,[style*="min-height:85vh"]+*::before{content:"page break";display:block;text-align:center;font:10px "DM Mono",monospace;letter-spacing:.14em;text-transform:uppercase;color:#999;border-top:1px dashed #bbb;padding-top:6px;margin:28px 0 24px}[style*="page-break-after:always"]+[style*="break-before:page"]::before{display:none}}</style>' /* 14 Sep 2026 (Paul's ruling): the preview reads as a sheet, marks every forced page break, and offers the browser\'s exact paged preview one click away */:'')+content+
+  '<\/style></head><body>'+((opts&&opts.preview)?'<div class="preview-note" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;font:12px/1.5 var(--sans,sans-serif);color:#333;background:#FBF6EC;border:1px solid #E8D9B8;padding:8px 12px;margin:0 0 24px"><button onclick="window.print()" style="font:12px var(--sans,sans-serif);font-weight:600;padding:6px 14px;border:1px solid #333;border-radius:6px;background:#fff;color:#111;cursor:pointer;white-space:nowrap">Show as pages</button><span style="flex:1;min-width:240px">Preview. Dashed rules below mark where the document forces a page break; where the printer breaks a long section in the middle is set when it prints. Show as pages opens your browser\u2019s print preview, where the pages are exact, and Cancel returns here.</span></div>'+'<style>@media print{.preview-note{display:none}}@media screen{html{background:#e6e6e6}body{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.12),0 8px 32px rgba(0,0,0,.08);padding:56px 64px !important;margin:24px auto !important}[style*="break-before:page"]::before,[style*="page-break-after:always"]:not([style*="display:flex"])::after,[style*="padding-top:75mm"]+*::before{content:"page break";display:block;text-align:center;font:10px "DM Mono",monospace;letter-spacing:.14em;text-transform:uppercase;color:#999;border-top:1px dashed #bbb;padding-top:6px;margin:28px 0 24px}[style*="page-break-after:always"]+[style*="break-before:page"]::before{display:none}}</style>' /* 14 Sep 2026 (Paul's ruling): the preview reads as a sheet, marks every forced page break, and offers the browser\'s exact paged preview one click away */:'')+content+
   '<div class="print-footer">'+printFooterText()+'</div>'+
   '</body></html>'); /* 12 Sep 2026 (Paul's ruling): the copyright footer on every page; the old centered module line is gone */
   w.document.close();
@@ -2878,7 +2912,7 @@
   function gateFieldsClear(){var els=document.querySelectorAll('#app .gate-field');for(var i=0;i<els.length;i++){var el=els[i],empty;if(el.classList.contains('gate-likert')){empty=!el.querySelector('.lk-btn.sel')}else{empty=!String(el.value||'').trim()}if(empty)return false}return true}
 
   function printDocCover(title,lead,countLine){var org=(function(){var ent=(data&&data.enterprise&&String(data.enterprise.name||'').trim())||'';if(ent)return ent;var o=null;try{o=getOrg(currentOrgId)}catch(e){}return (o&&o.name)||''})(); /* 13 Sep 2026 (Paul's ruling; family): the cover names the organization as Organization Details (the Organization & Team panel) records it; the sign-in organization's label is the fallback only when that name is blank */
-  return '<div style="page-break-after:always;display:flex;flex-direction:column;justify-content:center;min-height:85vh">'
+  return '<div style="page-break-after:always;break-after:page;padding-top:75mm">'
   +'<div style="font-family:var(--mono,monospace);font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#555;margin:0 0 18px">NextChapter \u00b7 '+esc(PRINT_MODULE_NAME)+'</div>'
   +'<div style="font-family:var(--serif,Georgia,serif);font-size:40px;font-weight:600;line-height:1.15;color:#111;margin:0 0 14px">'+esc(title)+'</div>'
   +(lead?'<div style="font-size:14px;color:#444;line-height:1.6;max-width:520px;margin:0 0 26px">'+esc(lead)+'</div>':'')
@@ -3307,7 +3341,11 @@
   function raciTeamEditor(){/* RACI@dashboard-person-controls fix (R2 triage, 25 Aug 2026): the person add/remove block, factored so the 2.2 card and the dashboard card carry identical controls — checklist item 31's "add/remove people and activities" holds at both sites; the two cards never render simultaneously, so the index-keyed rt_ ids cannot collide */
   return '<h4 style="font-size:14px;font-weight:700;margin:0 0 8px">Governance Team</h4><p style="font-size:12px;color:var(--text-faint);margin:0 0 10px">The people who hold letters in the matrix, alongside the Governance Owner above.</p>'+(data.raciPeople||[]).map(function(p,i){return '<div class="u-d34ea2f"><input id="rt_'+i+'_name" value="'+esc(p.name||'')+'" placeholder="Name" onchange="RG.saveRaciTeam()" class="row-input"/><input id="rt_'+i+'_role" value="'+esc(p.role||'')+'" placeholder="Role" onchange="RG.saveRaciTeam()" class="row-input"/><button onclick="RG.removeRaciPerson(\''+p.id+'\')" class="no-btn" title="Remove">✕</button></div>'}).join('')+'<div style="margin:4px 0 14px">'+btnAdd('+ Add Person','RG.addRaciPerson()',null,'font-size:13px;padding:6px 14px')+'</div>'}
 
-  function saveRC(){if(!data.reviewCadence)data.reviewCadence={};harvestRcLists();['reviewFrequency','firstReviewDate','fullReviewTrigger'].forEach(function(f){var e=document.getElementById('rc_'+f);if(e)data.reviewCadence[f]=e.value});if(document.getElementById('rc_scan_'+SCAN_SOURCES[0].k)){var _ss={};SCAN_SOURCES.forEach(function(s){var e=document.getElementById('rc_scan_'+s.k);if(e&&e.checked)_ss[s.k]=true});data.reviewCadence.scanSources=_ss;data.reviewCadence.rescanOwner=val('rc_rescanOwner')};saveData();render()}
+  /* 18 Nov 2026: what 2.3's fields hold, put into the document without a repaint, so the open-page harvest can
+     use it too. 2.3 was not in harvestOpenFields, so its fields were saved only by Mark step complete (or the
+     dashboard's Save): navigating away dropped them, and a colleague never saw them. */
+  function saveRC(){bankRC();saveData();render()}
+  function bankRC(){if(!data.reviewCadence)data.reviewCadence={};harvestRcLists();['reviewFrequency','firstReviewDate','fullReviewTrigger'].forEach(function(f){var e=document.getElementById('rc_'+f);if(e)data.reviewCadence[f]=e.value});if(document.getElementById('rc_scan_'+SCAN_SOURCES[0].k)){var _ss={};SCAN_SOURCES.forEach(function(s){var e=document.getElementById('rc_scan_'+s.k);if(e&&e.checked)_ss[s.k]=true});data.reviewCadence.scanSources=_ss;data.reviewCadence.rescanOwner=val('rc_rescanOwner')}}
 
   function saveGR(){if(!data.govRhythm)data.govRhythm={};harvestGrLists();['meetingDuration','firstMeeting','govFrequency'/* addendum 122 (14 Aug 2026): additionalAgenda became the agenda add-list */].forEach(function(f){var e=document.getElementById('gr_'+f);if(e)data.govRhythm[f]=e.value});saveData();render()}
 
@@ -4793,7 +4831,7 @@
   if(potential){
   h+='<div class="cd" style="padding:20px 24px">';
   h+='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px"><h3 class="h-sub-lg" style="margin:0;flex:1">Compliance Survey</h3>'+btnS(UI.regAdd?'Close':'Add a regime','UI.regAdd=!UI.regAdd;render()')+btnG('Export the register (CSV)','RG.exportRegimeCSV()')+'</div>';
-  if(UI.regAdd){h+=card('<h3 style="font-size:15px;font-weight:700;margin:0 0 10px">New potential regime</h3>'+inp('Name','ng_name','','e.g., Colorado AI Act (SB 24-205)')+sel('Type','ng_type','',[{v:'',l:'Select...'}].concat(REG_TYPES))+ta('Summary','ng_summary','','What it is and why it might matter here',2)+inp('Link','ng_link','','https://...')+inp('Owner','ng_owner','','Who watches this regime? Name and role')+(UI.pendingDoc?'<div style="display:flex;align-items:center;gap:8px;margin:6px 0 10px"><span class="btn-ghost pad-chip-sm" style="margin-bottom:0">\u2b07 '+esc(UI.pendingDoc.name)+'</span>'+btnG('\u00d7 Discard','UI.pendingDoc=null;render()')+'</div>':'<div style="margin:6px 0 10px"><label class="btn-ghost pad-chip-sm" style="cursor:pointer;margin-bottom:0">\u2b06 Upload documents (optional)<input type="file" accept="application/pdf,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none" onchange="RG.regimeDocPickedNew(this)"/></label></div>')+btnS('Add to the register','RG.addRegime()'))}
+  if(UI.regAdd){var _rd=data.regimeDraft||{};h+=regDraftLive(card('<h3 style="font-size:15px;font-weight:700;margin:0 0 10px">New potential regime</h3>'+inp('Name','ng_name',_rd.name,'e.g., Colorado AI Act (SB 24-205)')+sel('Type','ng_type',_rd.type||'',[{v:'',l:'Select...'}].concat(REG_TYPES))+ta('Summary','ng_summary',_rd.summary,'What it is and why it might matter here',2)+inp('Link','ng_link',_rd.link,'https://...')+inp('Owner','ng_owner',_rd.owner,'Who watches this regime? Name and role')+(UI.pendingDoc?'<div style="display:flex;align-items:center;gap:8px;margin:6px 0 10px"><span class="btn-ghost pad-chip-sm" style="margin-bottom:0">\u2b07 '+esc(UI.pendingDoc.name)+'</span>'+btnG('\u00d7 Discard','UI.pendingDoc=null;render()')+'</div>':'<div style="margin:6px 0 10px"><label class="btn-ghost pad-chip-sm" style="cursor:pointer;margin-bottom:0">\u2b06 Upload documents (optional)<input type="file" accept="application/pdf,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none" onchange="RG.regimeDocPickedNew(this)"/></label></div>')+btnS('Add to the register','RG.addRegime()')))}
   if(!regs.length)h+=card('<p style="color:var(--text-faint);font-style:italic;font-size:13px">The register is empty \u2014 list every potential source of compliance obligations.</p>');
   regs.forEach(function(g){var open=UI.regOpen===g.id;
   h+='<div style="border:1px solid var(--border-soft);background:var(--bg-elev);padding:14px 20px;margin-bottom:10px">';
@@ -4810,7 +4848,7 @@
   h+='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px"><h3 class="h-sub-lg" style="margin:0;flex:1">Compliance Survey</h3>'+btnS(UI.regAdd?'Close':'Add a regime','UI.regAdd=!UI.regAdd;render()')+btnG('Export the register (CSV)','RG.exportRegimeCSV()')+'</div>';
   h+='<p style="font-size:13px;color:var(--text-body);margin:0 0 14px">'+(currentStep==='5.2'?'Each potential regime waits here for its scoping judgment. Scoping a regime in moves it down to the Compliance Register.':'Each entry listed at Step 1.4 waits here for its scoping judgment. Scoping a regime in moves it down to the Compliance Register.')+'</p>';
   if(!pend.length)h+=card('<p style="color:var(--text-faint);font-style:italic;font-size:13px">Nothing awaits scoping \u2014 every listed regime has been reviewed.</p>');
-  if(UI.regAdd){h+=card('<h3 style="font-size:15px;font-weight:700;margin:0 0 10px">New regime</h3>'+inp('Name','ng_name','','e.g., Colorado AI Act (SB 24-205)')+sel('Type','ng_type','',[{v:'',l:'Select...'}].concat(REG_TYPES))+ta('Summary','ng_summary','','What it is and why it might matter here',2)+inp('Link','ng_link','','https://...')+(UI.pendingDoc?'<div style="display:flex;align-items:center;gap:8px;margin:6px 0 10px"><span class="btn-ghost pad-chip-sm" style="margin-bottom:0">\u2b07 '+esc(UI.pendingDoc.name)+'</span>'+btnG('\u00d7 Discard','UI.pendingDoc=null;render()')+'</div>':'<div style="margin:6px 0 10px"><label class="btn-ghost pad-chip-sm" style="cursor:pointer;margin-bottom:0">\u2b06 Upload documents (optional)<input type="file" accept="application/pdf,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none" onchange="RG.regimeDocPickedNew(this)"/></label></div>')+inp('Owner','ng_owner','','Who watches this regime')+btnS('Add to the register','RG.addRegime()'))}
+  if(UI.regAdd){var _rd=data.regimeDraft||{};h+=regDraftLive(card('<h3 style="font-size:15px;font-weight:700;margin:0 0 10px">New regime</h3>'+inp('Name','ng_name',_rd.name,'e.g., Colorado AI Act (SB 24-205)')+sel('Type','ng_type',_rd.type||'',[{v:'',l:'Select...'}].concat(REG_TYPES))+ta('Summary','ng_summary',_rd.summary,'What it is and why it might matter here',2)+inp('Link','ng_link',_rd.link,'https://...')+(UI.pendingDoc?'<div style="display:flex;align-items:center;gap:8px;margin:6px 0 10px"><span class="btn-ghost pad-chip-sm" style="margin-bottom:0">\u2b07 '+esc(UI.pendingDoc.name)+'</span>'+btnG('\u00d7 Discard','UI.pendingDoc=null;render()')+'</div>':'<div style="margin:6px 0 10px"><label class="btn-ghost pad-chip-sm" style="cursor:pointer;margin-bottom:0">\u2b06 Upload documents (optional)<input type="file" accept="application/pdf,.doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document" style="display:none" onchange="RG.regimeDocPickedNew(this)"/></label></div>')+inp('Owner','ng_owner',_rd.owner,'Who watches this regime')+btnS('Add to the register','RG.addRegime()')))}
   if(!regs.length)h+=card('<p style="color:var(--text-faint);font-style:italic;font-size:13px">The register is empty \u2014 add the regimes that govern you.</p>');
   pend.forEach(function(g){var open=UI.regOpen===g.id;var sc=g.scoping||{};
   h+='<div onclick="RG.regRowClick(event,\''+g.id+'\')" style="border:1px solid var(--border-soft);background:var(--bg-elev);padding:16px 20px;margin-bottom:10px;cursor:pointer">';
@@ -6046,9 +6084,24 @@
 
   function regimeDocPickedNew(inp){_regimeDocRead(inp.files&&inp.files[0],function(doc){UI.pendingDoc=doc;render()})}
 
+  /* ── The add-regime form as a shared draft (18 Nov 2026) ──
+     The form's fields were this browser's alone until "Add to the register", so a colleague who opened the
+     same form saw it empty while it was being filled in. The form takes one lock, 'regimes::new'
+     (idToRecordKey), so one person at a time is in it, and what they type is now the workspace's
+     data.regimeDraft: saved a beat after typing stops (data-live), shown in the form to everyone, and cleared
+     when the regime is added. Closing the form keeps it. Never written from a form a colleague holds: that one
+     shows their draft, and gathering it would send an older copy of their words back over them. */
+  function regDraftLive(h){return h.replace(/(<(?:input|textarea) [^>]*?id="ng_(?:name|summary|link|owner)")/g,'$1 data-live="1" onchange="RG.saveRegimeDraft()"').replace(/(<select id="ng_type"[^>]*?onchange=")/,'$1RG.saveRegimeDraft();')}
+  function readRegimeDraft(){return{name:val('ng_name')||'',type:val('ng_type')||'',summary:val('ng_summary')||'',link:val('ng_link')||'',owner:val('ng_owner')||''}}
+  function bankRegimeDraft(){if(!document.getElementById('ng_name'))return false;try{if(Collab.lockedByOther('regimes::new'))return false}catch(e){}
+  var d=readRegimeDraft(),was=data.regimeDraft;var empty=!d.name&&!d.type&&!d.summary&&!d.link&&!d.owner;
+  if(!was&&empty)return false;if(was&&JSON.stringify(d)===JSON.stringify({name:was.name||'',type:was.type||'',summary:was.summary||'',link:was.link||'',owner:was.owner||''}))return false;
+  data.regimeDraft=d;return true}
+  function saveRegimeDraft(){if(bankRegimeDraft())saveData()}
+
   function addRegime(){var nm=String(val('ng_name')||'').trim();if(!nm){alert('The regime needs a name.');return}if(!data.regimes)data.regimes=[];
   data.regimes.push({id:'reg-'+Math.random().toString(36).substr(2,9),name:nm,type:val('ng_type')||'other',scoping:null,systems:'all',summary:val('ng_summary'),link:val('ng_link'),doc:UI.pendingDoc||null,obligations:[],owner:val('ng_owner'),revisit:''});
-  UI.regAdd=false;UI.pendingDoc=null;saveData();render()}
+  delete data.regimeDraft;UI.regAdd=false;UI.pendingDoc=null;saveData();render()}
 
   function removeRegime(id){if(lockBlocked('regimes::'+id))return;var g=(data.regimes||[]).find(function(x){return x.id===id});if(!g||(g.scoping&&g.scoping.judgment)||(g.obligations||[]).length)return;/* mistake-erasure only \u2014 judged or itemized regimes stay */
   if(!confirm('Remove \u201c'+g.name+'\u201d from the register?'))return;data.regimes=(data.regimes||[]).filter(function(x){return x.id!==id});UI.regOpen=null;saveData();render()}
@@ -6405,7 +6458,7 @@
 
   function _recLock(rec){if(!rec)return null;try{if((data.systems||[]).indexOf(rec)>=0)return 'systems::'+rec.id;if((data.risks||[]).indexOf(rec)>=0)return 'risks::'+rec.id}catch(e){}return null}
 
-  function _rcStripCover(doc){var i=doc.indexOf('min-height:85vh');if(i<0)return doc;var end=doc.indexOf('</div></div>',i);return end>0?doc.slice(end+12):doc}
+  function _rcStripCover(doc){var i=doc.indexOf('padding-top:75mm');if(i<0)return doc;var end=doc.indexOf('</div></div>',i);return end>0?doc.slice(end+12):doc}
 
   function rcFirstRecordStays(body){var a=body.indexOf('<table class="ly-rec"');if(a<0)return body;var b=body.indexOf('<table class="ly-rec"',a+10);var first=b>0?body.slice(a,b):body.slice(a);var fixed=first.replace('break-inside:auto;page-break-inside:auto;break-before:page;page-break-before:always;','break-inside:auto;page-break-inside:auto;');return body.slice(0,a)+fixed+(b>0?body.slice(b):'')}
 
@@ -7076,6 +7129,7 @@
   RG.exportRegimeCSV = exportRegimeCSV;
   RG.regimeDocPickedNew = regimeDocPickedNew;
   RG.addRegime = addRegime;
+  RG.saveRegimeDraft = saveRegimeDraft;
   RG.removeRegime = removeRegime;
   RG.savePotential = savePotential;
   RG.regRowClick = regRowClick;

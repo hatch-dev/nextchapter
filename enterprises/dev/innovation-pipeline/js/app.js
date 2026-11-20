@@ -25,8 +25,8 @@ var data = emptyData();
    browser and the tab makes no request to any server after it starts. Decided here, before the Store below
    exists, so the Store runs on this browser's storage alone, and every request to the API or the chat relay is
    refused inside the browser (the app's own files still load: "the app itself still comes from the server"). -- */
-/* + AI-Ready Architecture (21 Oct 2026): a ?sample=1 address is its Demo tab too. */
-var SAMPLE_TAB_ADDR = (function () { try { return /[?&]sample=1(&|$)/.test(location.search) && !!(window.Modules && (Modules.isActive('pipeline') || Modules.isActive('exec-readiness') || Modules.isActive('ai-governance') || Modules.isActive('ai-architecture'))); } catch (e) { return false; } })();
+/* + AI-Ready Architecture (21 Oct 2026): a ?sample=1 address is its Demo tab too. + AI-Ready Culture (10 Nov 2026), whose build has the same Demo tab. */
+var SAMPLE_TAB_ADDR = (function () { try { return /[?&]sample=1(&|$)/.test(location.search) && !!(window.Modules && (Modules.isActive('pipeline') || Modules.isActive('exec-readiness') || Modules.isActive('ai-governance') || Modules.isActive('ai-architecture') || Modules.isActive('ai-culture'))); } catch (e) { return false; } })();
 var SAMPLE_LOCAL_ID = 'org_sample_local', SAMPLE_MODE = false, SAMPLE_REFUSED = false;
 if (SAMPLE_TAB_ADDR) (function () {
   var isServer = function (u) { u = String(u || ''); return /(^|\/)api\//.test(u) || /^wss?:/i.test(u); };
@@ -206,13 +206,27 @@ var Store = (function () {
 
   function apiUrl(path) { return (typeof API_BASE !== 'undefined' ? API_BASE : 'api') + path; }
 
+  /* A workspace request refused with 401/403 (18 Nov 2026). It was read as "offline" and retried for ever, so a
+     member removed by the administrator's Reset sat behind "Offline — Retrying…" on a workspace that no longer
+     existed for them. Now the server is asked whether this sign-in still stands (confirmSessionWithServer), and
+     if it does not, the page signs out. A 403 for any other reason leaves the session as it is. At most one
+     check every 15 seconds. */
+  var _authCheckAt = 0;
+  function authRefused(status) {
+    if (status !== 401 && status !== 403) return;
+    var t = nowMs(); if (t - _authCheckAt < 15000) return; _authCheckAt = t;
+    try { if (typeof confirmSessionWithServer === 'function') confirmSessionWithServer(); } catch (e) { }
+  }
+  /* A refusal is an answer, not a dropped connection: callers keep the Offline bar for a request that never got one. */
+  function refused(status) { return status === 401 || status === 403; }
   function getJSON(path, cb) {
+    var st = 0;
     try {
       fetch(apiUrl(path))
-        .then(function (r) { return r.json(); })
-        .then(function (res) { cb(res && res.success ? res.data : null); })
-        .catch(function () { cb(null); });
-    } catch (e) { cb(null); }
+        .then(function (r) { st = r.status; authRefused(r.status); return r.json(); })
+        .then(function (res) { cb(res && res.success ? res.data : null, st); })
+        .catch(function () { cb(null, st); });
+    } catch (e) { cb(null, 0); }
   }
 
   /* Mark the connection up/down and let the app paint the offline banner.
@@ -661,7 +675,7 @@ var Store = (function () {
     for (k in doc) {
       if (!has(doc, k) || MERGE_SKIP[k]) continue;
       if (!has(base, k) || !deepEq(base[k], doc[k])) {
-        var rd = has(base, k) ? recordDelta(base[k], doc[k]) : null;
+        var rd = has(base, k) ? (recordDelta(base[k], doc[k]) || fieldDelta(k, base[k], doc[k])) : null;
         if (rd) records[k] = rd; else sections[k] = doc[k];
         n++;
       }
@@ -720,11 +734,33 @@ var Store = (function () {
     var remove = b.filter(function (r) { return !has(di, String(r.id)); }).map(function (r) { return String(r.id); });
     return { upsert: upsert, patch: patch, remove: remove };
   }
+  /* ── An object section goes up as the fields that changed (18 Nov 2026) ──
+     The organization's details are one section, so two people editing different
+     fields of it a moment apart — one the website, the other the industry, each
+     locked out of the other's field — each sent the whole object, and the second
+     put the first one's field back as it was before. Now such a section goes as
+     { fields: { set, unset } }, laid over the section as stored at the moment of
+     writing (WorkspaceController::withRecords), the way a list's rows already go.
+     Only the sections named here: anything else still goes whole. */
+  var FIELD_DELTA_SECTIONS = { enterprise: 1, assigns: 1 };   /* assigns (19 Nov 2026): step by step, so two people assigning different steps both keep theirs */
+  function fieldDelta(key, b, d) {
+    if (!FIELD_DELTA_SECTIONS[key] || !isPlainObj(b) || !isPlainObj(d)) return null;
+    var set = {}, unset = [], k, n = 0;
+    for (k in d) { if (has(d, k) && (!has(b, k) || !deepEq(b[k], d[k]))) { set[k] = d[k]; n++; } }
+    for (k in b) { if (has(b, k) && !has(d, k)) { unset.push(k); n++; } }
+    return n ? { fields: { set: set, unset: unset } } : null;
+  }
   /* What the server makes of a row delta (WorkspaceController::withRecords), so the
      baseline can say what the server holds after one. Keep the two the same: a
      patch lands field by field on the row as stored, and a patch for a row that
      is no longer there (someone removed it) is dropped, never a half row. */
   function applyRecordDelta(stored, delta) {
+    if (delta && delta.fields) {   /* an object section's fields (fieldDelta) */
+      var obj = isPlainObj(stored) ? (cloneDoc(stored) || {}) : {}, fs = delta.fields, fk;
+      for (fk in (fs.set || {})) { if (has(fs.set, fk)) obj[fk] = cloneDoc(fs.set[fk]); }
+      (fs.unset || []).forEach(function (u) { delete obj[u]; });
+      return obj;
+    }
     var src = Array.isArray(stored) ? stored : [], up = {}, order = [], rm = {}, pt = {}, out = [];
     (delta.remove || []).forEach(function (x) { rm[String(x)] = 1; });
     (delta.upsert || []).forEach(function (r) { var x = String(r.id); if (!has(up, x)) order.push(x); up[x] = r; });
@@ -790,11 +826,11 @@ var Store = (function () {
     if (!confirmedNow && server.revs[id] == null) {
       if (_recovering[id]) { done(false); return; }   // one in flight is enough
       _recovering[id] = true;
-      getJSON('/workspace?org=' + encodeURIComponent(id) + modQ(id), function (w) {
+      getJSON('/workspace?org=' + encodeURIComponent(id) + modQ(id), function (w, st) {
         delete _recovering[id];
         if (!w) {
           // Could not read it. Keep everything, send nothing, try again later.
-          setOnline(false);
+          if (!refused(st)) setOnline(false);
           pendingOrgs[id] = true;
           setTimeout(function () { scheduleFlush(id); }, RETRY_DELAY_MS);
           done(false);
@@ -959,6 +995,7 @@ var Store = (function () {
 
         // 403/404/422: a real rejection, not a blip. Keep the local copy and
         // surface it — retrying identical bad data would just spin.
+        authRefused(res.status);
         console.error('Workspace save rejected:', res.status, res.body.message || '');
         done(false);
       })
@@ -1291,8 +1328,8 @@ var Store = (function () {
      commits we never read — so it comes here instead. */
   function pullDoc(id) {
     if (!server.enabled || !id) return;
-    getJSON('/workspace?org=' + encodeURIComponent(id) + modQ(id), function (w) {
-      if (!w) { setOnline(false); return; }
+    getJSON('/workspace?org=' + encodeURIComponent(id) + modQ(id), function (w, st) {
+      if (!w) { if (!refused(st)) setOnline(false); return; }
       setOnline(true);
       if (w.doc) adoptDoc(id, w.doc, w.rev, w.updated_by);
     });
@@ -1328,8 +1365,8 @@ var Store = (function () {
       // the document gets; only a real change pulls the document down.
       if (server.enabled) {
         var id = currentOrgId;
-        getJSON('/workspace/rev?org=' + encodeURIComponent(id) + modQ(id), function (d) {
-          if (!d) { setOnline(false); done(false); return; }
+        getJSON('/workspace/rev?org=' + encodeURIComponent(id) + modQ(id), function (d, st) {
+          if (!d) { if (!refused(st)) setOnline(false); done(false); return; }
           setOnline(true);
           if (d.rev <= (server.revs[id] || 0)) { done(false); return; }
           getJSON('/workspace?org=' + encodeURIComponent(id) + modQ(id), function (w) {
@@ -1394,7 +1431,7 @@ var Store = (function () {
       var id = rawGet(CURRENT_ORG_KEY);
       if (!id) { cb(); return; }
 
-      getJSON('/workspace?org=' + encodeURIComponent(id) + modQ(id), function (w) {
+      getJSON('/workspace?org=' + encodeURIComponent(id) + modQ(id), function (w, st) {
         if (w && w.doc) {
           server.revs[id] = w.rev;
           /* The mirror is not always behind the server. A reload inside the
@@ -1424,7 +1461,7 @@ var Store = (function () {
           // path seeds a workspace from the org's DB members
           // (openOrgWorkspace in js/features/org-admin.js).
           server.revs[id] = 0;
-        } else {
+        } else if (!refused(st)) {
           setOnline(false);
         }
         cb();
@@ -1443,6 +1480,8 @@ var Store = (function () {
     moduleId: moduleId,
     /* Connection state for the offline banner. */
     isOnline: function () { return server.online; },
+    /* Back to the state a fresh page starts in (18 Nov 2026): signing out must not leave the Offline bar over sign-in. */
+    resetConnection: function () { setOnline(true); },
     isServerMode: function () { return server.enabled; },
     /* The org as the database knows it (details + members) — used to seed a
        workspace for an org that has never been saved. */
@@ -1468,11 +1507,11 @@ var Store = (function () {
     loadOrg: function (id, cb) {
       if (!server.enabled) { cb(!!readJSON(orgKey(id), null)); return; }
       if (Object.prototype.hasOwnProperty.call(server.docs, id)) { cb(true); return; }
-      getJSON('/workspace?org=' + encodeURIComponent(id) + modQ(id), function (w) {
+      getJSON('/workspace?org=' + encodeURIComponent(id) + modQ(id), function (w, st) {
         if (!w) {
           // Offline. Fall back to the mirror, and never report "no workspace"
           // from a failed fetch — that is what would trigger a blank seed.
-          setOnline(false);
+          if (!refused(st)) setOnline(false);
           var cached = readJSON(orgKey(id), null);
           if (cached) { server.docs[id] = cached; cb(true); return; }
           cb(true); // unknown: refuse to seed rather than risk a clobber
@@ -2421,6 +2460,12 @@ function idToDocPath(id) {
 }
 
 function idToRecordKey(id) {
+  /* Organization & Team is the same window in every program (18 Nov 2026), so its fields lock the same way
+     everywhere, before a program's own map is asked: the organization's details as one record (as Governance,
+     Architecture and Culture already had it), and the AI Guide / Voice switches as another, so a colleague
+     sees "Locked · … is editing" on them too. */
+  if (id && id.indexOf('ent_') === 0) return 'enterprise';
+  if (id && id.indexOf('aiSet_') === 0) return 'settings';
   var own = window.Modules && Modules.hook('idToRecordKey');
   if (own) return own(id);
   if (!id) return null;
@@ -2710,9 +2755,9 @@ function applyLockUI(force) {
        those would put a field on a step this member may not edit back within
        reach, one beat after somebody else let go of it. */
     var wasLocked = root.querySelectorAll('[data-collab-locked]'); for (var j = 0; j < wasLocked.length; j++) { if (!wasLocked[j].getAttribute('data-assign-locked')) wasLocked[j].disabled = false; wasLocked[j].removeAttribute('data-collab-locked'); }
-    var seen = {}, onPage = [], fields = root.querySelectorAll('input,select,textarea');
+    var seen = {}, onPage = [], fields = root.querySelectorAll('input,select,textarea,[data-lock]');   /* [data-lock]: the 1-5 scales (19 Nov 2026) */
     for (var k = 0; k < fields.length; k++) {
-      var el = fields[k], rk = idToRecordKey(el.id); if (!rk) continue; var h = lockMap[rk]; if (!h) continue;
+      var el = fields[k], rk = (el.getAttribute && el.getAttribute('data-lock')) || idToRecordKey(el.id); if (!rk) continue; var h = lockMap[rk]; if (!h) continue;
       el.disabled = true; el.setAttribute('data-collab-locked', '1');
       if (!seen[rk]) {
         seen[rk] = true;
@@ -2723,6 +2768,9 @@ function applyLockUI(force) {
           ? ('Loading ' + (h.name || 'their') + '\u2019s changes\u2026')
           : ('Locked \u00b7 ' + (h.name || 'Someone') + ' is editing');
         var anchor = lockMarkTarget(el, _roots[0]);
+        /* A field inside a folded section (Organization & Team's AI Features): the note goes above the fold,
+           where it can be seen without opening it (18 Nov 2026). */
+        var fold = el.closest ? el.closest('details:not([open])') : null; if (fold) anchor = fold;
         if (anchor && anchor.parentNode) anchor.parentNode.insertBefore(mk2, anchor);
       }
     }
@@ -2762,6 +2810,31 @@ if (typeof document !== 'undefined') {
 
 /* Acquire on focus, release when focus leaves all record fields (focusin handles field-to-field). */
 var _heldLock = null;
+/* A click on a control that names its record (data-lock: the 1-5 scales, 19 Nov 2026) takes that record's lock,
+   as focusing a field does; a scale is buttons, so it took none and a colleague was neither told nor kept out.
+   Each click re-renders the page and the focus goes, so the lock is held for 12 seconds after the last click
+   rather than released on the way out. The control's own handler still refuses when someone else holds it. */
+var _clickHold = 0;
+/* An open form that edits one record says so (data-lock-hold="<record>": the Add Role and Add Leader forms,
+   19 Nov 2026), and the lock is kept while it is on the page, not only while the cursor is in one of its boxes:
+   someone part-way through adding a role, between boxes or ticking a principle, was otherwise let go of and a
+   colleague could open the same form over them. The lock goes once the form is saved or cancelled. */
+function _lockStillWanted(rk) {
+  if (Date.now() < _clickHold) return true;
+  var a = document.activeElement;
+  if (a && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName || '') && idToRecordKey(a.id) === rk) return true;
+  try { var hs = document.querySelectorAll('[data-lock-hold]'); for (var i = 0; i < hs.length; i++) { if (hs[i].getAttribute('data-lock-hold') === rk) return true; } } catch (e) { }
+  return false;
+}
+var _releaseTimer = null;
+function _releaseWhenDone() {
+  if (_releaseTimer) clearTimeout(_releaseTimer);
+  _releaseTimer = setTimeout(function () {
+    _releaseTimer = null; if (!_heldLock) return;
+    if (_lockStillWanted(_heldLock)) { _releaseWhenDone(); return; }
+    Collab.release(_heldLock); _heldLock = null;
+  }, Math.max(1500, _clickHold - Date.now() + 100));
+}
 if (typeof document !== 'undefined') {
   document.addEventListener('focusin', function (e) {
     var t = e.target; if (!t || !/^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName || '')) return;
@@ -2771,18 +2844,112 @@ if (typeof document !== 'undefined') {
     if (_heldLock && _heldLock !== rk) { Collab.release(_heldLock); _heldLock = null; }
     if (Collab.acquire(rk)) _heldLock = rk;
   });
+  document.addEventListener('click', function (e) {
+    try {
+      var t = e.target && e.target.closest ? e.target.closest('[data-lock]') : null; if (!t || t.disabled) return;
+      var rk = t.getAttribute('data-lock'); if (!rk || Collab.lockedByOther(rk)) return;
+      if (_heldLock && _heldLock !== rk) { Collab.release(_heldLock); _heldLock = null; }
+      if (Collab.acquire(rk)) _heldLock = rk;
+      _clickHold = Date.now() + 12000;
+      _releaseWhenDone();
+    } catch (err) { }
+  }, true);
   document.addEventListener('focusout', function (e) {
     setTimeout(function () {
       var a = document.activeElement;
       var stillField = a && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName || '') && idToRecordKey(a.id);
-      if (_heldLock && !stillField) { Collab.release(_heldLock); _heldLock = null; }
+      if (!_heldLock || stillField) return;
+      if (_lockStillWanted(_heldLock)) { _releaseWhenDone(); return; }   /* its form is still open, or a scale was just clicked */
+      Collab.release(_heldLock); _heldLock = null;
     }, 60);
   });
   window.addEventListener('beforeunload', function () { try { Collab.leave(); } catch (e) { } });
   setInterval(function () { try { Collab.refreshMine(); applyLockUI(false); } catch (e) { } }, 4000);
 }
 /* ================= end Collab ================= */
+/* ── Date boxes: saved on leaving, a half-typed date refused (18 Nov 2026) ─────────
+   The user-testing sheet: "the date saves on leaving the box, Tab moves between its parts, and a
+   half-typed date is refused with a reason". AI-Ready Culture has done this since Sweep 6 (item 2, in its
+   program.js); every other program saved whatever the box said at each change, so deleting the month of
+   a date it already held saved the date as empty, and a half-typed one was dropped without a word.
+
+   The same rule, for every program but Culture (which keeps its own, so nothing is committed twice):
+     · while a date box is being edited its input and change events are held back — on the window, in
+       the capture phase, so they reach nothing: not its onchange, not a program's save-while-typing
+       (Governance's liveHarvestSoon), not the shell's own timed commit for data-live fields;
+     · on leaving it, a value that has changed is committed once, as a change event the box's own handler
+       and everything else then receive as before;
+     · a half-typed date (the browser's badInput), or one without a four-digit year from 1900, is refused:
+       the box goes back to what it held and a note says why. Nothing is saved.
+   Tab between day, month and year is the browser's own, inside the one box, so it is untouched. */
+(function () {
+  try {
+    var isDate = function (t) { return !!t && t.tagName === 'INPUT' && String(t.type).toLowerCase() === 'date' && !t.readOnly && !t.disabled; };
+    var cultureOwnsIt = function () { try { return !!(window.Modules && Modules.isActive && Modules.isActive('ai-culture')); } catch (e) { return false; } };
+    window.addEventListener('focusin', function (e) {
+      var t = e.target; if (!isDate(t) || cultureOwnsIt() || t.__ncDateOn) return;
+      t.__ncDateOn = true; t.__ncDateStart = t.value;   /* what it held when editing began, kept through a refocus mid-entry */
+    }, true);
+    ['input', 'change'].forEach(function (ev) {
+      window.addEventListener(ev, function (e) {
+        var t = e.target; if (!isDate(t) || cultureOwnsIt() || e.__ncDateCommit || !t.__ncDateOn) return;
+        e.stopPropagation();
+      }, true);
+    });
+    window.addEventListener('focusout', function (e) {
+      var t = e.target; if (!isDate(t) || cultureOwnsIt() || !t.__ncDateOn) return;
+      t.__ncDateOn = false;
+      var v = t.value, s = t.__ncDateStart == null ? '' : t.__ncDateStart;
+      var bad = (t.validity && t.validity.badInput) || (v && !(/^\d{4}-\d{2}-\d{2}$/.test(v) && Number(v.slice(0, 4)) >= 1900));
+      if (bad) {
+        t.value = s;
+        try { if (typeof showToast === 'function') showToast('That date is not complete. Enter the day, month and a four-digit year (1900 or later), or clear the box. Nothing was saved.', 'error'); } catch (x) { }
+        return;
+      }
+      if (v === s) return;
+      t.__ncDateStart = v;
+      var ce; try { ce = new Event('change', { bubbles: true }); } catch (x) { ce = document.createEvent('Event'); ce.initEvent('change', true, true); }
+      ce.__ncDateCommit = true; t.dispatchEvent(ce);
+    }, true);
+  } catch (e) { }
+})();
+/* ── Back after Sign out (18 Nov 2026) ─────────────────────────────────
+   A page the browser restores from its back/forward cache runs none of the start-up
+   code: it reappears exactly as it was left. After Sign out that was the program,
+   still on screen, one Back away. index.php now serves the shell no-store, which
+   keeps it out of that cache; this covers a browser that restores it anyway. Signed
+   out (signOut and sessionEnded clear these before leaving): hide it and load the
+   page afresh, which sends a signed-out visitor to sign-in the way any load does.
+   Still signed in here: ask the server, in case it was ended in another tab. */
+window.addEventListener('pageshow', function (e) {
+  if (!e || !e.persisted) return;
+  try {
+    if (window.SAMPLE_MODE) return;
+    var kind = (window.Router && Router.served()) ? Router.kind() : 'module';
+    if (kind === 'auth') return;
+    if (!currentUserId && !isAppAdmin) {
+      try { document.documentElement.style.visibility = 'hidden'; } catch (x) { }
+      location.reload();
+      return;
+    }
+    confirmSessionWithServer();
+  } catch (err) { }
+});
 // A user is an admin if explicitly flagged, or holds an owner/admin role.
+/* Sign out at once, with no "Sign out?" question: Decline and sign out on the Terms of Use screen (directive of
+   18 Nov 2026). The same steps as signOut() below, the server's session included. */
+function signOutNow() {
+  try { Collab.leave(); } catch (e) { }
+  try { chatShutdown(); } catch (e) { }
+  notesData = [];
+  try { sealSession(); } catch (e) { }
+  Auth.clearSession();
+  UI.entry = { step: 'login', err: '' };
+  var left = false;
+  var leave = function () { if (left) return; left = true; if (window.Router && Router.served()) { Router.openAuth('login'); return; } render(); };
+  setTimeout(leave, 1500);
+  Auth.serverSignOut(leave);
+}
 function signOut() {
   if (SAMPLE_MODE) { closeSample(); return; }   /* Sweep 4R item 9 (addendum 5 Oct 2026; amends Part 3): in the sample tab Sign Out closes the tab; it never signs anyone out, never opens sign-in and writes nothing */
   if (!confirm('Sign out? Your work is saved.')) return;
@@ -2891,8 +3058,8 @@ function createOrg(name, firstUser, serverIds, accountTypeKey, modules) {
    reverses applyLoginTheme's August ruling that a sign-in keeps the reader's Light Mode: the directive's
    "preferences included" is the later ruling. UI.entry is kept: it is the sign-in screen doing the switching,
    and the sign-in path reads it straight after switchToOrg. -- */
-/* + AI-Ready Architecture (21 Oct 2026): its build seals the session the same way (UI_PRISTINE, 1 Oct 2026). */
-function sealApplies() { try { return !!(window.Modules && (Modules.isActive('pipeline') || Modules.isActive('exec-readiness') || Modules.isActive('ai-governance') || Modules.isActive('ai-architecture'))); } catch (e) { return false; } }
+/* + AI-Ready Architecture (21 Oct 2026): its build seals the session the same way (UI_PRISTINE, 1 Oct 2026). + AI-Ready Culture (10 Nov 2026): so does its build (Spec §24). */
+function sealApplies() { try { return !!(window.Modules && (Modules.isActive('pipeline') || Modules.isActive('exec-readiness') || Modules.isActive('ai-governance') || Modules.isActive('ai-architecture') || Modules.isActive('ai-culture'))); } catch (e) { return false; } }
 function sealSession() {
   if (!sealApplies()) return;
   try { if (coachOpen) toggleCoach(); } catch (e) { }
@@ -3219,7 +3386,7 @@ function adminConsoleDelete(orgId) { if (!isAppAdmin) return;   /* Sweep 4R item
    organization that exists only in this browser is gone on the next load: the
    registry is re-read from the database, which never heard of it. */
 function adminConsoleNewOrg() { if (!isAppAdmin) return;   /* Sweep 4R item 10: the app administrator's console checks its caller itself, not only by hiding its button */ persistAdminSession(); UI.entry = { step: 'admin' }; adminNewOrgOpen(); }
-function exitAdmin() { try { Auth.serverSignOut(); } catch (e) { } Auth.setAdminSession(false); UI.adminNewOrg = null; try { Store.setSession(null); } catch (e) { } UI.entry = { step: 'login', err: '' }; render(); }
+function exitAdmin() { try { Auth.serverSignOut(); } catch (e) { } Auth.setAdminSession(false); UI.adminNewOrg = null; UI.adminPage = false; try { renderAdminModal(); } catch (e) { } try { Store.setSession(null); } catch (e) { } UI.entry = { step: 'login', err: '' }; render(); }
 /* ── Change password (5.6), and the administrator's username (5.12.3) ──────────
    One dialog for both kinds of account: a member changes their own (POST /password),
    the app administrator theirs (POST /admin/password). Changing it ends the person's
@@ -3368,49 +3535,106 @@ function orgRosterPreview(orgId) {
    Set up organization, Admin sign-in, Choose a new password) are rendered by the auth.js module
    (window.Entry) into `container`; the admin *console* (after admin sign-in)
    stays here. Called by render() as renderEntry(app). */
+/* ═══ Terms of Use acceptance (Paul, 18 Nov 2026): every person accepts the program terms after signing in and before the workspace opens.
+   The person who first accepts for an organization, as one of its administrators, also confirms they may accept on the organization's behalf.
+   The block is the same in every module: it uses only esc, $, getOrg, getCurrentUser, persistRoster, render, closeModal, data, UI and currentModal, and checks for the rest.
+   Acceptance is kept on the person's roster record (terms) and, for the organization, on data.termsOrg, with each acceptance logged in data.termsLog.
+   Raising TERMS_VERSION asks everyone to accept again at their next visit. The sample organization and the app administrator's view are exempt. ═══ */
+var TERMS_VERSION='1.0';
+var TERMS_EFFECTIVE='November 18, 2026';
+var TERMS_CONTACT='faisal.hoque@nextchapter.org';
+var TERMS_PRIVACY_URL='https://nextchapter.org/privacy/'; /* was privacy.html, which does not exist (19 Nov 2026) */
+var TERMS_SECTIONS=[
+ {h:"1. Agreement",p:["These Terms of Use (“Terms”) are an agreement between you and Next Chapter, LLC and Shadoka LLC (together, “NextChapter”, “we”, “us”). They govern your use of the NextChapter 90-Day program applications, including AI Innovation Pipeline, Responsible AI Governance, AI-Ready Architecture, Executive Readiness, AI-Ready Culture and AI-Ready Workforce, together with their software, content, documents, videos, AI guide and related services (the “Service”). By ticking the box and continuing, you agree to these Terms and to our Privacy Policy. If you are using the Service on behalf of an organization, you also agree to them on that organization’s behalf. If you do not agree, do not use the Service."]},
+ {h:"2. Who may use the Service",p:["You may use the Service only if your organization has been given access by NextChapter, or you have been invited by an administrator of such an organization. You must be at least 18 and able to enter into a binding contract. If you accept on behalf of an organization, you confirm that you are authorized to do so."]},
+ {h:"3. Your account",p:["You must give accurate information and keep your sign-in details confidential. Your account is for you alone, and you may not share it. You are responsible for everything done through your account. Tell us at once at "+TERMS_CONTACT+" if you believe your account has been used without your permission."]},
+ {h:"4. Our intellectual property",p:["The Service and everything in it belong to NextChapter or its licensors and are protected by copyright, trade secret, trademark and other laws. This includes:"],ol:["the software, source code, scripts, stylesheets and data structures","the design, layout, screens and user interface","the programs’ structure, phases, steps, sequences and workflows","the frameworks, methods, concepts and models","the questionnaires, assessment instruments, scoring rules and indices","the templates, report formats, explanatory text, videos and other content","the names, logos and branding"],after:["Except for the limited right of use in section 5, these Terms grant you no right, title or interest in any of this."]},
+ {h:"5. Your right to use the Service",p:["Subject to these Terms, NextChapter grants you a limited, non-exclusive, non-transferable, non-sublicensable and revocable right to use the Service during your organization’s period of access. The right covers your organization’s own internal purposes only, such as evaluating the Service and running the programs within your organization."]},
+ {h:"6. What you may not do",p:["You may not, and may not help or allow anyone else to:"],ol:["copy, reproduce, download, store or distribute any part of the Service, except reports and documents the Service produces for your organization’s internal use","access, view, copy, extract or analyze the Service’s source code, scripts or stylesheets, by browser developer tools or any other means","reverse engineer, decompile, disassemble or otherwise attempt to derive the Service’s code, structure, methods or logic","use the Service, or any knowledge of its design, structure, methods, frameworks, questionnaires, scoring rules or content, to build, design, train or improve any product, service, course or tool, whether for yourself or anyone else","reproduce the programs’ frameworks, step structures, questionnaires, scoring models or templates outside the Service, in any medium, for any purpose other than your organization’s internal use","use bots, scrapers, crawlers or other automated means to access, collect or harvest any part of the Service","enter any part of the Service’s content, code or design into an AI system or tool for the purpose of training, analyzing or reproducing it","record, screenshot or capture the Service for distribution outside your organization","publish or share benchmarks, reviews, comparisons or descriptions of the Service’s design or performance without our written permission","give access to the Service, or share its non-public features or content, with anyone outside your organization, or with anyone who offers competing products or services","sell, rent, lease, sublicense or otherwise make the Service available to anyone else","remove or change any copyright, trademark or other notice","probe, test or bypass the Service’s security, or interfere with its operation","use the Service in any way that breaks the law or infringes anyone’s rights"]},
+ {h:"7. Confidentiality",p:["The Service, its non-public features and content, and any information we share about it are our confidential information. Keep them confidential and use them only as these Terms allow. This duty continues for five years after your access ends, and for as long as any part qualifies as a trade secret under applicable law. It does not cover information that is publicly available through no fault of yours, that you already lawfully had, or that you are required by law to disclose, provided you tell us first where the law allows."]},
+ {h:"8. Feedback",p:["If you give us suggestions, comments or ideas about the Service, we may use them freely and without obligation to you. You assign to us any rights you have in that feedback."]},
+ {h:"9. Your organization’s data",p:["The information your organization enters into the Service (“Your Data”) remains your organization’s. You give us permission to host, process and display Your Data to provide, secure and support the Service. We may use information about how the Service is used, in a form that does not identify you or your organization, to operate and improve it. You are responsible for having the right to enter Your Data, including any information about other people, and for entering it lawfully. How we handle personal information is described in our Privacy Policy."]},
+ {h:"10. Reports and documents",p:["Your organization may use the reports and documents the Service produces from Your Data for its own internal purposes. The formats, templates, structure and explanatory text in them remain ours and are covered by sections 4 to 7."]},
+ {h:"11. AI features",p:["If your administrator switches on the AI guide, the text you type into it and the context of the page you are on are sent to our AI provider to generate an answer. AI answers can be wrong or incomplete. Check them before relying on them."]},
+ {h:"12. No professional advice",p:["The Service provides frameworks, tools and guidance. It does not provide legal, regulatory, financial, employment or other professional advice. Where the Service refers to laws, regulations or standards, it helps you organize your own work and does not confirm that you comply with them. You are responsible for your decisions and for taking professional advice where you need it."]},
+ {h:"13. Third-party content and services",p:["The Service may link to or include material from others, such as articles, books, videos and podcasts. We are not responsible for that material or for any third party’s services."]},
+ {h:"14. Pre-release features",p:["Some features may be in development or offered for evaluation. They may change, be withdrawn or contain errors, and are provided for testing and feedback."]},
+ {h:"15. Monitoring and enforcement",p:["We may monitor use of the Service to keep it secure and to enforce these Terms. If we believe you or your organization have breached these Terms, we may suspend or end access at once. A breach of sections 4 to 7 could cause us harm that money alone could not put right. We may therefore seek an injunction or other court order to stop it, in addition to any other remedy."]},
+ {h:"16. Disclaimer",p:["The Service is provided “as is” and “as available”. To the fullest extent the law allows, we disclaim all warranties, express or implied, including warranties of merchantability, fitness for a particular purpose, accuracy and non-infringement. We do not promise that the Service will be uninterrupted or error-free."]},
+ {h:"17. Limitation of liability",p:["To the fullest extent the law allows, NextChapter will not be liable for any indirect, incidental, special, consequential or punitive damages, or for any loss of profits, revenue, data or goodwill. Our total liability for all claims relating to the Service is limited to the greater of the amount your organization paid us for the Service in the twelve months before the claim, and one hundred US dollars. Nothing in these Terms limits liability that cannot be limited by law."]},
+ {h:"18. Indemnity",p:["You will defend and indemnify NextChapter against claims, losses and costs arising from your breach of these Terms or from Your Data, to the extent the law allows."]},
+ {h:"19. Ending access",p:["You may stop using the Service at any time. We may suspend or end access to the Service, in whole or in part, at any time. Sections 4, 6, 7, 8, 10, and 15 to 21 continue after access ends."]},
+ {h:"20. Changes to these Terms",p:["We may update these Terms. When we do, we will change the version number, and you will be asked to accept the new version before you continue using the Service."]},
+ {h:"21. General",p:["These Terms are governed by the laws of the State of Connecticut, and the state and federal courts located in Connecticut have exclusive jurisdiction, except that we may seek injunctive relief in any court. If any part of these Terms is unenforceable, the rest remains in effect. Not enforcing a term is not a waiver of it. You may not transfer your rights under these Terms. These Terms, together with the Privacy Policy and any separate written agreement between NextChapter and your organization, are the whole agreement on their subject. If a separate written agreement conflicts with these Terms, the separate agreement prevails.","Questions about these Terms: "+TERMS_CONTACT+"."]}
+];
+function termsBodyHtml(){ var h='<div class="terms-doc-title">Terms of Use for the NextChapter 90-Day Programs</div><div class="terms-doc-meta">Version '+esc(TERMS_VERSION)+' \u00b7 Effective '+esc(TERMS_EFFECTIVE)+'</div>';
+  TERMS_SECTIONS.forEach(function(sec){ h+='<h4 class="terms-h">'+esc(sec.h)+'</h4>'; (sec.p||[]).forEach(function(t){h+='<p>'+esc(t)+'</p>'}); if(sec.ol){h+='<ol>'+sec.ol.map(function(t){return '<li>'+esc(t)+'</li>'}).join('')+'</ol>'} (sec.after||[]).forEach(function(t){h+='<p>'+esc(t)+'</p>'}); });
+  h+='<p class="terms-privacy">Privacy Policy: <a href="'+_termsAttr(TERMS_PRIVACY_URL)+'" target="_blank" rel="noopener">'+esc(TERMS_PRIVACY_URL.replace(/^https?:\/\//,''))+'</a></p>';
+  return h; }
+function _termsAttr(x){ return (typeof escAttr==='function')?escAttr(x):esc(x); }
+function termsAcceptedBy(u){ return !!(u&&u.terms&&u.terms.v===TERMS_VERSION); }
+function termsPending(){ try{ if((typeof SAMPLE_MODE!=='undefined'&&SAMPLE_MODE)||(typeof isAppAdmin!=='undefined'&&isAppAdmin))return false; if(!currentOrgId||!currentUserId)return false; var u=getCurrentUser(); return !!u&&!termsAcceptedBy(u); }catch(e){return false} }
+function termsNeedsOrg(){ var u=getCurrentUser(); return !!(u&&u.admin===true&&!(data&&data.termsOrg&&data.termsOrg.v===TERMS_VERSION)); }
+function renderTermsScreen(){ var e=UI.termsErr||'', org=getOrg(currentOrgId), oname=(org&&org.name)||'your organization', needOrg=termsNeedsOrg();
+  return '<div class="login-screen terms-screen"><div class="login-card terms-card">'
+   +'<div class="login-eyebrow">NextChapter \u00b7 90-Day Jump-Start Program</div>'
+   +'<h1 class="login-title">Before you start</h1>'
+   +'<p class="login-sub terms-sub">These terms govern your use of the NextChapter 90-Day programs. They protect the work you put into the app, and they protect the software, methods and content that make up the programs. Please read them before you continue.</p>'
+   +'<div class="terms-box" id="termsBox" tabindex="0" aria-label="Terms of Use">'+termsBodyHtml()+'</div>'
+   +'<label class="terms-tick"><input type="checkbox" id="termsAgree" onchange="termsTick()"/> <span>I have read and agree to the Terms of Use and the Privacy Policy.</span></label>'
+   +(needOrg?'<label class="terms-tick"><input type="checkbox" id="termsOrg" onchange="termsTick()"/> <span>I am authorized to accept these terms on behalf of '+esc(oname)+'.</span></label>':'')
+   +(e?'<div class="entry-err">'+esc(e)+'</div>':'')
+   +'<div class="terms-actions"><button class="btn-gold" id="termsContinue" onclick="acceptTerms()" disabled>Continue</button><button class="btn-ghost" onclick="declineTerms()">Decline and sign out</button></div>'
+   +'</div></div>'; }
+function termsTick(){ var a=$('termsAgree'),o=$('termsOrg'),b=$('termsContinue'); if(b)b.disabled=!((a&&a.checked)&&(!o||o.checked)); }
+function acceptTerms(){ var u=getCurrentUser(); if(!u)return; var a=$('termsAgree'),o=$('termsOrg'), needOrg=termsNeedsOrg();
+  if(!(a&&a.checked)||(needOrg&&!(o&&o.checked))){UI.termsErr='Tick the box to accept the terms, or decline and sign out.';render();return}
+  var at=new Date().toISOString();
+  u.terms={v:TERMS_VERSION,at:at};
+  if(!Array.isArray(data.termsLog))data.termsLog=[];
+  data.termsLog.push({userId:u.id,name:u.name||'',v:TERMS_VERSION,at:at,forOrg:!!needOrg});
+  if(needOrg)data.termsOrg={v:TERMS_VERSION,userId:u.id,name:u.name||'',at:at};
+  persistRoster(); UI.termsErr=''; var then=UI.termsThen; UI.termsThen=null; render(); if(then==='orgSetup'&&typeof openOrgSetup==='function')openOrgSetup(); }
+function declineTerms(){ UI.termsErr=''; UI.termsThen=null; if(typeof signOutNow==='function'){signOutNow();return} try{Collab.leave()}catch(e){} try{Auth.clearSession()}catch(e){} UI.entry={step:'login',err:''}; render(); }
+function openTermsView(){ currentModal='terms'; renderTermsModal(); }
+function renderTermsModal(){ var mr=$('modalRoot'); if(!mr||currentModal!=='terms')return; var u=getCurrentUser(), org=getOrg(currentOrgId), to=data&&data.termsOrg;
+  var mine=(u&&u.terms&&u.terms.at)?'You accepted version '+u.terms.v+' on '+fmtTermsDate(u.terms.at)+'.':'';
+  var forOrg=(to&&to.at)?'Accepted for '+((org&&org.name)||'the organization')+' by '+(to.name||'an administrator')+' on '+fmtTermsDate(to.at)+'.':'';
+  mr.innerHTML='<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal terms-modal">'
+   +'<h3 class="h-sub-lg" style="margin:0 0 6px">Terms of Use</h3>'
+   +((mine||forOrg)?'<div class="terms-modal-meta">'+esc([mine,forOrg].filter(Boolean).join(' '))+'</div>':'')
+   +'<div class="terms-box">'+termsBodyHtml()+'</div>'
+   +'<div style="display:flex;justify-content:flex-end;margin-top:18px"><button class="btn-gold" onclick="closeModal()">Done</button></div>'
+   +'</div></div>'; }
+function fmtTermsDate(iso){ try{ var d=new Date(iso); return d.toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'}); }catch(e){return String(iso||'')} }
+/* This shell's addition to the directive's block above, which stays word for word: an acceptance goes to the
+   server at once rather than with the next timed save, so a reload or a move straight after Continue cannot lose
+   it and ask again. */
+var _termsAcceptBlock = acceptTerms;
+acceptTerms = function () {
+  var u = getCurrentUser(), was = u && u.terms && u.terms.at;
+  _termsAcceptBlock.apply(this, arguments);
+  try { if (u && u.terms && u.terms.at !== was && window.Store && Store.flushNow) Store.flushNow(); } catch (e) { }
+};
 function renderEntry(container) {
   if (!UI.entry) UI.entry = { step: 'login' };
   var s = UI.entry.step;
-  if (s === 'admin' && isAppAdmin) { container.innerHTML = renderAdminConsole(); return; }
+  /* The console (10 Nov 2026) is one page for both surfaces, on its own layer (renderAdminModal in
+     js/features/org-admin.js); here it only needs a plain backdrop under it. */
+  if (s === 'admin' && isAppAdmin) {
+    container.innerHTML = '<div class="login-screen admin-screen"></div>';
+    UI.adminPage = true; renderAdminModal();
+    if (UI.adminData == null) fetchAdminData();
+    return;
+  }
+  if (UI.adminPage) { UI.adminPage = false; renderAdminModal(); }
   if (window.Entry) { Entry.mount(s, container); return; }
   // auth.js not loaded yet (should not happen — it's a <script> before app.js)
   container.innerHTML = '<div class="login-screen"><div class="login-card"><p class="login-sub">Loading…</p></div></div>';
 }
 
-function renderAdminConsole() {
-  var orgs = getOrgs();
-  var totalUsers = 0; orgs.forEach(function (o) { totalUsers += orgRosterPreview(o.id).length; });
-  var h = '<div class="login-screen admin-screen"><div class="admin-console">'
-    + '<div class="admin-console-head"><div><div class="login-eyebrow">Administrator</div><h1 class="login-title" style="margin:6px 0 0">All <em>organizations</em></h1></div>'
-    + '<div class="admin-console-actions"><button class="org-btn-cancel" onclick="adminConsoleNewOrg()">+ New Organization</button><button class="entry-link" onclick="openChangePassword()">Change password</button><button class="entry-link" onclick="openChangeUsername()">Change username</button><button class="entry-link" onclick="exitAdmin()">Exit admin</button></div></div>'
-    + '<p class="login-sub" style="margin-bottom:18px">' + orgs.length + ' organization' + (orgs.length === 1 ? '' : 's') + ' · ' + totalUsers + ' user' + (totalUsers === 1 ? '' : 's') + ' total. Each workspace is fully isolated.</p>';
-  if (UI.adminNewOrg && UI.adminNewOrg.open) h += adminNewOrgFormHtml(); // creates the org in the database
-  h += '<div class="admin-console-list">';
-  if (!orgs.length) { h += '<div class="entry-empty">No organizations yet.</div>'; }
-  orgs.forEach(function (o) {
-    var roster = orgRosterPreview(o.id);
-    h += '<div class="admin-cardx">';
-    h += '<div class="admin-cardx-head"><div class="entry-org-badge">' + esc((o.name || '?').slice(0, 1).toUpperCase()) + '</div>'
-      + '<div class="admin-cardx-meta"><div class="admin-org-name">' + esc(o.name) + '</div>'
-      + '<div class="admin-org-sub">' + roster.length + ' user' + (roster.length === 1 ? '' : 's') + ' · created ' + fmtDate(o.created) + '</div></div>'
-      + '<div class="admin-org-actions"><button class="org-btn-cancel" onclick="adminConsoleOpen(\'' + o.id + '\')">Open</button>'
-      + '<button class="org-btn-cancel" onclick="adminResetOrg(\'' + (o.serverId || o.id) + '\')">Reset data</button>'
-      + '<button class="org-btn-del" onclick="adminConsoleDelete(\'' + o.id + '\')">Delete</button></div></div>';
-    if (roster.length) {
-      h += '<div class="admin-users">';
-      roster.forEach(function (u) {
-        h += '<div class="admin-user-row">' + userAv(u, 26)
-          + '<span class="admin-user-name">' + esc(u.name || 'Unnamed') + '</span>'
-          + '<span class="admin-user-uname">@' + esc(u.username || '—') + '</span>'
-          + '<span class="admin-user-role">' + esc(u.role || '') + '</span></div>';
-      });
-      h += '</div>';
-    }
-    h += '</div>';
-  });
-  h += '</div></div></div>';
-  return h;
-}
+/* renderAdminConsole (the pre-login console list) was replaced on 10 Nov 2026 by the console page in
+   js/features/org-admin.js, which both surfaces now share. */
 
 var currentPage = 'home', currentStep = null, currentPhase = null; var gateArmed = false, _lastGateStep = null;
 var sidebarOpen = true;
@@ -4062,7 +4286,13 @@ function repaintAfterSync() {
     }
   } catch (e) { }
   _syncPainting = true;
-  try { loadData(); applyTeamRoster(); render(); } catch (e) { } finally { _syncPainting = false; }
+  /* Organization & Team is drawn on its own layer, which render() leaves alone (18 Nov 2026): it is
+     brought up to date here too, before the loop below puts back what the reader was typing. */
+  var entBefore = null;
+  try { entBefore = JSON.stringify((typeof data !== 'undefined' && data && data.enterprise) || {}); } catch (e) { }
+  try { loadData(); applyTeamRoster(); render(); } catch (e) { }
+  try { if (typeof orgModalAfterSync === 'function') orgModalAfterSync(entBefore); } catch (e) { }
+  _syncPainting = false;
   try {
     Object.keys(edits).forEach(function (id) {
       var el = document.getElementById(id);
@@ -4278,6 +4508,36 @@ function render() {
        is not entitled to. The API refuses the same request anyway; this just
        spares the user a screen that would fail every save. */
     if (window.Router && Router.enforceRole(accountType())) return;
+
+    /* Terms of Use (directive of 18 Nov 2026, Hooks 1 and 2): signed in, in a program, terms not yet accepted for
+       it. The terms screen in place of the program, with the top bar, sidebar, drawer and Guide hidden, as for a
+       signed-out visitor. Sign-in itself lives on its own /login pages here, so this is where the gate sits. */
+    if (typeof termsPending === 'function' && termsPending()) {
+      if (nt) nt.innerHTML = '';
+      if (nr) nr.innerHTML = '';
+      if (navEl) navEl.style.display = 'none';
+      if (ftEl) ftEl.style.display = 'none';
+      var _sbT = $('pipSidebar'); if (_sbT) _sbT.style.display = 'none';
+      var _tgT = $('sidebarToggle'); if (_tgT) _tgT.style.display = 'none';
+      var _dhT = $('navDrawerHost'); if (_dhT) { _dhT.innerHTML = ''; _dhT.className = ''; }
+      UI.navDrawer = false;
+      app.classList.remove('sidebar-mini'); app.classList.add('sidebar-collapsed');
+      setCoachVisible(false);
+      /* Drawn again while already showing (a sync, the roster arriving): keep the ticks, the terms box's place and
+         the focus, or a background repaint would quietly untick a box the reader had just ticked. */
+      var _tA = $('termsAgree'), _tO = $('termsOrg'), _tB = $('termsBox'), _tF = document.activeElement && document.activeElement.id;
+      var _again = !!_tA, _keepA = !!(_tA && _tA.checked), _keepO = !!(_tO && _tO.checked), _keepS = _tB ? _tB.scrollTop : 0;
+      app.innerHTML = renderTermsScreen();
+      if (_again) {
+        var _nA = $('termsAgree'), _nO = $('termsOrg'), _nB = $('termsBox');
+        if (_nA) _nA.checked = _keepA;
+        if (_nO) _nO.checked = _keepO;
+        if (_nB) _nB.scrollTop = _keepS;
+        try { termsTick(); } catch (e) { }
+        if (_tF && $(_tF) && $(_tF).focus) $(_tF).focus();
+      } else { try { window.scrollTo(0, 0); } catch (e) { } }
+      return;
+    }
 
     /* Belt and braces on the wordmark: it was applied once at load from the
        URL's kind, so make it agree with what is actually being rendered. Any
@@ -5802,7 +6062,7 @@ var PRINT_MODULE_NAME='90-Day AI Innovation Pipeline'; /* 16 Sep 2026 (Paul's ru
 function printDateLine(){return new Date().toLocaleDateString('en-US',{day:'numeric',month:'long',year:'numeric'})}
 function printFooterText(){return '\u00a9 '+new Date().getFullYear()+' Next Chapter, LLC. All rights reserved.'} /* the same words as the site footer at nextchapter.org */
 function printDocCover(title,lead,countLine){var org=(function(){var ent=(data&&data.enterprise&&String(data.enterprise.name||'').trim())||'';if(ent)return ent;var o=null;try{o=getOrg(currentOrgId)}catch(e){}return (o&&o.name)||''})(); /* 13 Sep 2026 (Paul's ruling; family): the cover names the organization as Organization Details (the Organization & Team panel) records it; the sign-in organization's label is the fallback only when that name is blank — ported to the Innovation Pipeline 16 Sep 2026 (Paul's ruling: the cover as Governance has it) */
-return '<div style="page-break-after:always;display:flex;flex-direction:column;justify-content:center;min-height:85vh">'
+return '<div style="page-break-after:always;break-after:page;padding-top:75mm">'
 +'<div style="font-family:var(--mono,monospace);font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#555;margin:0 0 18px">NextChapter \u00b7 '+esc(PRINT_MODULE_NAME)+'</div>'
 +'<div style="font-family:var(--serif,Georgia,serif);font-size:40px;font-weight:600;line-height:1.15;color:#111;margin:0 0 14px">'+esc(title)+'</div>'
 +(lead?'<div style="font-size:14px;color:#444;line-height:1.6;max-width:520px;margin:0 0 26px">'+esc(lead)+'</div>':'')
@@ -5854,7 +6114,7 @@ w.document.write('<html><head><meta charset="utf-8"><title>'+title+'</title>'+
 '*{-webkit-print-color-adjust:exact;print-color-adjust:exact}[style*="#F5F2EC"],[style*="#8A8278"],[style*="rgba(245,242,236"],[style*="rgba(138,130,120"],[style*="color:var(--paper)"]{color:#1e2530 !important}[style*="color:var(--stone)"],[style*="color:var(--text-muted)"],[style*="color:var(--text-faint)"]{color:#555 !important}@media print{body{margin:0;padding:0}}'+
 '@page{margin:16mm 14mm 20mm 14mm;@top-left{content:""}@top-center{content:""}@top-right{content:""}@bottom-center{content:""}@bottom-left{content:"'+printFooterText()+'";font:9px "DM Mono",monospace;color:#666}@bottom-right{content:counter(page) " / " counter(pages);font:9px "DM Mono",monospace;color:#666}}'+ /* PRINT MARGINS (Paul's ruling, 12 Sep 2026; family): the document owns all six page corners — the top three empty, the copyright line bottom left, the page number bottom right — so the browser's own date, title, address, and count never print, whatever the user's Headers and footers setting */
 '.print-footer{display:none}@media screen{.print-footer{display:block;margin-top:40px;padding-top:10px;border-top:1px solid #ddd;font-family:"DM Mono",monospace;font-size:9px;letter-spacing:.06em;color:#666}}'+ /* on screen, before printing, the copyright line ends the document */
-(extraCss||'')+'</style></head><body>'+((opts&&opts.preview)?'<div class="preview-note" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;font:12px/1.5 var(--sans,sans-serif);color:#333;background:#FBF6EC;border:1px solid #E8D9B8;padding:8px 12px;margin:0 0 24px"><button onclick="window.print()" style="font:12px var(--sans,sans-serif);font-weight:600;padding:6px 14px;border:1px solid #333;border-radius:6px;background:#fff;color:#111;cursor:pointer;white-space:nowrap">Show as pages</button><span style="flex:1;min-width:240px">Preview. Dashed rules below mark where the document forces a page break; where the printer breaks a long section in the middle is set when it prints. Show as pages opens your browser\u2019s print preview, where the pages are exact, and Cancel returns here.</span></div>'+'<style>@media print{.preview-note{display:none}}@media screen{html{background:#e6e6e6}body{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.12),0 8px 32px rgba(0,0,0,.08);padding:56px 64px !important;margin:24px auto !important}[style*="break-before:page"]::before,[style*="page-break-after:always"]:not([style*="display:flex"])::after,[style*="min-height:85vh"]+*::before{content:"page break";display:block;text-align:center;font:10px "DM Mono",monospace;letter-spacing:.14em;text-transform:uppercase;color:#999;border-top:1px dashed #bbb;padding-top:6px;margin:28px 0 24px}[style*="page-break-after:always"]+[style*="break-before:page"]::before{display:none}}</style>':'')+content+'<div class="print-footer">'+printFooterText()+'</div>'+((opts&&opts.preview)?'':'<scr'+'ipt>(function(){function p(){try{window.print()}catch(e){}}if(document.readyState==="complete"){setTimeout(p,60)}else{window.addEventListener("load",function(){setTimeout(p,60)})}})();<\/scr'+'ipt>')+'</body></html>');
+(extraCss||'')+'</style></head><body>'+((opts&&opts.preview)?'<div class="preview-note" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;font:12px/1.5 var(--sans,sans-serif);color:#333;background:#FBF6EC;border:1px solid #E8D9B8;padding:8px 12px;margin:0 0 24px"><button onclick="window.print()" style="font:12px var(--sans,sans-serif);font-weight:600;padding:6px 14px;border:1px solid #333;border-radius:6px;background:#fff;color:#111;cursor:pointer;white-space:nowrap">Show as pages</button><span style="flex:1;min-width:240px">Preview. Dashed rules below mark where the document forces a page break; where the printer breaks a long section in the middle is set when it prints. Show as pages opens your browser\u2019s print preview, where the pages are exact, and Cancel returns here.</span></div>'+'<style>@media print{.preview-note{display:none}}@media screen{html{background:#e6e6e6}body{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.12),0 8px 32px rgba(0,0,0,.08);padding:56px 64px !important;margin:24px auto !important}[style*="break-before:page"]::before,[style*="page-break-after:always"]:not([style*="display:flex"])::after,[style*="padding-top:75mm"]+*::before{content:"page break";display:block;text-align:center;font:10px "DM Mono",monospace;letter-spacing:.14em;text-transform:uppercase;color:#999;border-top:1px dashed #bbb;padding-top:6px;margin:28px 0 24px}[style*="page-break-after:always"]+[style*="break-before:page"]::before{display:none}}</style>':'')+content+'<div class="print-footer">'+printFooterText()+'</div>'+((opts&&opts.preview)?'':'<scr'+'ipt>(function(){function p(){try{window.print()}catch(e){}}if(document.readyState==="complete"){setTimeout(p,60)}else{window.addEventListener("load",function(){setTimeout(p,60)})}})();<\/scr'+'ipt>')+'</body></html>');
 w.document.close()} /* 18 Sep 2026: the document prints ITSELF. print() suspends the script that calls it, so calling it on the popup from a timer in the opener left the app frozen behind a dialog it did not own. Waiting for load also beats the fixed 500ms, which cuts a slow webfont out of the first layout */
 
 /* Portfolio output pages are accordions – on screen the detail sits behind a fold.
@@ -6694,6 +6954,7 @@ function sessionEnded() {
   try { chatShutdown(); } catch (e) { }
   try { sealSession(); } catch (e) { }
   Auth.clearSession();
+  try { Store.resetConnection(); } catch (e) { }   /* the refusals that led here were not a dropped connection */
   UI.adminNewOrg = null;
   UI.entry = { step: 'login', err: 'Your session has ended. Sign in again.', errors: {} };
   /* The sign-in page is a new load: carry the reason across so it can say why. */
@@ -6727,13 +6988,13 @@ function scrubStoredPasswords() {
    each person's browser (key pipeline-org-data::org_sample_local), never in the organization list, never sent
    to the server (see SAMPLE_TAB_ADDR at the top of this file). The sample people have no passwords. -- */
 var SAMPLE_NOTE_TITLE = 'DEMO', SAMPLE_NOTE_TEXT = 'Sample organization. Your changes stay in this browser only.';
-/* AI-Ready Architecture (21 Oct 2026): its build has the same Demo tab and Notes-in-More (Part 3). */
-function sampleAppliesHere() { try { return !!(window.Modules && (Modules.isActive('pipeline') || Modules.isActive('exec-readiness') || Modules.isActive('ai-governance') || Modules.isActive('ai-architecture'))); } catch (e) { return false; } }
+/* AI-Ready Architecture (21 Oct 2026): its build has the same Demo tab and Notes-in-More (Part 3). AI-Ready Culture too (10 Nov 2026). */
+function sampleAppliesHere() { try { return !!(window.Modules && (Modules.isActive('pipeline') || Modules.isActive('exec-readiness') || Modules.isActive('ai-governance') || Modules.isActive('ai-architecture') || Modules.isActive('ai-culture'))); } catch (e) { return false; } }
 /* Part 4 (4.2.3) moved Reset all data out of the More menu into the admin console's Reset data — on the Pipeline (6 Oct 2026)
    Executive Readiness and Responsible AI Governance (7 Oct 2026), whose data that Reset now covers (OrganizationController::reset). Its own test, not
    sampleAppliesHere(): a program that has the sample tab but not yet the console's Reset would keep its menu item. */
-/* AI-Ready Architecture (21 Oct 2026): its data is in the console's Reset (RESET_MODULES). */
-function resetMovedToConsole() { try { return !!(window.Modules && (Modules.isActive('pipeline') || Modules.isActive('exec-readiness') || Modules.isActive('ai-governance') || Modules.isActive('ai-architecture'))); } catch (e) { return false; } }
+/* AI-Ready Architecture (21 Oct 2026): its data is in the console's Reset (RESET_MODULES). AI-Ready Culture too (10 Nov 2026). */
+function resetMovedToConsole() { try { return !!(window.Modules && (Modules.isActive('pipeline') || Modules.isActive('exec-readiness') || Modules.isActive('ai-governance') || Modules.isActive('ai-architecture') || Modules.isActive('ai-culture'))); } catch (e) { return false; } }
 function isSampleTab() { return !!SAMPLE_TAB_ADDR; }
 function openSampleTab() {
   if (!currentUserId || SAMPLE_MODE || !sampleAppliesHere()) return;
@@ -6937,6 +7198,9 @@ function bootApp() {
     if (!to) return;
     currentPage = to.page;
     currentStep = to.step || null;
+    /* Step 5.1 is the dashboard page, as go() has it: opened from its address (/step/5.1, a reload or a link) it
+       showed a "Coming soon" placeholder instead (19 Nov 2026). */
+    if (currentPage === 'step' && currentStep === '5.1') { currentPage = 'phase5'; currentStep = null; }
     if (currentStep) {
       // Resolve the phase the step belongs to, exactly as go() does — the
       // sidebar and the header read currentPhase, not the step id.

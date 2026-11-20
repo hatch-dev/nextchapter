@@ -190,7 +190,7 @@
         rhythm: {}, opRhythm: {}, evaluation: {}, evalSuccession: {}, review: {}, slowThinking: [],
         practiceLog: {}, completedSteps: {}, completedSections: {}, stepDoneAt: {}, stepDue: {},
         landscapeNotes: {}, notes: [], assigns: {}, roster: null, members: [], enterprise: {}, orgSetup: false,
-        settings: { aiGuide: false, voice: false }   /* Part 2 (7 Oct 2026): the AI Guide and Voice, off until an administrator switches them on */
+        settings: { aiGuide: true, voice: true }   /* 29 Oct 2026: the AI Guide and Voice start on for a new organization; an administrator can switch them off */
       };
     },
 

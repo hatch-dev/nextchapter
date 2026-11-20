@@ -9595,6 +9595,37 @@ html.adm-open .admin-view-bar { display: none }   /* the page has its own way ba
   color: var(--paper);
   letter-spacing: 0
 }
+/* Organization details in the console's Manage view (18 Nov 2026): three columns, the objective across all of them */
+.adm-dets { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px 20px }
+.adm-det { min-width: 0 }
+.adm-det-wide { grid-column: 1 / -1 }
+.adm-det-k { font-family: var(--mono); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--stone); margin-bottom: 4px }
+.adm-det-v { font-size: 14px; line-height: 1.5; color: var(--paper); overflow-wrap: anywhere; white-space: pre-line }
+.adm-det-none { color: var(--stone) }
+@media (max-width: 860px) { .adm-dets { grid-template-columns: repeat(2, minmax(0, 1fr)) } }
+@media (max-width: 520px) { .adm-dets { grid-template-columns: minmax(0, 1fr) } }
+.adm-detform .org-edit-grid > div:first-child { grid-column: 1 / -1 }   /* the name across the row, the six details in two rows of three */
+.adm-detform-obj { margin-top: 16px }
+/* Generated temporary passwords (18 Nov 2026) */
+.tp-row { display: flex; gap: 8px; align-items: stretch }
+.tp-row .tp-val { flex: 1; min-width: 0; font-family: var(--mono); letter-spacing: .06em; cursor: text }
+.tp-btn { padding: 0 14px; white-space: nowrap }
+.tp-reset { padding: 9px 16px }
+.tp-keep { display: inline-block; margin-top: 6px; font-size: 12px }
+/* Reset data chooser (18 Nov 2026): one program, or all of them */
+.adm-reset { border-color: rgba(192, 57, 43, .45) }
+.adm-reset-lead { margin: 0 0 12px }
+.adm-reset-opts { display: flex; flex-direction: column; gap: 8px }
+.adm-reset-opt { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--rule); cursor: pointer }
+.adm-reset-opt:hover, .adm-reset-opt.on { border-color: rgba(var(--fg-rgb), .35); background: rgba(var(--fg-rgb), .04) }
+.adm-reset-opt.adm-reset-all.on { border-color: #c0392b }
+.adm-reset-opt input { margin-top: 3px; accent-color: #c0392b }
+.adm-reset-opt > span { display: flex; flex-direction: column; gap: 2px; min-width: 0 }
+.adm-reset-opt b { font-weight: 600; font-size: 14px; color: var(--paper) }
+.adm-reset-opt > span > span { font-size: 13px; line-height: 1.45; color: var(--stone) }
+.adm-reset .adm-reset-go[disabled] { opacity: .45; cursor: not-allowed }
+.adm-detform .field-ta { width: 100%; min-height: 76px }
+@media (max-width: 860px) { .adm-detform.adm-form-3 .org-edit-grid { grid-template-columns: minmax(0, 1fr) } }
 .adm-chips { display: flex; flex-wrap: wrap; gap: 8px }
 .adm-chip {
   font-size: 13px;
@@ -12518,3 +12549,68 @@ a.lp-card:hover {
 
 /* Sweep 4R item 3 (addendum 5 Oct 2026): A.5.31 under Organization Details, for everyone but an administrator */
 .ent-ro-note{font-family:var(--sans);font-style:normal;font-size:13px;line-height:1.5;color:var(--stone);margin:-4px 0 14px}
+
+/* Four-across rows on phones (18 Nov 2026). Several pages write a row of four cards or tiles as an inline grid
+   (grid-template-columns:repeat(4,1fr)): the Governance Dashboard's GOVERN / MAP / MEASURE / MANAGE cards, the
+   Module Management tiles, and the like in every program. On a phone four columns leave each card about 70px,
+   so the figures wrapped ("12 /" then "19") and the last card ran off the screen. At phone width they go two
+   by two. In the app only: the print windows are documents of their own and keep their four columns. */
+@media (max-width: 640px) {
+  #app [style*="grid-template-columns:repeat(4,1fr)"],
+  #app [style*="grid-template-columns:repeat(4,minmax(0,1fr))"],
+  #app [style*="grid-template-columns:1fr 1fr 1fr 1fr"],
+  #app [style*="grid-template-columns:repeat(6,1fr)"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important
+  }
+  /* Governance 5.2's NIST rows (id · what NIST asks · where it lives · status) ran off the screen: stacked. */
+  #app [style*="grid-template-columns:110px 1.1fr 1fr 100px"] {
+    grid-template-columns: minmax(0, 1fr) !important;
+    row-gap: 4px
+  }
+  /* Governance 5.1's matrix (a label and six categories) keeps its columns and scrolls sideways inside itself. */
+  #app [style*="grid-template-columns:80px repeat(6,1fr)"] {
+    grid-template-columns: 80px repeat(6, minmax(72px, 1fr)) !important;
+    overflow-x: auto
+  }
+}
+
+/* Terms of Use acceptance (Paul, 18 Nov 2026) */
+.terms-screen{padding-top:calc(40px + 24px)}
+.terms-card{max-width:760px;padding:36px 44px}
+.terms-sub{max-width:none;margin-bottom:20px}
+.terms-box{max-height:38vh;overflow-y:auto;padding:20px 22px;margin-bottom:20px;background:rgba(var(--fg-rgb),.03);border:1px solid rgba(var(--rule-rgb),.24);font-size:14px;line-height:1.65;color:var(--paper)}
+.terms-box p{margin:0 0 10px}
+.terms-box ol{margin:0 0 10px;padding-left:22px}
+.terms-box li{margin:0 0 4px}
+.terms-box a{color:var(--gold-text)}
+.terms-doc-title{font-family:var(--serif);font-size:22px;color:var(--paper);margin-bottom:4px}
+.terms-doc-meta{font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--stone);margin-bottom:16px}
+.terms-h{font-size:14px;font-weight:600;color:var(--paper);margin:16px 0 6px}
+.terms-tick{display:flex;align-items:flex-start;gap:10px;font-size:15px;line-height:1.5;color:var(--paper);margin-bottom:12px;cursor:pointer}
+.terms-tick input{margin-top:4px;flex:0 0 auto;width:16px;height:16px}
+.terms-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:8px}
+.terms-actions .btn-gold[disabled]{opacity:.45;cursor:not-allowed}
+.terms-privacy{margin-top:14px;color:var(--stone)}
+.terms-modal{max-width:760px}
+.terms-modal-meta{font-size:13px;color:var(--stone);line-height:1.6;margin-bottom:14px}
+
+/* Terms of Use: the reference build's type (the user's ruling, 19 Nov 2026, after terms-screen-dark.png and
+   terms-screen-light.png). A Times serif for the two titles, Inter for the text, the ticks and the buttons, and a
+   plain monospace for the eyebrow and the version line. Only on the terms screen and its read-only view: the rest
+   of the app keeps its own fonts. Inter is self-hosted (fonts/OFL-Inter.txt), like the app's other fonts. */
+@font-face{font-family:'Inter';font-style:normal;font-weight:400;font-display:swap;src:url('../../fonts/Inter-Regular-latin.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Inter';font-style:normal;font-weight:400;font-display:swap;src:url('../../fonts/Inter-Regular-latin-ext.woff2') format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+@font-face{font-family:'Inter';font-style:normal;font-weight:600;font-display:swap;src:url('../../fonts/Inter-SemiBold-latin.woff2') format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:'Inter';font-style:normal;font-weight:600;font-display:swap;src:url('../../fonts/Inter-SemiBold-latin-ext.woff2') format('woff2');unicode-range:U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF}
+.terms-screen,.terms-modal{--serif:"Times New Roman",Times,"Liberation Serif",Georgia,serif;--sans:"Inter","Segoe UI",-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;--mono:ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono","Courier New",monospace;font-family:var(--sans)}
+.terms-screen .login-eyebrow{font-family:var(--mono);font-size:14px;font-weight:400;letter-spacing:.22em}
+.terms-screen .login-title{font-family:var(--serif);font-size:52px;font-weight:400;font-style:normal;letter-spacing:0;line-height:1.15;margin:0 0 18px}
+.terms-screen .terms-sub{font-family:var(--sans);font-size:16px;line-height:1.7}
+.terms-screen .terms-box,.terms-modal .terms-box{font-family:var(--sans);font-size:14px;line-height:1.65}
+.terms-screen .terms-doc-title,.terms-modal .terms-doc-title{font-family:var(--serif);font-size:22px;font-weight:400}
+.terms-screen .terms-doc-meta,.terms-modal .terms-doc-meta{font-family:var(--mono);font-size:12px;letter-spacing:.08em}
+.terms-screen .terms-h,.terms-modal .terms-h{font-family:var(--sans);font-size:14px;font-weight:600}
+.terms-screen .terms-tick{font-family:var(--sans);font-size:15px}
+.terms-screen .terms-actions .btn-gold,.terms-screen .terms-actions .btn-ghost{font-family:var(--sans);font-size:14px;font-weight:400;letter-spacing:.14em;text-transform:uppercase;padding:12px 28px}
+.terms-modal .h-sub-lg{font-family:var(--serif);font-weight:400;font-size:26px}
+@media (max-width:640px){.terms-screen .login-title{font-size:40px}.terms-card{padding:28px 22px}}

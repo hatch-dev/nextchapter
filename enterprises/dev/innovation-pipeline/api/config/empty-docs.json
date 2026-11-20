@@ -34,8 +34,8 @@
   "members": [],
   "orgSetup": false,
   "settings": {
-   "aiGuide": false,
-   "voice": false
+   "aiGuide": true,
+   "voice": true
   },
   "reportDefs": []
  },
@@ -77,8 +77,8 @@
   "enterprise": {},
   "orgSetup": false,
   "settings": {
-   "aiGuide": false,
-   "voice": false
+   "aiGuide": true,
+   "voice": true
   }
  },
  "ai-governance": {
@@ -111,14 +111,14 @@
   "enterprise": {},
   "orgSetup": false,
   "settings": {
-   "aiGuide": false,
-   "voice": false
+   "aiGuide": true,
+   "voice": true
   }
  },
  "ai-architecture": {
   "settings": {
-   "aiGuide": false,
-   "voice": false
+   "aiGuide": true,
+   "voice": true
   },
   "commitmentChecks": {},
   "computeResources": [],

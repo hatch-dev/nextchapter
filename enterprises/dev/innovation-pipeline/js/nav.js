@@ -268,6 +268,7 @@
       ((typeof asgnAvailable === 'function' && asgnAvailable())
         ? '<button class="nav-more-item" role="menuitem" data-act="user-assignments"><span class="nav-more-ic">&#9776;</span> View Assignments</button>'
         : '') +
+      (isAppAdmin ? '' : '<button class="nav-more-item" role="menuitem" data-act="user-terms"><span class="nav-more-ic">&#167;</span> Terms of Use</button>') +   /* Terms of Use (18 Nov 2026) */
       '<div class="nav-more-sep"></div>' +
       '<button class="nav-more-item" role="menuitem" data-act="signout"><span class="nav-more-ic">&#8594;</span> Sign Out</button>' +
       '</div>';
@@ -393,6 +394,7 @@
           + (isAppAdmin ? '' : drawerRow('user-profile', '&#9679;', 'Organization &amp; Team'))
           + ((typeof asgnAvailable === 'function' && asgnAvailable())
               ? drawerRow('user-assignments', '&#9776;', 'My Assignments') : '')
+          + (isAppAdmin ? '' : drawerRow('user-terms', '&#167;', 'Terms of Use'))   /* Terms of Use (18 Nov 2026) */
           + (SAMPLE_MODE ? '' : drawerRow('user-password', '&#9679;', 'Change password'))
       : '';
 
@@ -543,6 +545,7 @@
     'close-usermenu': function () { closeUserMenu(); },
     'user-profile': function () { closeUserMenu(); openOrg(); },
     'user-assignments': function () { closeUserMenu(); openAssignments(); },
+    'user-terms': function () { closeUserMenu(); openTermsView(); },
     'user-password': function () { closeUserMenu(); openChangePassword(); },
     'close-more': function () { closeNavMore(); },
     track: function () { closeNavMore(); go('mgmt-hub'); },

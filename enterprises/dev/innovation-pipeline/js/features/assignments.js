@@ -268,7 +268,7 @@ function assignmentsLoad(cb) {
   go();
 }
 
-function assignmentsFetch(org, cb) {
+function assignmentsFetch(org, cb, quiet) {
   /* `actor` because reading assignments requires organization membership now —
      the endpoint took an org public id and nothing else, so anyone holding one
      could read who was accountable for what. */
@@ -290,14 +290,47 @@ function assignmentsFetch(org, cb) {
           if (lid == null) { lost++; (map[row.step] = map[row.step] || []).push(row.user_public_id); return; }
           (map[row.step] = map[row.step] || []).push(lid);
         });
-        if (lost) { try { console.warn('assignments: ' + lost + ' row(s) name a member who is not on this device\'s roster; kept unresolved'); } catch (e) { } }
+        if (lost && !quiet) { try { console.warn('assignments: ' + lost + ' row(s) name a member who is not on this device\'s roster; kept unresolved'); } catch (e) { } }
+        /* A background check (quiet) changes nothing and repaints nothing when the list is as it was. */
+        if (quiet && assignMapKey(map) === assignMapKey(data.assigns)) { if (cb) cb(); return; }
         data.assigns = map;
         saveData();
-        if (typeof currentUserId !== 'undefined' && currentUserId && typeof render === 'function') render();
+        if (typeof currentUserId !== 'undefined' && currentUserId) {
+          if (quiet && typeof repaintAfterSync === 'function') repaintAfterSync();   /* keeps what is being typed, and the caret */
+          else if (typeof render === 'function') render();
+        }
       }
       if (cb) cb();
     })
     .catch(function () { if (cb) cb(); });
+}
+
+/* ── Kept current while the page is open (19 Nov 2026) ──────────────
+   The database is the record of who is assigned, and it was read once, when the program opened. A colleague's
+   assignment reached an open page only through the workspace document's copy, and two people assigning in the
+   same minute could put back each other's older copy of it, so an assignment could stay missing until a refresh.
+   Now the list is asked for again every 8 seconds while the tab is open and in view, and at once when the tab
+   comes back into view. Nothing is saved or repainted unless it changed. */
+function assignMapKey(m) {
+  var out = {}; Object.keys(m || {}).forEach(function (k) { var v = (m[k] || []).slice().sort(); if (v.length) out[k] = v; });
+  return JSON.stringify(Object.keys(out).sort().map(function (k) { return [k, out[k]]; }));
+}
+var _assignPollBusy = false;
+function assignmentsRefresh() {
+  try {
+    if (_assignPollBusy || (typeof SAMPLE_MODE !== 'undefined' && SAMPLE_MODE)) return;
+    if (typeof currentUserId === 'undefined' || !currentUserId || (typeof document !== 'undefined' && document.hidden)) return;
+    if (typeof termsPending === 'function' && termsPending()) return;
+    var org = assignmentsOrg(); if (!org || !actorId()) return;
+    _assignPollBusy = true;
+    assignmentsFetch(org, function () { _assignPollBusy = false; }, true);
+  } catch (e) { _assignPollBusy = false; }
+}
+if (typeof window !== 'undefined') {
+  try {
+    setInterval(assignmentsRefresh, 8000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) assignmentsRefresh(); });
+  } catch (e) { }
 }
 
 /* ── UI: the "Assigned to" bar + member picker ────────────────── */
@@ -309,12 +342,30 @@ function stepAssignBar(stepId) {
     + '</div>';
 }
 
+/* ── One picker at a time, even when a step is listed twice (19 Nov 2026) ──
+   A page can show the same step's assignment control in more than one place (Module Management lists a step
+   in its week's panel and again in its phase's table). The open picker was remembered by step alone, so
+   opening one opened every copy, stacked over each other. Each control is now numbered by its place on the
+   page as the page is drawn (first, second… for that step), and only the one that was clicked opens. */
+var _assignSeen = null;
+function assignOccurrence(taskId) {
+  if (!_assignSeen) { _assignSeen = {}; try { Promise.resolve().then(function () { _assignSeen = null; }); } catch (e) { setTimeout(function () { _assignSeen = null; }, 0); } }
+  _assignSeen[taskId] = (_assignSeen[taskId] || 0) + 1;
+  return _assignSeen[taskId];
+}
+function assignPickerToggle(taskId, nth) {
+  if (UI.assignOpen === taskId && (UI.assignOpenNth || 1) === nth) UI.assignOpen = null;
+  else { UI.assignOpen = taskId; UI.assignOpenNth = nth; }
+  render();
+}
+
 function assignBtn(taskId) {
   var assigns = getAssigns(taskId);
   var mayAssign = canAssign();
+  var nth = assignOccurrence(taskId);   /* which copy of this step's control this is, on this page */
   // The picker can only be open for someone allowed to use it — a member who
   // opened it and then lost authority (admin left the org) must not keep it.
-  var isOpen = mayAssign && UI.assignOpen === taskId;
+  var isOpen = mayAssign && UI.assignOpen === taskId && (UI.assignOpenNth || 1) === nth;
   var h = '<div class="assign-wrap">';
 
   // Who is responsible. Everyone sees this; only an admin can click it.
@@ -327,7 +378,7 @@ function assignBtn(taskId) {
     if (!u) { unknown++; return; }
     var who = esc(u.name) + ' – responsible for this section';
     if (mayAssign) {
-      h += '<span class="assign-av" style="cursor:pointer" title="' + who + '. Click to manage assignments" onclick="event.stopPropagation();UI.assignOpen=UI.assignOpen===\'' + taskId + '\'?null:\'' + taskId + '\';render()">' + userAv(u, 24) + '</span>';
+      h += '<span class="assign-av" style="cursor:pointer" title="' + who + '. Click to manage assignments" onclick="event.stopPropagation();assignPickerToggle(\'' + taskId + '\',' + nth + ')">' + userAv(u, 24) + '</span>';
     } else {
       h += '<span class="assign-av" title="' + who + '">' + userAv(u, 24) + '</span>';
     }
@@ -346,7 +397,7 @@ function assignBtn(taskId) {
   }
 
   // + Assign button (admins only)
-  h += '<button class="assign-add" style="width:24px;height:24px;padding:0;border-radius:50%;border:1px dashed rgba(var(--fg-rgb),.45);background:none;display:inline-flex;align-items:center;justify-content:center;font-size:14px;line-height:1" title="Assign members" onclick="event.stopPropagation();UI.assignOpen=UI.assignOpen===\'' + taskId + '\'?null:\'' + taskId + '\';render()">+</button>';
+  h += '<button class="assign-add" style="width:24px;height:24px;padding:0;border-radius:50%;border:1px dashed rgba(var(--fg-rgb),.45);background:none;display:inline-flex;align-items:center;justify-content:center;font-size:14px;line-height:1" title="Assign members" onclick="event.stopPropagation();assignPickerToggle(\'' + taskId + '\',' + nth + ')">+</button>';
   // Picker popover
   if (isOpen) {
     h += '<div class="assign-pop">';

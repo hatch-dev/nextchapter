@@ -29,6 +29,7 @@ class OrganizationController extends Controller
            every member and every assignment is built from, so an N+1 here is
            an N+1 on the one screen that always asks for everything. */
         $orgGrants = $access->forOrgs(array_column($orgs, 'id'));
+        $aiByOrg   = $this->isAppAdmin() ? $this->aiFeaturesByOrg() : [];
 
         $out = [];
         foreach ($orgs as $o) {
@@ -74,8 +75,79 @@ class OrganizationController extends Controller
                 'created_at'        => $o['created_at'],
                 'users'             => $users,
             ];
+            if ($this->isAppAdmin()) {
+                $out[count($out) - 1]['ai'] = $aiByOrg[(int) $o['id']] ?? ['aiGuide' => null, 'voice' => null, 'programs' => []];
+            }
         }
         Response::success(['organizations' => $out]);
+    }
+
+    /**
+     * The AI Guide and Voice switches, per organization (29 Oct 2026). The admin console sets them for an
+     * organization as a whole: every program of RESET_MODULES it has a workspace document for. A program it
+     * has not opened yet has nothing to change; its document starts with both on (emptyData()).
+     * Per switch: true / false when its programs agree, null when they differ ("Mixed") or there are none.
+     * A document without settings counts as both off, as in the browser (js/features/coach.js, aiGuideOn).
+     */
+    private function aiFeaturesByOrg(): array
+    {
+        $in   = implode(',', array_fill(0, count(self::RESET_MODULES), '?'));
+        $stmt = Database::connection()->prepare('SELECT organization_id, module, doc FROM workspaces WHERE module IN (' . $in . ')');
+        $stmt->execute(self::RESET_MODULES);
+        $seen = [];
+        foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $r) {
+            $doc = json_decode((string) $r['doc']);
+            $s   = (is_object($doc) && isset($doc->settings) && is_object($doc->settings)) ? $doc->settings : null;
+            $seen[(int) $r['organization_id']][$r['module']] = [
+                'aiGuide' => $s !== null && !empty($s->aiGuide),
+                'voice'   => $s !== null && !empty($s->voice),
+            ];
+        }
+        $out = [];
+        foreach ($seen as $orgId => $byModule) {
+            $agreed = static function (string $key) use ($byModule): ?bool {
+                $values = array_unique(array_column($byModule, $key));
+                return count($values) === 1 ? (bool) reset($values) : null;
+            };
+            $out[$orgId] = ['aiGuide' => $agreed('aiGuide'), 'voice' => $agreed('voice'), 'programs' => array_keys($byModule)];
+        }
+        return $out;
+    }
+
+    /** POST /organizations/ai-features {id, key: 'aiGuide'|'voice', on} — the admin console only. */
+    public function aiFeatures(): void
+    {
+        $this->requireAppAdmin();
+        $input = $this->input();
+        $key   = (string) ($input['key'] ?? '');
+        if ($key !== 'aiGuide' && $key !== 'voice') {
+            Response::error('Unknown setting.', 422, ['reason' => 'bad-key']);
+        }
+        $on  = !empty($input['on']);
+        $org = (new Organization())->findByPublicId(trim((string) ($input['id'] ?? '')));
+        if ($org === null) {
+            Response::error('Organization not found.', 404, ['reason' => 'no-org']);
+        }
+        $orgId     = (int) $org['id'];
+        $workspace = new Workspace();
+        $changed   = [];
+        foreach (self::RESET_MODULES as $module) {
+            $stored = $workspace->findByOrg($orgId, $module);
+            if ($stored === null) continue;
+            /* Built from the document as it is at the moment of writing (patch re-reads on contention), so the
+               other switch is never put back to an older value. A new revision: open browsers merge it on their next poll. */
+            $set = static function (object $sections, ?object $doc) use ($key, $on): object {
+                $s = ($doc !== null && isset($doc->settings) && is_object($doc->settings)) ? clone $doc->settings : new \stdClass();
+                $s->$key = $on;
+                return (object) ['settings' => $s];
+            };
+            $result = $workspace->patch($orgId, new \stdClass(), [], null, (int) $stored['schema_version'], $module, $set);
+            if ($result === null) {
+                Response::error('Someone saved at the same moment. Try again.', 409, ['reason' => 'busy', 'changed' => $changed]);
+            }
+            $changed[] = $module;
+        }
+        Response::success(['programs' => $changed]);
     }
 
     public function delete(): void
@@ -133,8 +205,17 @@ class OrganizationController extends Controller
             Response::error('Organization not found.', 404, ['reason' => 'no-org']);
         }
 
+        /* One program (18 Nov 2026), or every program when none is named. Resetting one program clears that
+           program's work for the whole organization and keeps its members: they are the organization's, shared
+           with its other programs. Only the reset of everything removes the members who are not administrators. */
+        $only = isset($input['module']) ? trim((string) $input['module']) : '';
+        if ($only !== '' && !in_array($only, self::RESET_MODULES, true)) {
+            Response::error('That program cannot be reset.', 422, ['reason' => 'bad-module']);
+        }
+        $modules = $only !== '' ? [$only] : self::RESET_MODULES;
+
         $templates = json_decode((string) @file_get_contents(dirname(__DIR__) . '/config/empty-docs.json'));
-        foreach (self::RESET_MODULES as $m) {
+        foreach ($modules as $m) {
             if (!is_object($templates) || !isset($templates->{$m}) || !is_object($templates->{$m})) {
                 Response::error('The empty document of ' . $m . ' is missing (run tools/build-empty-docs.js).', 500, ['reason' => 'no-template']);
             }
@@ -152,7 +233,7 @@ class OrganizationController extends Controller
            rows of the administrators (their local ids are what the document's other records point at);
            with no stored document there is nothing to keep and the app rebuilds it from the database. */
         $plans = [];
-        foreach (self::RESET_MODULES as $module) {
+        foreach ($modules as $module) {
             $stored = $workspace->findByOrg($orgId, $module);
             if ($stored === null && $module !== 'pipeline') continue;
             $was   = $stored !== null ? json_decode((string) $stored['doc']) : null;
@@ -162,7 +243,7 @@ class OrganizationController extends Controller
                 foreach ($was->roster as $row) {
                     if (!is_object($row)) continue;
                     $sid = isset($row->serverId) ? (string) $row->serverId : '';
-                    if (($sid !== '' && in_array($sid, $adminIds, true)) || ($sid === '' && !empty($row->admin))) {
+                    if ($only !== '' || ($sid !== '' && in_array($sid, $adminIds, true)) || ($sid === '' && !empty($row->admin))) {
                         unset($row->passcode);
                         $keepRoster[] = $row;
                     }
@@ -171,7 +252,7 @@ class OrganizationController extends Controller
             $fresh->roster     = $keepRoster ? $keepRoster : null;
             $fresh->settings   = (is_object($was) && isset($was->settings) && is_object($was->settings))
                 ? $was->settings
-                : (object) ['aiGuide' => false, 'voice' => false];
+                : (object) ['aiGuide' => true, 'voice' => true];
             $fresh->enterprise = (object) ['name' => (is_object($was) && isset($was->enterprise->name) && $was->enterprise->name !== '')
                 ? (string) $was->enterprise->name
                 : (string) $org['name']];
@@ -187,14 +268,21 @@ class OrganizationController extends Controller
         $revs = [];
         $db->beginTransaction();
         try {
-            $del = $db->prepare('DELETE FROM users WHERE organization_id = ? AND is_admin = 0');   /* their notes, assignments and program grants go with them (FK cascade) */
-            $del->execute([$orgId]);
-            $removed = $del->rowCount();
-            foreach (self::RESET_MODULES as $module) {
+            $removed = 0;
+            if ($only === '') {
+                $del = $db->prepare('DELETE FROM users WHERE organization_id = ? AND is_admin = 0');   /* their notes, assignments and program grants go with them (FK cascade) */
+                $del->execute([$orgId]);
+                $removed = $del->rowCount();
+            }
+            foreach ($modules as $module) {
                 foreach (['step_answers', 'step_assignments', 'messages', 'workspace_locks'] as $table) {
                     $db->prepare('DELETE FROM ' . $table . ' WHERE organization_id = ? AND module = ?')->execute([$orgId, $module]);
                 }
-                if ($adminIds) {
+                if ($only !== '') {
+                    /* Everyone stays, so everyone's notes in this program go, not only the administrators'. */
+                    $db->prepare('DELETE n FROM notes n JOIN users u ON u.public_id = n.user_public_id WHERE u.organization_id = ? AND n.module = ?')
+                        ->execute([$orgId, $module]);
+                } elseif ($adminIds) {
                     $in = implode(',', array_fill(0, count($adminIds), '?'));
                     $db->prepare('DELETE FROM notes WHERE module = ? AND user_public_id IN (' . $in . ')')->execute(array_merge([$module], $adminIds));
                 }
@@ -213,7 +301,7 @@ class OrganizationController extends Controller
         }
 
         Response::success(['reset' => true, 'removed' => $removed, 'administrators' => count($adminIds),
-            'rev' => $revs['pipeline'] ?? null, 'module' => 'pipeline', 'modules' => $revs]);
+            'rev' => $revs['pipeline'] ?? null, 'module' => 'pipeline', 'modules' => $revs, 'program' => $only !== '' ? $only : null]);
     }
 
     public function members(): void

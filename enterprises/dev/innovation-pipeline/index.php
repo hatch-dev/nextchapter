@@ -491,5 +491,8 @@ $html = (string) preg_replace_callback(
 );
 
 header('Content-Type: text/html; charset=utf-8');
-header('Cache-Control: no-cache');
+/* no-store, not no-cache (18 Nov 2026): with no-cache the browser kept the signed-in page in its back/forward cache,
+   so Back after Sign out showed the program again from memory, without a request. Only this shell is affected:
+   its scripts and stylesheets are versioned (stamp()) and still cache. js/app.js handles a restore that happens anyway. */
+header('Cache-Control: no-store');
 echo $html;

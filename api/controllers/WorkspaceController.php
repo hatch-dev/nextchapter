@@ -317,6 +317,21 @@ class WorkspaceController extends Controller
                 if (!is_string($key) || $key === '' || !is_object($delta) || isset($sections->$key)) {
                     continue;
                 }
+                /* An object section as the fields that changed (js/app.js fieldDelta, 18 Nov 2026):
+                   { fields: { set: {field: value}, unset: [field] } }. */
+                if (isset($delta->fields) && is_object($delta->fields)) {
+                    $unset = [];
+                    foreach ((isset($delta->fields->unset) && is_array($delta->fields->unset)) ? $delta->fields->unset : [] as $f) {
+                        if (is_string($f) && $f !== '') {
+                            $unset[] = $f;
+                        }
+                    }
+                    $records[$key] = ['fields' => [
+                        'set'   => (isset($delta->fields->set) && is_object($delta->fields->set)) ? $delta->fields->set : new \stdClass(),
+                        'unset' => $unset,
+                    ]];
+                    continue;
+                }
                 $upsert = [];
                 foreach ((isset($delta->upsert) && is_array($delta->upsert)) ? $delta->upsert : [] as $row) {
                     if (is_object($row) && isset($row->id) && is_scalar($row->id)) {
@@ -698,6 +713,19 @@ class WorkspaceController extends Controller
         }
         $out = clone $sections;
         foreach ($records as $key => $delta) {
+            /* An object section's fields land one by one on the section as stored now, so two people editing
+               different fields of it both keep theirs (18 Nov 2026). */
+            if (isset($delta['fields'])) {
+                $obj = ($stored !== null && isset($stored->$key) && is_object($stored->$key)) ? clone $stored->$key : new \stdClass();
+                foreach ($delta['fields']['set'] as $field => $value) {
+                    $obj->$field = $value;
+                }
+                foreach ($delta['fields']['unset'] as $field) {
+                    unset($obj->$field);
+                }
+                $out->$key = $obj;
+                continue;
+            }
             $list   = ($stored !== null && isset($stored->$key) && is_array($stored->$key)) ? $stored->$key : [];
             $remove = array_fill_keys($delta['remove'], true);
             $upsert = [];

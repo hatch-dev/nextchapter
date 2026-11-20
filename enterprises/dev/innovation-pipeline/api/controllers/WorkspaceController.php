@@ -205,10 +205,11 @@ class WorkspaceController extends Controller
             ], 409);
         }
 
-        $doc    = $this->reencode($privacy->forWrite(
+        $written = $privacy->forWrite(
             json_decode($doc),
             $stored !== null ? json_decode((string) $stored['doc']) : null
-        )) ?? $doc;
+        );
+        $doc    = $this->reencode($stored === null ? self::withAiDefaults($written, $module) : $written) ?? $doc;
 
         $newRev = $workspace->save((int) $org['id'], $doc, $baseRev, $actor['public_id'], $schemaVersion, $module);
 
@@ -316,6 +317,21 @@ class WorkspaceController extends Controller
                 if (!is_string($key) || $key === '' || !is_object($delta) || isset($sections->$key)) {
                     continue;
                 }
+                /* An object section as the fields that changed (js/app.js fieldDelta, 18 Nov 2026):
+                   { fields: { set: {field: value}, unset: [field] } }. */
+                if (isset($delta->fields) && is_object($delta->fields)) {
+                    $unset = [];
+                    foreach ((isset($delta->fields->unset) && is_array($delta->fields->unset)) ? $delta->fields->unset : [] as $f) {
+                        if (is_string($f) && $f !== '') {
+                            $unset[] = $f;
+                        }
+                    }
+                    $records[$key] = ['fields' => [
+                        'set'   => (isset($delta->fields->set) && is_object($delta->fields->set)) ? $delta->fields->set : new \stdClass(),
+                        'unset' => $unset,
+                    ]];
+                    continue;
+                }
                 $upsert = [];
                 foreach ((isset($delta->upsert) && is_array($delta->upsert)) ? $delta->upsert : [] as $row) {
                     if (is_object($row) && isset($row->id) && is_scalar($row->id)) {
@@ -362,11 +378,13 @@ class WorkspaceController extends Controller
             $actor['public_id'],
             $schemaVersion,
             $module,
-            static function (object $sections, ?object $stored) use ($privacy, $records): object {
+            static function (object $sections, ?object $stored) use ($privacy, $module, $records): object {
                 /* Row deltas become whole lists here, against the document as stored at
                    this instant, so the privacy filter and everything after see what they
                    always saw. */
-                return $privacy->forPatch(self::withRecords($sections, $records, $stored), $stored);
+                $sections = self::withRecords($sections, $records, $stored);
+                $out = $privacy->forPatch($sections, $stored);
+                return $stored === null ? self::withAiDefaults($out, $module) : $out;
             }
         );
 
@@ -667,16 +685,14 @@ class WorkspaceController extends Controller
         return $json === false ? null : $json;
     }
 
-    /** Resolve the org by public id or 404. */
-    private function requireOrg(string $orgPublicId): array
-    {
-        $org = (new Organization())->findByPublicId(trim($orgPublicId));
-        if ($org === null) {
-            Response::error('Organization not found.', 404, ['reason' => 'no-org']);
-        }
-        return $org;
-    }
+    /** The programs whose workspace carries the AI Guide and Voice switches (js/features/coach.js, aiSwitchesApply). */
+    private const AI_SWITCH_MODULES = ['pipeline', 'exec-readiness', 'ai-governance', 'ai-architecture', 'ai-culture'];   /* AI-Ready Culture: 10 Nov 2026 */
 
+    /**
+     * A program's FIRST document starts with the AI Guide and Voice on (29 Oct 2026), whatever the first write sent.
+     * The browser's first save is often a patch of only the sections that differ from its empty document — and since
+     * the empty document has both on, `settings` was left out, and a document without it reads as both off.
+     */
     /**
      * Lay row deltas over the lists as stored (live test 13 Nov 2026, F-01).
      *
@@ -688,7 +704,7 @@ class WorkspaceController extends Controller
      * every row nobody here touched stays exactly as stored. The same rules as
      * the client's mergeRows / applyRecordDelta (js/app.js); keep them alike.
      *
-     * @param array<string, array{upsert: array<int, object>, remove: array<int, string>}> $records
+     * @param array<string, array{upsert: array<int, object>, patch?: array<int, array{id: string, set: object, unset: array<int, string>}>, remove: array<int, string>}> $records
      */
     private static function withRecords(object $sections, array $records, ?object $stored): object
     {
@@ -697,6 +713,19 @@ class WorkspaceController extends Controller
         }
         $out = clone $sections;
         foreach ($records as $key => $delta) {
+            /* An object section's fields land one by one on the section as stored now, so two people editing
+               different fields of it both keep theirs (18 Nov 2026). */
+            if (isset($delta['fields'])) {
+                $obj = ($stored !== null && isset($stored->$key) && is_object($stored->$key)) ? clone $stored->$key : new \stdClass();
+                foreach ($delta['fields']['set'] as $field => $value) {
+                    $obj->$field = $value;
+                }
+                foreach ($delta['fields']['unset'] as $field) {
+                    unset($obj->$field);
+                }
+                $out->$key = $obj;
+                continue;
+            }
             $list   = ($stored !== null && isset($stored->$key) && is_array($stored->$key)) ? $stored->$key : [];
             $remove = array_fill_keys($delta['remove'], true);
             $upsert = [];
@@ -742,5 +771,23 @@ class WorkspaceController extends Controller
             $out->$key = $merged;
         }
         return $out;
+    }
+
+    private static function withAiDefaults(object $doc, string $module): object
+    {
+        if (in_array($module, self::AI_SWITCH_MODULES, true) && !(isset($doc->settings) && is_object($doc->settings))) {
+            $doc->settings = (object) ['aiGuide' => true, 'voice' => true];
+        }
+        return $doc;
+    }
+
+    /** Resolve the org by public id or 404. */
+    private function requireOrg(string $orgPublicId): array
+    {
+        $org = (new Organization())->findByPublicId(trim($orgPublicId));
+        if ($org === null) {
+            Response::error('Organization not found.', 404, ['reason' => 'no-org']);
+        }
+        return $org;
     }
 }

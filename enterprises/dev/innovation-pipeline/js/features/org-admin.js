@@ -74,10 +74,10 @@ function openOrg() { orgSetupMode = false; currentModal = 'org'; UI.orgEdit = nu
 
    pullOrgMembers() for the same reason openOrg() calls it: this panel lists the
    team, and the workspace's copy of the roster can be behind the database's. */
-function openOrgSetup() { orgSetupMode = true; currentModal = 'org'; UI.orgEdit = null; UI.orgDetErrors = {}; UI.orgDetBusy = false; renderOrgModal(); pullOrgMembers(); }
+function openOrgSetup() { if (typeof termsPending === 'function' && termsPending()) { UI.termsThen = 'orgSetup'; return } /* the setup panel opens once the terms are accepted (Terms of Use, 18 Nov 2026) */ orgSetupMode = true; currentModal = 'org'; UI.orgEdit = null; UI.orgDetErrors = {}; UI.orgDetBusy = false; renderOrgModal(); pullOrgMembers(); }
 
 /* ── Admin: manage all organizations ───────────────── */
-function openAdmin() { if (!isAppAdmin) { return; } currentModal = 'admin'; UI.adminUserEdit = null; UI.adminUserErr = {}; UI.adminNewOrg = null; UI.adminAccess = null; UI.adminData = null; UI.adminError = ''; renderAdminModal(); fetchAdminData(); }
+function openAdmin() { if (!isAppAdmin) { return; } if (currentModal) closeModal(); UI.adminPage = true; adminView().orgId = null; UI.adminUserEdit = null; UI.adminUserErr = {}; UI.adminNewOrg = null; UI.adminAccess = null; UI.adminDetEdit = null; UI.adminReset = null; UI.adminError = ''; renderAdminModal(); fetchAdminData(); }   /* 10 Nov 2026: a page, not a modal (see renderAdminModal) */
 
 /* Load every organization + its users from the database (source of truth). */
 function fetchAdminData() {
@@ -87,10 +87,10 @@ function fetchAdminData() {
       .then(function (r) { return r.json(); })
       .then(function (res) {
         UI.adminData = (res && res.success && res.data && Array.isArray(res.data.organizations)) ? res.data.organizations : [];
-        if (currentModal === 'admin') renderAdminModal();
+        if (adminPageShowing()) renderAdminModal();
       })
-      .catch(function () { UI.adminData = []; UI.adminError = 'Could not reach the server.'; if (currentModal === 'admin') renderAdminModal(); });
-  } catch (e) { UI.adminData = []; UI.adminError = 'Could not reach the server.'; if (currentModal === 'admin') renderAdminModal(); }
+      .catch(function () { UI.adminData = []; UI.adminError = 'Could not reach the server.'; if (adminPageShowing()) renderAdminModal(); });
+  } catch (e) { UI.adminData = []; UI.adminError = 'Could not reach the server.'; if (adminPageShowing()) renderAdminModal(); }
 }
 
 /* Helpers for the DB-backed admin console. */
@@ -304,7 +304,7 @@ function adminOpenOrg(orgPublicId) { if (!isAppAdmin) return;   /* Sweep 4R item
     try { Store.setRemember(null); } catch (e) { }
     switchToOrg(localId); Auth.setSession((USERS[0] && USERS[0].id) || null);
     persistAdminSession();
-    UI.adminUserEdit = null; closeModal(); render();
+    UI.adminUserEdit = null; UI.adminPage = false; UI.entry = null; renderAdminModal(); render();
   });
 }
 /* ── Reset data (Directive 2 Oct 2026, Part 4; live 6 Oct 2026) ─────────────────────────────
@@ -313,17 +313,73 @@ function adminOpenOrg(orgPublicId) { if (!isAppAdmin) return;   /* Sweep 4R item
    is removed — from the ORGANIZATION, so from every program (ruled 6 Oct 2026) — with the work of every program
    whose directive is applied: the Pipeline's and, since 7 Oct 2026, Executive Readiness's and Responsible AI Governance's. One request; the server
    does all of it in one transaction (OrganizationController::reset). Replaces the More menu's Reset all data on both. */
+/* ── Reset data (18 Nov 2026): one program, or all of them ─────────────────
+   Reset data opens a chooser under the organization's header. One program clears that program's work,
+   assignments, Team Chat, notes and locks for the whole organization; its members stay, because they are the
+   organization's and shared with its other programs. All programs is the reset there always was: every
+   program, and every member who is not an administrator removed. POST /organizations/reset, with `module`
+   for one program (OrganizationController::reset, whose RESET_MODULES this list matches). */
+var ADMIN_RESET_MODULES = ['pipeline', 'exec-readiness', 'ai-governance', 'ai-architecture', 'ai-culture'];
+function adminResetPrograms(o) {
+  var held = (o && o.modules) || [];
+  return ADMIN_RESET_MODULES.filter(function (m) { return held.indexOf(m) >= 0; }).map(function (m) {
+    var mm = window.Modules && Modules.byId(m); return { id: m, name: (mm && mm.name) || m };
+  });
+}
 function adminResetOrg(orgPublicId) {
   if (!isAppAdmin || !orgPublicId) return;
-  if (!confirm('Reset all data for this organization? Team members other than administrators are also removed. This cannot be undone.')) return;
-  postJSON(API_BASE + '/organizations/reset', { id: orgPublicId },   /* the app administrator's session authorises it */
+  if (UI.adminReset && UI.adminReset.orgId === orgPublicId) { UI.adminReset = null; renderAdminModal(); return; }   /* the button closes it again */
+  UI.adminUserEdit = null; UI.adminAccess = null; UI.adminNewOrg = null; UI.adminDetEdit = null;
+  UI.adminReset = { orgId: orgPublicId, pick: '', busy: false, error: '' };
+  renderAdminModal();
+}
+function adminResetPick(val) { if (UI.adminReset) { UI.adminReset.pick = val; UI.adminReset.error = ''; renderAdminModal(); } }
+function adminResetCancel() { UI.adminReset = null; renderAdminModal(); }
+function adminResetPanelHtml(o) {
+  var st = UI.adminReset || {}, busy = !!st.busy, progs = adminResetPrograms(o), id = esc(o.id);
+  function opt(val, title, sub) {
+    var on = st.pick === val;
+    return '<label class="adm-reset-opt' + (on ? ' on' : '') + (val === 'all' ? ' adm-reset-all' : '') + '">'
+      + '<input type="radio" name="admResetPick" value="' + esc(val) + '"' + (on ? ' checked' : '') + (busy ? ' disabled' : '')
+      + ' onchange="adminResetPick(this.value)"/><span><b>' + esc(title) + '</b><span>' + esc(sub) + '</span></span></label>';
+  }
+  var h = '<section class="adm-card adm-reset" id="admResetCard"><div class="adm-card-h"><h3 class="adm-h3">Reset data</h3></div>';
+  h += '<p class="adm-msub adm-reset-lead">Choose what to clear. This cannot be undone.</p>';
+  if (st.error) h += '<div class="entry-err" style="margin:0 0 12px;color:#c0392b;font-size:13px">' + esc(st.error) + '</div>';
+  h += '<div class="adm-reset-opts">';
+  progs.forEach(function (p) { h += opt(p.id, p.name, 'Clears this program’s work, assignments, Team Chat and notes for everyone. Members and their access stay.'); });
+  h += opt('all', 'All programs', 'Clears every program and removes every member who is not an administrator.');
+  h += '</div><div class="org-edit-actions">'
+    + '<button class="org-btn-del adm-reset-go" onclick="adminResetDo(\'' + id + '\')"' + (busy || !st.pick ? ' disabled' : '') + '>' + (busy ? 'Resetting…' : 'Reset') + '</button>'
+    + '<button class="org-btn-cancel" onclick="adminResetCancel()"' + (busy ? ' disabled' : '') + '>Cancel</button></div>';
+  return h + '</section>';
+}
+function adminResetDo(orgPublicId) {
+  var st = UI.adminReset; if (!isAppAdmin || !st || st.orgId !== orgPublicId || st.busy || !st.pick) return;
+  var org = adminOrgById(orgPublicId), orgName = (org && org.name) || 'this organization';
+  var one = st.pick !== 'all', prog = one ? (adminResetPrograms(org).filter(function (p) { return p.id === st.pick; })[0] || { name: st.pick }) : null;
+  var q = one
+    ? 'Reset ' + prog.name + ' for ' + orgName + '?\n\nEverything done in this program is cleared for everyone. Members stay. This cannot be undone.'
+    : 'Reset ALL programs for ' + orgName + '?\n\nEvery program is cleared and team members other than administrators are removed. This cannot be undone.';
+  if (!confirm(q)) return;
+  st.busy = true; st.error = ''; renderAdminModal();
+  var body = { id: orgPublicId }; if (one) body.module = st.pick;
+  postJSON(API_BASE + '/organizations/reset', body,   /* the app administrator's session authorises it */
     function () {
-      if (currentModal === 'admin') fetchAdminData();
+      UI.adminReset = null;
+      if (adminPageShowing()) { renderAdminModal(); fetchAdminData(); }
+      showToast(one ? prog.name + ' was reset.' : 'All programs were reset.');
       if (UI.entry && UI.entry.step === 'admin') { try { hydrateOrgsFromServer(function () { render(); }); } catch (e) { render(); } }
       /* The organization being viewed: its document was just replaced — read it now rather than at the next poll. */
       try { if (orgServerId() === orgPublicId && Store.checkRemote) Store.checkRemote(); } catch (e) { }
     },
-    function (err) { alert((err && err.message) || 'Could not reset this organization.'); });
+    function (err) {
+      st.busy = false;
+      st.error = (err && err.reason === 'forbidden') ? 'Your admin session has ended. Sign in again to reset data.'
+        : (err && err.reason === 'network') ? 'The server could not be reached, so nothing was reset.'
+        : ((err && err.message) || 'Could not reset this organization.');
+      renderAdminModal();
+    });
 }
 
 function adminDeleteOrg(orgPublicId) { if (!isAppAdmin) return;   /* Sweep 4R item 10: the app administrator's console checks its caller itself, not only by hiding its button */
@@ -336,19 +392,76 @@ function adminDeleteOrg(orgPublicId) { if (!isAppAdmin) return;   /* Sweep 4R it
 }
 
 /* ── Temporary passwords (Directive 2 Oct 2026, Part 5.7) ──────────────────────
-   An administrator never sees or keeps a member's password. Adding someone, they
-   give a temporary one (required); editing someone, an empty field leaves the
-   password alone and a typed one replaces it. Either way it is sent once to
+   An administrator never keeps a member's password. Adding someone, a temporary one
+   is generated for them (required); editing someone, it is left alone unless Reset
+   password generates a new one (see temporaryFieldHtml, 18 Nov 2026). Either way it is sent once to
    POST /admin/temporary-password, marked must-change, and the member chooses
    their own at their next sign-in. The field is never filled back in — not even
    after a refused Save. */
-function temporaryFieldHtml(id, isNew, err) {
-  return '<div><label class="org-flabel" for="' + id + '">Temporary password' + (isNew ? ' <span style="color:#c0392b">*</span>' : '') + '</label>'
-    + '<input id="' + id + '" class="field-input" type="password" autocomplete="new-password" value="" placeholder="' + (isNew ? '' : 'Leave empty to keep their password') + '"'
-    + (err ? ' style="border-color:#c0392b"' : '') + '/>'
+/* ── Generated, never typed (18 Nov 2026) ───────────────────────────────
+   A temporary password is no longer made up by whoever adds the person: the field
+   holds one generated here (12 characters, upper and lower case, a digit and a
+   special character, so it always meets passwordProblem), shown so it can be
+   copied, with New for another. Someone new always gets one. Editing someone
+   keeps their password unless Reset password is pressed. Re-rendering a form
+   (a refused Save, another field's error) keeps the one already on screen: the
+   markup is built while the old field is still in the page, so its value is read
+   back from there. Closing the form drops it, and the next one starts afresh.
+   Readers are unchanged: they read the field by its id, '' when it is absent. */
+var TEMP_PW_SETS = ['abcdefghijkmnpqrstuvwxyz', 'ABCDEFGHJKLMNPQRSTUVWXYZ', '23456789', '!#$%&*?@'];   /* no 0/O, 1/l/I: it may be read aloud or copied by hand */
+function tempPwRandoms(n) { var a = new Uint32Array(n); (window.crypto || window.msCrypto).getRandomValues(a); return a; }
+function generateTemporaryPassword() {
+  var all = TEMP_PW_SETS.join(''), len = 12, pw = '';
+  for (var tries = 0; tries < 20; tries++) {
+    var r = tempPwRandoms(len), chars = TEMP_PW_SETS.map(function (set, i) { return set.charAt(r[i] % set.length); });
+    for (var i = chars.length; i < len; i++) chars.push(all.charAt(r[i] % all.length));
+    var s = tempPwRandoms(len);
+    for (var j = len - 1; j > 0; j--) { var k = s[j] % (j + 1), t = chars[j]; chars[j] = chars[k]; chars[k] = t; }
+    pw = chars.join('');
+    if (!passwordProblem(pw)) return pw;
+  }
+  return pw;
+}
+function tempPwBoxHtml(id, val, isNew, emailed) {
+  return '<div class="tp-row"><input id="' + id + '" class="field-input tp-val" type="text" readonly spellcheck="false" autocomplete="off" value="' + esc(val) + '" aria-label="Temporary password"/>'
+    + '<button type="button" class="org-btn-cancel tp-btn" onclick="tempPwCopy(\'' + id + '\', this)">Copy</button>'
+    + '<button type="button" class="org-btn-cancel tp-btn" onclick="tempPwNew(\'' + id + '\')" title="Generate another">New</button></div>'
+    + (isNew ? '' : '<button type="button" class="adm-link tp-keep" onclick="tempPwKeep(\'' + id + '\')">Keep their current password</button>')
+    + '<div class="pw-note">' + (isNew && emailed ? 'Sent in their invite email. Copy it if you would rather pass it on yourself.'
+      : 'Copy it and give it to them.') + ' They choose their own password the first time they sign in with it.</div>';
+}
+function tempPwResetHtml(id) {
+  return '<button type="button" class="org-btn-cancel tp-reset" onclick="tempPwReset(\'' + id + '\')">Reset password</button>'
+    + '<div class="pw-note">Their current password stays. Reset it to give them a new temporary one.</div>';
+}
+/* emailed: whether a NEW person is sent it in an invite (adding a member) or not (a new organization's administrator). */
+function temporaryFieldHtml(id, isNew, err, emailed) {
+  if (emailed == null) emailed = true;
+  var prev = document.getElementById(id), val = (prev && prev.value) ? prev.value : '';
+  if (!val && isNew) val = generateTemporaryPassword();
+  return '<div class="tp-field" id="' + id + '_wrap" data-emailed="' + (emailed ? '1' : '0') + '">'
+    + '<label class="org-flabel"' + (val ? ' for="' + id + '"' : '') + '>Temporary password</label>'
+    + (val ? tempPwBoxHtml(id, val, isNew, emailed) : tempPwResetHtml(id))
     + (err ? '<div class="org-field-err" style="color:#c0392b;font-size:12px;margin-top:4px">' + esc(err) + '</div>' : '')
-    + '<div class="pw-rule">' + PASSWORD_RULE_TEXT + '</div>'
-    + '<div class="pw-note">The person will be asked to choose their own password the next time they sign in.</div></div>';
+    + '</div>';
+}
+function tempPwWrap(id) { return document.getElementById(id + '_wrap'); }
+function tempPwReset(id) {
+  var w = tempPwWrap(id); if (!w) return;
+  w.innerHTML = '<label class="org-flabel" for="' + id + '">Temporary password</label>' + tempPwBoxHtml(id, generateTemporaryPassword(), false, false);
+}
+function tempPwKeep(id) {
+  var w = tempPwWrap(id); if (!w) return;
+  w.innerHTML = '<label class="org-flabel">Temporary password</label>' + tempPwResetHtml(id);
+}
+function tempPwNew(id) { var el = document.getElementById(id); if (el) el.value = generateTemporaryPassword(); }
+function tempPwCopy(id, btn) {
+  var el = document.getElementById(id); if (!el) return;
+  function done(ok) { if (!btn) return; var was = 'Copy'; btn.textContent = ok ? 'Copied' : 'Select it'; setTimeout(function () { btn.textContent = was; }, 1600); }
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(el.value).then(function () { done(true); }, function () { el.select(); done(false); }); return; }
+  } catch (e) { }
+  try { el.select(); done(document.execCommand('copy')); } catch (e) { done(false); }
 }
 /** '' when acceptable: required for someone new, optional (empty = unchanged) otherwise. */
 function temporaryProblem(temp, isNew) {
@@ -407,6 +520,11 @@ function adminUserFieldValue(u, key) {
   if (typed) return typed[key] || '';
   return (u && u[key]) || '';
 }
+
+/* The longest each console field may be: the validators' own limits. The boxes carry them as maxlength and opt out
+   of the 10,000 counter, which said nothing true about a name or a username (10 Nov 2026). */
+var ADMIN_FIELD_MAX = { name: 120, username: 60, role: 60, scope: 60, email: 150, dept: 80, organization_name: 150 };
+function adminMaxAttr(key) { var n = ADMIN_FIELD_MAX[key]; return n ? ' maxlength="' + n + '" data-uncapped="1"' : ''; }
 
 /* Required-field validation for the admin user editor (server also enforces). */
 function validateAdminUserFields(v, isNew) {
@@ -592,6 +710,111 @@ function adminAccessEditorHtml(o) {
   return h;
 }
 
+/* ── An organization's details (18 Nov 2026) ───────────────────────
+   The same fields, rules and endpoint as the organization's own Org & Team page
+   (validateOrgDetails, POST /organizations/update, which lets the app administrator
+   act for any organization). A Leader account is only asked for its name and
+   objective there, so only those are offered here; its other columns are sent back
+   as stored, never blanked. */
+var ORG_SIZE_OPTS = [['', 'Select size\u2026'], ['1\u201350', '1\u201350'], ['51\u2013200', '51\u2013200'], ['201\u20131,000', '201\u20131,000'], ['1,001\u20135,000', '1,001\u20135,000'], ['5,000+', '5,000+']];
+var ORG_MATURITY_OPTS = [['', 'Select stage\u2026'], ['Exploring', 'Exploring'], ['Piloting', 'Piloting'], ['Scaling', 'Scaling'], ['Operating', 'Operating']];
+
+function adminDetOpen(orgId) { if (!isAppAdmin) return;
+  UI.adminUserEdit = null; UI.adminAccess = null; UI.adminNewOrg = null; UI.adminReset = null;
+  UI.adminDetEdit = { orgId: orgId, values: null, errors: {}, busy: false };
+  renderAdminModal();
+  var el = $('ad_name'); if (el) el.focus();
+}
+function adminDetCancel() { UI.adminDetEdit = null; renderAdminModal(); }
+/* What a box shows: what was typed once Save has been pressed (so a rejected save keeps it), else what is stored. */
+function adminDetValue(o, f) {
+  var st = UI.adminDetEdit;
+  if (st && st.values) return st.values[f] || '';
+  return enterpriseFromDbOrg(o)[f] || '';
+}
+
+function adminDetEditorHtml(o) {
+  var st = UI.adminDetEdit || {}, fe = st.errors || {}, busy = !!st.busy, solo = o.account_type === 'leader';
+  function err(k) { return fe[k] ? '<div class="org-field-err" style="color:#c0392b;font-size:12px;margin-top:4px">' + esc(fe[k]) + '</div>' : ''; }
+  function red(k) { return fe[k] ? ' style="border-color:#c0392b"' : ''; }
+  function lab(k, label, req) { return '<label class="org-flabel" for="ad_' + k + '">' + label + (req ? ' <span style="color:#c0392b">*</span>' : '') + '</label>'; }
+  function inp(k, label, ph, max, req) {
+    return '<div>' + lab(k, label, req) + '<input id="ad_' + k + '" class="field-input" type="text" value="' + esc(adminDetValue(o, k)) + '" placeholder="' + esc(ph) + '"'
+      + ' autocomplete="off" maxlength="' + max + '" data-uncapped="1"' + red(k) + (busy ? ' disabled' : '') + '/>' + err(k) + '</div>';
+  }
+  function sel(k, label, opts) {
+    var cur = adminDetValue(o, k), list = opts.slice();
+    if (cur && !list.some(function (x) { return x[0] === cur; })) list.push([cur, cur]);   /* a value stored before these choices existed is kept, not lost */
+    return '<div>' + lab(k, label) + '<select id="ad_' + k + '" class="field-sel"' + red(k) + (busy ? ' disabled' : '') + '>'
+      + list.map(function (x) { return '<option value="' + esc(x[0]) + '"' + (x[0] === cur ? ' selected' : '') + '>' + esc(x[1]) + '</option>'; }).join('')
+      + '</select>' + err(k) + '</div>';
+  }
+  var h = '<div class="adm-form adm-form-3 adm-detform">';
+  if (fe._general) h += '<div class="entry-err" style="margin:0 0 12px;color:#c0392b;font-size:13px">' + esc(fe._general) + '</div>';
+  h += '<div class="org-edit-grid">';
+  h += inp('name', solo ? 'Workspace name' : 'Organization name', solo ? 'e.g. Maria Torres' : 'e.g. Acme Manufacturing', 150, true);
+  if (!solo) {
+    h += inp('industry', 'Industry', 'e.g. Industrial / Pharma', 120);
+    h += sel('size', 'Company size', ORG_SIZE_OPTS);
+    h += inp('region', 'Region / HQ', 'e.g. Boston, USA', 120);
+    h += inp('website', 'Website', 'e.g. acme.com', 150);
+    h += sel('maturity', 'AI maturity', ORG_MATURITY_OPTS);
+    h += inp('sponsor', 'Executive sponsor', 'e.g. CEO / CFO name', 120);
+  }
+  h += '</div>';
+  h += '<div class="adm-detform-obj">' + lab('objective', 'Primary objective')
+    + '<textarea id="ad_objective" class="field-ta" rows="3" maxlength="1000" data-uncapped="1" placeholder="'
+    + (solo ? 'What do you want to be able to do by day 90?' : 'What is the enterprise aiming to achieve with AI in the next 90 days?') + '"'
+    + red('objective') + (busy ? ' disabled' : '') + '>' + esc(adminDetValue(o, 'objective')) + '</textarea>' + err('objective') + '</div>';
+  h += '<div class="org-edit-actions">'
+    + '<button class="org-btn-save" onclick="adminDetSave(\'' + esc(o.id) + '\')"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Saving…' : 'Save details') + '</button>'
+    + '<button class="org-btn-cancel" onclick="adminDetCancel()"' + (busy ? ' disabled' : '') + '>Cancel</button></div>';
+  return h + '</div>';
+}
+
+function adminDetSave(orgId) { if (!isAppAdmin) return;
+  var st = UI.adminDetEdit; if (!st || st.orgId !== orgId || st.busy) return;
+  var org = adminOrgById(orgId); if (!org) return;
+  var stored = enterpriseFromDbOrg(org), v = {};
+  ORG_DET_FIELDS.forEach(function (f) { var el = $('ad_' + f); v[f] = el ? ('' + el.value).trim() : (stored[f] || ''); });
+  st.values = v;
+  var errs = validateOrgDetails(v);
+  if (Object.keys(errs).length) { st.errors = errs; renderAdminModal(); return; }
+  st.errors = {}; st.busy = true; renderAdminModal();
+  var cols = { name: v.name, industry: v.industry, company_size: v.size, region: v.region, website: v.website,
+    ai_maturity: v.maturity, executive_sponsor: v.sponsor, objective: v.objective };
+  postJSON(API_BASE + '/organizations/update', Object.assign({ id: orgId, actor_id: orgAdminActor(org) }, cols),
+    function () {
+      Object.assign(org, cols);           /* the console shows the new values at once; fetchAdminData() confirms them */
+      adminDetMirrorLocal(orgId, v, cols);
+      UI.adminDetEdit = null; renderAdminModal(); fetchAdminData();
+      showToast('Organization details saved.');
+    },
+    function (err) {
+      st.busy = false;
+      st.errors = mapOrgServerErrors(err && err.errors);
+      if (!Object.keys(st.errors).length) {
+        st.errors = { _general: (err && err.reason === 'forbidden') ? 'Your admin session has ended. Sign in again to change an organization\u2019s details.'
+          : (err && err.reason === 'network') ? 'The server could not be reached, so nothing was saved.'
+          : ((err && err.message) || 'Could not save these details.') };
+      }
+      renderAdminModal();
+    });
+}
+/* Keep this browser's copies in step: the organization registry's name, the cached database record that
+   orgDetails() reads, and, for the organization the administrator is signed into, its workspace copy, which
+   orgDetails() falls back to for a field the database leaves blank. */
+function adminDetMirrorLocal(sid, v, cols) {
+  try {
+    var local = findLocalOrgByServerId(sid); if (!local) return;
+    if (local.name !== v.name) saveOrgs(getOrgs().map(function (x) { return x.id === local.id ? Object.assign({}, x, { name: v.name }) : x; }));
+    if (typeof Store !== 'undefined' && Store.patchDbOrg) Store.patchDbOrg(local.id, cols);
+    if (local.id === currentOrgId && typeof data !== 'undefined' && data && data.enterprise) {
+      ORG_DET_FIELDS.forEach(function (f) { data.enterprise[f] = v[f]; });
+    }
+  } catch (e) { }
+}
+
 /** One line naming a member's programs, for the console's user rows. */
 function adminUserAccessLine(o, u) {
   var pool = o.modules || [];
@@ -618,11 +841,11 @@ function adminUserEditorHtml(orgId, u) {
     var req = opts.req !== false;
     var err = fe[key];
     return '<div><label class="org-flabel">' + label + (req ? ' <span style="color:#c0392b">*</span>' : '') + '</label>'
-      + '<input id="au_' + key + '" class="field-input" type="' + (type || 'text') + '" value="' + esc(adminUserFieldValue(u, key)) + '" placeholder="' + esc(ph) + '" autocomplete="off"' + (err ? ' style="border-color:#c0392b"' : '') + '/>'
+      + '<input id="au_' + key + '" class="field-input" type="' + (type || 'text') + '" value="' + esc(adminUserFieldValue(u, key)) + '" placeholder="' + esc(ph) + '" autocomplete="off"' + adminMaxAttr(key) + (err ? ' style="border-color:#c0392b"' : '') + '/>'
       + (err ? '<div class="org-field-err" style="color:#c0392b;font-size:12px;margin-top:4px">' + esc(err) + '</div>' : '') + '</div>';
   }
   var idArg = isNew ? 'new' : u.public_id;
-  var h = '<div class="org-card editing admin-user-editor">';
+  var h = '<div class="org-card editing admin-user-editor adm-form adm-form-3">';
   h += '<div class="org-card-head">' + userAv(isNew ? { initials: '?', color: '#8A7B72' } : adminUserAvatar(u), 36) + '<div class="org-card-headtxt">' + (isNew ? 'New user' : 'Editing user') + '</div></div>';
   if (fe._general) h += '<div class="entry-err" style="margin:0 0 12px;color:#c0392b;font-size:13px">' + esc(fe._general) + '</div>';
   h += '<div class="org-edit-grid">';
@@ -677,9 +900,7 @@ function adminUserEditorHtml(orgId, u) {
    the pre-login admin console (renderAdminConsole in app.js). Repaint whichever
    one is on screen, so the same server-backed form serves both. */
 function adminSurfaceRender() {
-  if (currentModal === 'admin') { renderAdminModal(); return; }
-  if (isAppAdmin && UI.entry && UI.entry.step === 'admin') { render(); return; }
-  renderAdminModal();
+  renderAdminModal();   /* one page for both surfaces now (10 Nov 2026) */
 }
 function adminNewOrgOpen() { if (!isAppAdmin) return;   /* Sweep 4R item 10: the app administrator's console checks its caller itself, not only by hiding its button */ UI.adminUserEdit = null; UI.adminNewOrg = { open: true, errors: {}, busy: false }; adminSurfaceRender(); }
 function adminNewOrgCancel() { UI.adminNewOrg = null; adminSurfaceRender(); }
@@ -710,7 +931,7 @@ function adminNewOrgSave() { if (!isAppAdmin) return;   /* Sweep 4R item 10: the
   postJSON(API_BASE + '/setup', { organization_name: v.organization_name, name: v.name, email: v.email, username: v.username, password: v.password },
     function () {
       UI.adminNewOrg = null; showToast('✓ Organization created. Give its administrator the temporary password.');
-      if (currentModal === 'admin') fetchAdminData();
+      if (adminPageShowing()) fetchAdminData();
       // Pull the registry back from the database so the console lists the new
       // org under its real id — the id every later save and sign-in uses.
       hydrateOrgsFromServer(function () { adminSurfaceRender(); });
@@ -728,18 +949,19 @@ function adminNewOrgFormHtml() {
   function f(label, key, ph, type) {
     var err = fe[key];
     return '<div><label class="org-flabel">' + label + ' <span style="color:#c0392b">*</span></label>'
-      + '<input id="nao_' + key + '" class="field-input" type="' + (type || 'text') + '" placeholder="' + esc(ph) + '" autocomplete="off" value="' + esc(vals[key] || '') + '"' + (err ? ' style="border-color:#c0392b"' : '') + '/>'
+      + '<input id="nao_' + key + '" class="field-input" type="' + (type || 'text') + '" placeholder="' + esc(ph) + '" autocomplete="off" value="' + esc(vals[key] || '') + '"' + adminMaxAttr(key) + (err ? ' style="border-color:#c0392b"' : '') + '/>'
       + (err ? '<div class="org-field-err" style="color:#c0392b;font-size:12px;margin-top:4px">' + esc(err) + '</div>' : '') + '</div>';
   }
-  var h = '<div class="org-card editing" style="margin-top:10px">';
+  var h = '<div class="org-card editing adm-form adm-newform">';
   h += '<div class="org-card-head"><div class="org-card-headtxt">New organization &amp; its administrator</div></div>';
+  h += '<p class="adm-form-lead">The organization is created with every program of its plan. Its administrator signs in with this username and the temporary password, then chooses their own.</p>';
   if (fe._general) h += '<div class="entry-err" style="margin:0 0 12px;color:#c0392b;font-size:13px">' + esc(fe._general) + '</div>';
   h += '<div class="org-edit-grid">';
   h += f('Organization name', 'organization_name', 'e.g. Acme Manufacturing');
   h += f('Administrator name', 'name', 'e.g. Maria Torres');
   h += f('Email', 'email', 'e.g. maria@acme.com', 'email');
   h += f('Username', 'username', 'e.g. maria');
-  h += temporaryFieldHtml('nao_password', true, fe.password);
+  h += temporaryFieldHtml('nao_password', true, fe.password, false);   /* a new organization's administrator is not emailed it */
   h += '</div>';
   h += '<div class="org-edit-actions">';
   h += '<button class="org-btn-save" onclick="adminNewOrgSave()"' + (busy ? ' disabled' : '') + '>' + (busy ? 'Creating…' : 'Create organization') + '</button>';
@@ -748,98 +970,356 @@ function adminNewOrgFormHtml() {
   return h;
 }
 
-function renderAdminModal() {
-  var mr = $('modalRoot'); if (!mr) return;
-  if (currentModal !== 'admin') { mr.innerHTML = ''; return; }
-  var h = '<div class="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal">';
-  h += '<h3>Admin</h3>';
-  if (UI.adminData == null) {
-    h += '<div class="u-e6b5a04">Loading organizations from the database...</div>';
-    h += '<div class="u-ea28b89"><button class="btn-gold" onclick="closeModal()">Done</button></div></div></div>';
-    mr.innerHTML = h; return;
-  }
-  var orgs = UI.adminData || [];
-  var totalUsers = 0; orgs.forEach(function (o) { totalUsers += (o.users || []).length; });
-  var ed = UI.adminUserEdit || null;
-  var acc = UI.adminAccess || null;
-  var curSid = orgServerId();
-  /* Both audiences in one count. A Leader account is an organization of one, so
-     it appears in this list like any other — but calling twelve individuals
-     "12 organizations" hides the thing the Super Admin most needs to see. */
-  var leaderCount = orgs.filter(function (o) { return o.account_type === 'leader'; }).length;
-  var entCount = orgs.length - leaderCount;
-  h += '<div class="u-e6b5a04">Every account in the database, with its programs and who can open them. '
-    + entCount + ' organization' + (entCount === 1 ? '' : 's')
-    + ' \xb7 ' + leaderCount + ' leader' + (leaderCount === 1 ? '' : 's')
-    + ' \xb7 ' + totalUsers + ' user' + (totalUsers === 1 ? '' : 's') + '.</div>';
-  if (UI.adminError) h += '<div class="entry-err" style="margin:0 0 12px;color:#c0392b">' + esc(UI.adminError) + ' <button class="org-btn-cancel admin-mini-btn" onclick="fetchAdminData()">Retry</button></div>';
-  if (!orgs.length && !UI.adminError) h += '<div class="u-e6b5a04" style="opacity:.7">No organizations yet.</div>';
-  h += '<div class="admin-mgr-list">';
-  orgs.forEach(function (o) {
-    var cur = (o.id === curSid);
-    var users = o.users || [];
-    var hasLocal = !!findLocalOrgByServerId(o.id);
-    var isLeader = o.account_type === 'leader';
-    var plan = o.modules || [];
-    h += '<div class="admin-mgr-org' + (cur ? ' admin-org-current' : '') + '">';
-    // Org header
-    h += '<div class="admin-mgr-orghead"><div class="entry-org-badge">' + esc((o.name || '?').slice(0, 1).toUpperCase()) + '</div>';
-    h += '<div class="admin-mgr-orgmeta"><div class="admin-org-name">' + esc(o.name) + (cur ? ' <span class="org-you">Current</span>' : '') + '</div>';
-    /* The role space, then the plan. Both are new to this line and both earn
-       their place: which space an account is in decides which six programs it
-       could ever hold, and how many it actually holds is the number that
-       explains everything listed under it. */
-    h += '<div class="admin-org-sub">' + (isLeader ? 'Leader' : 'Enterprise')
-      + ' \xb7 ' + plan.length + ' program' + (plan.length === 1 ? '' : 's')
-      + ' \xb7 ' + users.length + ' user' + (users.length === 1 ? '' : 's')
-      + ' \xb7 created ' + esc(fmtAdminDate(o.created_at)) + '</div>';
-    /* The organization code. Sign-in asks for the organization first, and its
-       NAME is normally the answer — but if two organizations ever share one,
-       this is what their members have to type instead. The console is where
-       someone is asked for it, so it is written here rather than looked up. */
-    h += '<div class="admin-org-sub">Sign-in code: <code>' + esc(o.id) + '</code></div></div>';
-    h += '<div class="admin-mgr-orgactions">';
-    h += '<button class="org-btn-cancel admin-mini-btn" onclick="adminAccessOpen(\'' + o.id + '\')">Programs</button>';
-    if (!cur) h += '<button class="org-btn-cancel admin-mini-btn" onclick="adminOpenOrg(\'' + o.id + '\')">Open</button>';
-    h += '<button class="org-btn-cancel admin-mini-btn" onclick="adminResetOrg(\'' + o.id + '\')">Reset data</button>';
-    if (!cur) h += '<button class="org-row-btn org-row-del" title="Delete organization" onclick="adminDeleteOrg(\'' + o.id + '\')">\xd7</button>';
-    h += '</div></div>';
-    // The organization's plan, when it is the one being edited.
-    if (acc && acc.orgId === o.id) h += adminAccessEditorHtml(o);
-    // Users
-    h += '<div class="admin-mgr-users">';
-    users.forEach(function (u) {
-      if (ed && ed.orgId === o.id && ed.userId === u.public_id) { h += adminUserEditorHtml(o.id, u); return; }
-      h += '<div class="admin-mgr-userrow">' + userAv(adminUserAvatar(u), 28)
-        + '<div class="admin-mgr-uinfo"><span class="admin-user-name">' + esc(u.name || 'Unnamed') + '</span> <span class="admin-user-uname">@' + esc(u.username || '—') + '</span>'
-        /* Which programs this person can open, on the row itself. It is the
-           answer the Super Admin console exists to give, and it was not visible
-           anywhere before — not on the row, not in the editor, not in the API.
+/* ═══ The admin console as a page (10 Nov 2026) ═══════════════════════════════
+   The console used to be a modal listing every organization with every member
+   printed under it: readable for a dozen accounts, not for hundreds. It is now a
+   full page with a search box, filters and pages, and one organization at a time
+   in detail, whose members are searchable and paged too.
 
-           A DIV, not a span: .admin-mgr-uinfo is `white-space: nowrap`, so an
-           inline element runs straight on from the username with no gap. A
-           block child takes its own line without touching the stylesheet. */
-        + '<div class="admin-org-sub">' + esc(adminUserAccessLine(o, u)) + '</div></div>'
-        + '<span class="admin-user-role">' + esc(u.role || '') + '</span>'
-        + '<button class="org-row-btn" title="Edit user" onclick="adminEditUser(\'' + o.id + '\',\'' + u.public_id + '\')">\u270E</button>'
-        + '</div>';
+   It sits on a layer of its own (#adminPageRoot, z-index under .modal-bg) rather
+   than in #modalRoot or #app: under the dialogs so Change password / Change
+   username still open over it, and outside #app so the app's own repaints (the
+   sync poll, Team Chat) never rebuild it under a half-typed form.
+
+   The list is filtered in the browser from GET /organizations, which the console
+   already loads whole and which every action here reads (adminOrgById). The
+   same page is the pre-login console at /admin (renderEntry in app.js). */
+var ADMIN_PER_PAGE = [10, 25, 50];
+var ADMIN_MEMBERS_PER_PAGE = 10;
+var _admQT = null, _admMqT = null;
+
+function adminViewDefaults(per) { return { q: '', type: 'all', program: '', sort: 'newest', per: per || 10, page: 1, orgId: null, mq: '', mfilter: 'all', mpage: 1 }; }
+function adminView() { if (!UI.adminView) UI.adminView = adminViewDefaults(); return UI.adminView; }
+function adminPageShowing() { return !!(isAppAdmin && UI.adminPage); }
+function adminPageRoot() {
+  var r = document.getElementById('adminPageRoot');
+  if (!r) { r = document.createElement('div'); r.id = 'adminPageRoot'; document.body.appendChild(r); }
+  return r;
+}
+/* Signed in to a workspace (the admin acting as one of its members), so there is somewhere to go back to. */
+function adminInWorkspace() { return !!(currentOrgId && currentUserId && getCurrentUser()); }
+function closeAdminPage() {
+  UI.adminPage = false; UI.adminUserEdit = null; UI.adminAccess = null; UI.adminNewOrg = null; UI.adminDetEdit = null; UI.adminReset = null;
+  renderAdminModal(); render();
+}
+
+/* ── Filtering ── */
+function adminText(parts) { return parts.map(function (x) { return x == null ? '' : String(x); }).join(' ').toLowerCase(); }
+function adminFilteredOrgs() {
+  var v = adminView(), q = String(v.q || '').trim().toLowerCase(), out = [];
+  (UI.adminData || []).forEach(function (o) {
+    if (v.type !== 'all' && (o.account_type || 'enterprise') !== v.type) return;
+    if (v.program && (o.modules || []).indexOf(v.program) < 0) return;
+    var people = [];
+    if (q) {
+      people = (o.users || []).filter(function (u) { return adminText([u.name, u.username, u.email, u.role]).indexOf(q) >= 0; });
+      if (adminText([o.name, o.id, o.industry, o.region]).indexOf(q) < 0 && !people.length) return;
+    }
+    out.push({ org: o, people: people });
+  });
+  function created(r) { return String(r.org.created_at || ''); }
+  var sorts = {
+    newest: function (a, b) { return created(b).localeCompare(created(a)); },
+    oldest: function (a, b) { return created(a).localeCompare(created(b)); },
+    name: function (a, b) { return String(a.org.name || '').localeCompare(String(b.org.name || ''), undefined, { sensitivity: 'base' }); },
+    users: function (a, b) { return (b.org.users || []).length - (a.org.users || []).length || created(b).localeCompare(created(a)); }
+  };
+  out.sort(sorts[v.sort] || sorts.newest);
+  /* The organization the administrator is signed into (18 Nov 2026) always heads the list, whatever the sort. */
+  var curSid = orgServerId();
+  if (curSid) { for (var i = 1; i < out.length; i++) { if (out[i].org.id === curSid) { out.unshift(out.splice(i, 1)[0]); break; } } }
+  return out;
+}
+function adminFilteredMembers(o) {
+  var v = adminView(), q = String(v.mq || '').trim().toLowerCase();
+  return (o.users || []).filter(function (u) {
+    if (v.mfilter === 'admins' && !u.is_admin) return false;
+    if (v.mfilter === 'noaccess' && (u.modules || []).length) return false;
+    return !q || adminText([u.name, u.username, u.email, u.role, u.department]).indexOf(q) >= 0;
+  }).sort(function (a, b) {
+    if (!!b.is_admin !== !!a.is_admin) return b.is_admin ? 1 : -1;   /* administrators first */
+    return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
+  });
+}
+
+/* ── State changes ── */
+function adminShowOrg(id) {
+  var v = adminView(); v.orgId = id || null; v.mq = ''; v.mfilter = 'all'; v.mpage = 1; UI.adminDetEdit = null; UI.adminReset = null;
+  UI.adminUserEdit = null; UI.adminAccess = null; UI.adminNewOrg = null;
+  renderAdminModal(); adminPageRoot().scrollTop = 0;
+}
+function adminSetFilter(key, val) { var v = adminView(); v[key] = val; v.page = 1; renderAdminModal(); }
+function adminSetPer(n) { var v = adminView(); v.per = parseInt(n, 10) || 10; v.page = 1; renderAdminModal(); }
+function adminSetPage(p) { adminView().page = p; renderAdminModal(); adminScrollTo('admList'); }
+function adminClearFilters() { var v = adminView(); UI.adminView = adminViewDefaults(v.per); renderAdminModal(); }
+function adminSetQuery(val) {
+  clearTimeout(_admQT);
+  _admQT = setTimeout(function () { var v = adminView(); v.q = val; v.page = 1; adminRefreshPart('admList', adminListHtml); }, 150);
+}
+function adminSetMemberQuery(val) {
+  clearTimeout(_admMqT);
+  _admMqT = setTimeout(function () {
+    var v = adminView(), o = adminOrgById(v.orgId); v.mq = val; v.mpage = 1; UI.adminUserEdit = null;
+    adminRefreshPart('admMembers', function () { return o ? adminMembersHtml(o) : ''; });
+  }, 150);
+}
+function adminSetMemberFilter(val) { var v = adminView(); v.mfilter = val; v.mpage = 1; UI.adminUserEdit = null; renderAdminModal(); }
+function adminSetMemberPage(p) { adminView().mpage = p; UI.adminUserEdit = null; renderAdminModal(); adminScrollTo('admMembersCard'); }
+/* Repaints one part of the page, leaving the search box (and its caret) alone. */
+function adminRefreshPart(id, fn) { var el = document.getElementById(id); if (el) el.innerHTML = fn(); else renderAdminModal(); }
+function adminScrollTo(id) {
+  var el = document.getElementById(id), root = adminPageRoot();
+  if (el && root && el.getBoundingClientRect().top < 0) root.scrollTop += el.getBoundingClientRect().top - 16;
+}
+
+/* ── Pieces ── */
+function adminPagerHtml(total, page, per, fn, withPer) {
+  var pages = Math.max(1, Math.ceil(total / per));
+  var from = total ? (page - 1) * per + 1 : 0, to = Math.min(total, page * per);
+  var h = '<div class="adm-pager"><div class="adm-pager-info">Showing ' + from + '–' + to + ' of ' + total + '</div>';
+  if (withPer) {
+    h += '<label class="adm-pager-per">Per page <select class="field-sel adm-sel" onchange="adminSetPer(this.value)">';
+    ADMIN_PER_PAGE.forEach(function (n) { h += '<option value="' + n + '"' + (n === per ? ' selected' : '') + '>' + n + '</option>'; });
+    h += '</select></label>';
+  }
+  if (pages > 1) {
+    h += '<div class="adm-pager-nav" role="navigation" aria-label="Pages">';   /* not <nav>: the app styles every nav element as its top bar */
+    function b(label, p, off, cur) {
+      return '<button type="button" class="adm-pg' + (cur ? ' on' : '') + '"' + (off ? ' disabled' : ' onclick="' + fn + '(' + p + ')"')
+        + (cur ? ' aria-current="page"' : '') + '>' + label + '</button>';
+    }
+    h += b('‹', page - 1, page <= 1);
+    var shown = {};
+    [1, page - 1, page, page + 1, pages].forEach(function (p) { if (p >= 1 && p <= pages) shown[p] = true; });
+    var last = 0;
+    Object.keys(shown).map(Number).sort(function (a, c) { return a - c; }).forEach(function (p) {
+      if (last && p - last > 1) h += '<span class="adm-pg-gap">…</span>';
+      h += b(String(p), p, false, p === page); last = p;
     });
-    if (ed && ed.orgId === o.id && ed.userId === 'new') { h += adminUserEditorHtml(o.id, {}); }
-    /* A Leader account is an organization of ONE. Offering "+ Add user" on one
-       invites the console to create a second person inside a tenant whose whole
-       design is that there is never more than one — the launchpad, the
-       workspace and the chat room all assume it. */
-    else if (!isLeader) { h += '<button class="admin-adduser" onclick="adminAddUser(\'' + o.id + '\')">+ Add user</button>'; }
+    h += b('›', page + 1, page >= pages);
     h += '</div>';
+  }
+  return h + '</div>';
+}
+
+function adminToolbarHtml() {
+  var v = adminView();
+  function opt(val, label, cur) { return '<option value="' + esc(val) + '"' + (val === cur ? ' selected' : '') + '>' + esc(label) + '</option>'; }
+  var mods = window.Modules ? Modules.list('enterprise').concat(Modules.list('leader')) : [];
+  var h = '<div class="adm-toolbar">';
+  h += '<div class="adm-search"><span class="adm-search-ic" aria-hidden="true">⌕</span><input id="admQ" type="search" class="field-input" autocomplete="off" maxlength="200" data-uncapped="1"'
+    + ' placeholder="Search organizations, sign-in codes or people" aria-label="Search organizations" value="' + esc(v.q) + '" oninput="adminSetQuery(this.value)"/></div>';
+  h += '<select class="field-sel adm-sel" aria-label="Account type" onchange="adminSetFilter(\'type\',this.value)">'
+    + opt('all', 'All accounts', v.type) + opt('enterprise', 'Enterprise', v.type) + opt('leader', 'Leader', v.type) + '</select>';
+  h += '<select class="field-sel adm-sel" aria-label="Program" onchange="adminSetFilter(\'program\',this.value)">' + opt('', 'Any program', v.program);
+  mods.forEach(function (m) { h += opt(m.id, m.name, v.program); });
+  h += '</select>';
+  h += '<select class="field-sel adm-sel" aria-label="Sort" onchange="adminSetFilter(\'sort\',this.value)">'
+    + opt('newest', 'Newest first', v.sort) + opt('oldest', 'Oldest first', v.sort) + opt('name', 'Name A–Z', v.sort) + opt('users', 'Most users', v.sort) + '</select>';
+  if (!(UI.adminNewOrg && UI.adminNewOrg.open)) h += '<button class="btn-gold adm-new" onclick="adminNewOrgOpen()">+ New organization</button>';
+  return h + '</div>';
+}
+
+function adminListHtml() {
+  var v = adminView(), all = adminFilteredOrgs(), total = all.length;
+  var pages = Math.max(1, Math.ceil(total / v.per)); if (v.page > pages) v.page = pages;
+  if (!total) {
+    return '<div class="adm-empty">' + ((UI.adminData || []).length
+      ? 'No organizations match these filters. <button type="button" class="adm-link" onclick="adminClearFilters()">Clear filters</button>'
+      : 'No organizations yet.') + '</div>';
+  }
+  var rows = all.slice((v.page - 1) * v.per, v.page * v.per), curSid = orgServerId(), q = String(v.q || '').trim();
+  var h = '<div class="adm-table" role="table" aria-label="Organizations">';
+  h += '<div class="adm-tr adm-th" role="row"><div role="columnheader">Organization</div><div role="columnheader">Type</div>'
+    + '<div role="columnheader" class="adm-num">Programs</div><div role="columnheader" class="adm-num">Users</div>'
+    + '<div role="columnheader">Created</div><div role="columnheader"><span class="sr-only">Actions</span></div></div>';
+  rows.forEach(function (r) {
+    var o = r.org, cur = o.id === curSid, isLeader = o.account_type === 'leader', id = esc(o.id);
+    h += '<div class="adm-tr' + (cur ? ' adm-cur' : '') + '" role="row">';
+    h += '<div class="adm-td-org" role="cell"><button type="button" class="adm-orgbtn" onclick="adminShowOrg(\'' + id + '\')">'
+      + '<span class="entry-org-badge adm-badge">' + esc((o.name || '?').slice(0, 1).toUpperCase()) + '</span>'
+      + '<span class="adm-orgtxt"><span class="adm-orgname">' + esc(o.name || 'Unnamed') + (cur ? ' <span class="org-you">Current</span>' : '') + '</span>'
+      + '<span class="adm-code">' + id + '</span></span></button>';
+    if (q && r.people.length) {
+      h += '<div class="adm-hits">Matches ' + r.people.slice(0, 3).map(function (u) { return esc(u.name || u.username || ''); }).join(', ')
+        + (r.people.length > 3 ? ' and ' + (r.people.length - 3) + ' more' : '') + '</div>';
+    }
+    h += '</div>';
+    h += '<div role="cell" data-label="Type"><span class="adm-pill' + (isLeader ? ' adm-pill-leader' : '') + '">' + (isLeader ? 'Leader' : 'Enterprise') + '</span></div>';
+    h += '<div role="cell" class="adm-num" data-label="Programs">' + (o.modules || []).length + '</div>';
+    h += '<div role="cell" class="adm-num" data-label="Users">' + (o.users || []).length + '</div>';
+    h += '<div role="cell" data-label="Created">' + esc(fmtAdminDate(o.created_at)) + '</div>';
+    h += '<div role="cell" class="adm-acts"><button class="org-btn-cancel admin-mini-btn" onclick="adminShowOrg(\'' + id + '\')">Manage</button>'
+      + (cur ? '' : '<button class="org-btn-cancel admin-mini-btn" onclick="adminOpenOrg(\'' + id + '\')">Open</button>') + '</div>';
     h += '</div>';
   });
   h += '</div>';
-  // Create a brand-new organization + its first administrator.
-  if (UI.adminNewOrg && UI.adminNewOrg.open) { h += adminNewOrgFormHtml(); }
-  else { h += '<div style="text-align:center;margin-top:10px"><button class="admin-adduser" onclick="adminNewOrgOpen()">+ New Organization</button></div>'; }
-  h += '<div class="u-ea28b89"><button class="btn-gold" onclick="closeModal()">Done</button></div>';
-  h += '</div></div>';
-  mr.innerHTML = h;
+  return h + adminPagerHtml(total, v.page, v.per, 'adminSetPage', true);
+}
+
+function adminMembersHtml(o) {
+  var v = adminView(), list = adminFilteredMembers(o), total = list.length, per = ADMIN_MEMBERS_PER_PAGE;
+  var pages = Math.max(1, Math.ceil(total / per)); if (v.mpage > pages) v.mpage = pages;
+  var ed = UI.adminUserEdit || null, h = '';
+  if (ed && ed.orgId === o.id && ed.userId === 'new') h += adminUserEditorHtml(o.id, {});
+  if (!total) {
+    return h + '<div class="adm-empty adm-empty-sm">' + ((o.users || []).length ? 'No members match.' : 'No members yet.') + '</div>';
+  }
+  h += '<div class="adm-mlist">';
+  list.slice((v.mpage - 1) * per, v.mpage * per).forEach(function (u) {
+    if (ed && ed.orgId === o.id && ed.userId === u.public_id) { h += adminUserEditorHtml(o.id, u); return; }
+    h += '<div class="adm-mrow">' + userAv(adminUserAvatar(u), 32)
+      + '<div class="adm-minfo"><div class="adm-mname">' + esc(u.name || 'Unnamed') + ' <span class="admin-user-uname">@' + esc(u.username || '—') + '</span>'
+      + (u.is_admin ? ' <span class="adm-pill adm-pill-admin">Admin</span>' : '') + '</div>'
+      + '<div class="adm-msub">' + esc([u.role, u.email].filter(Boolean).join(' · ')) + '</div>'
+      + '<div class="adm-msub adm-maccess">' + esc(adminUserAccessLine(o, u)) + '</div></div>'
+      + '<button class="org-row-btn" title="Edit user" aria-label="Edit ' + esc(u.name || 'user') + '" onclick="adminEditUser(\'' + esc(o.id) + '\',\'' + esc(u.public_id) + '\')">✎</button>'
+      + '</div>';
+  });
+  h += '</div>';
+  return h + adminPagerHtml(total, v.mpage, per, 'adminSetMemberPage', false);
+}
+
+function adminOrgDetailHtml(o) {
+  var v = adminView(), cur = o.id === orgServerId(), isLeader = o.account_type === 'leader', id = esc(o.id), users = o.users || [];
+  var h = '<button type="button" class="adm-back" onclick="adminShowOrg(null)">← All organizations</button>';
+  h += '<div class="adm-card adm-orghead"><span class="entry-org-badge adm-badge-lg">' + esc((o.name || '?').slice(0, 1).toUpperCase()) + '</span>'
+    + '<div class="adm-orghead-txt"><h2 class="adm-h2">' + esc(o.name || 'Unnamed') + (cur ? ' <span class="org-you">Current</span>' : '') + '</h2>'
+    + '<div class="adm-msub"><span class="adm-pill' + (isLeader ? ' adm-pill-leader' : '') + '">' + (isLeader ? 'Leader' : 'Enterprise') + '</span>'
+    + ' Created ' + esc(fmtAdminDate(o.created_at)) + ' · Sign-in code <code>' + id + '</code></div></div>'
+    + '<div class="adm-acts">' + (cur ? '' : '<button class="btn-gold adm-btn" onclick="adminOpenOrg(\'' + id + '\')">Open workspace</button>')
+    + '<button class="org-btn-cancel admin-mini-btn" onclick="adminResetOrg(\'' + id + '\')">Reset data</button>'
+    + (cur ? '' : '<button class="org-btn-del" onclick="adminDeleteOrg(\'' + id + '\')">Delete</button>') + '</div></div>';
+
+  if (UI.adminReset && UI.adminReset.orgId === o.id) h += adminResetPanelHtml(o);
+
+  /* Organization details (18 Nov 2026): what the organization entered on its Org & Team page, read-only here.
+     A Leader account is a workspace of one and is only asked for its objective, so only that shows for it. */
+  function det(label, val, wide) {
+    var t = String(val == null ? '' : val).trim();
+    return '<div class="adm-det' + (wide ? ' adm-det-wide' : '') + '"><div class="adm-det-k">' + label + '</div><div class="adm-det-v' + (t ? '' : ' adm-det-none') + '">'
+      + (t ? esc(t) : '—') + '</div></div>';
+  }
+  /* The app administrator can edit them here too (18 Nov 2026): Edit details turns the card into the form. */
+  var detEd = !!(UI.adminDetEdit && UI.adminDetEdit.orgId === o.id);
+  h += '<section class="adm-card" id="admDetCard"><div class="adm-card-h"><h3 class="adm-h3">' + (isLeader ? 'Workspace details' : 'Organization details') + '</h3>'
+    + (detEd ? '' : '<button class="org-btn-cancel admin-mini-btn" onclick="adminDetOpen(\'' + id + '\')">Edit details</button>') + '</div>';
+  if (detEd) {
+    h += adminDetEditorHtml(o);
+  } else {
+    h += '<div class="adm-dets">';
+    if (!isLeader) {
+      h += det('Industry', o.industry) + det('Company size', o.company_size) + det('Region / HQ', o.region)
+        + det('Website', o.website) + det('AI maturity', o.ai_maturity) + det('Executive sponsor', o.executive_sponsor);
+    }
+    h += det('Primary objective', o.objective, true) + '</div>';
+  }
+  h += '</section>';
+
+  /* AI features. The Programs card (the organization's plan, with Edit plan) was removed at the user's request on
+     18 Nov 2026, so a plan is now set only when the organization is created (adminAccessEditorHtml is unused). */
+  var ai = adminAiFeaturesRowHtml(o);
+  h += '<section class="adm-card"><div class="adm-card-h"><h3 class="adm-h3">AI features</h3></div>'
+    + (ai ? ai.replace('class="admin-org-ai" style="', 'class="admin-org-ai adm-ai" style="') : '<p class="adm-msub">Not used by this account.</p>') + '</section>';
+
+  /* Members: searchable, filtered and paged. */
+  h += '<section class="adm-card" id="admMembersCard"><div class="adm-card-h"><h3 class="adm-h3">Members <span class="adm-count">' + users.length + '</span></h3>'
+    + (isLeader || (UI.adminUserEdit && UI.adminUserEdit.userId === 'new') ? '' : '<button class="admin-adduser adm-adduser" onclick="adminAddUser(\'' + id + '\')">+ Add user</button>') + '</div>';
+  if (users.length > 1) {
+    h += '<div class="adm-toolbar adm-toolbar-sm"><div class="adm-search"><span class="adm-search-ic" aria-hidden="true">⌕</span>'
+      + '<input id="admMq" type="search" class="field-input" autocomplete="off" maxlength="200" data-uncapped="1" placeholder="Search members by name, username, email or role" aria-label="Search members" value="' + esc(v.mq) + '" oninput="adminSetMemberQuery(this.value)"/></div>'
+      + '<select class="field-sel adm-sel" aria-label="Show members" onchange="adminSetMemberFilter(this.value)">'
+      + ['all|Everyone', 'admins|Administrators', 'noaccess|No program access'].map(function (p) { var k = p.split('|'); return '<option value="' + k[0] + '"' + (v.mfilter === k[0] ? ' selected' : '') + '>' + k[1] + '</option>'; }).join('')
+      + '</select></div>';
+  }
+  h += '<div id="admMembers">' + adminMembersHtml(o) + '</div></section>';
+  return h;
+}
+
+function adminPageHtml() {
+  var v = adminView(), data = UI.adminData;
+  var h = '<div class="adm-page"><header class="adm-head"><div><div class="login-eyebrow">Administrator</div>'
+    + '<h1 class="adm-title">All <em>organizations</em></h1></div><div class="adm-head-acts">';
+  if (adminInWorkspace()) {
+    var org = getOrg(currentOrgId);
+    h += '<button class="org-btn-cancel" onclick="closeAdminPage()">← Back to ' + esc((org && org.name) || 'workspace') + '</button>';
+  }
+  h += '<button class="entry-link" onclick="openChangePassword()">Change password</button><button class="entry-link" onclick="openChangeUsername()">Change username</button>';
+  if (!adminInWorkspace()) h += '<button class="entry-link" onclick="exitAdmin()">Sign out</button>';
+  h += '</div></header>';
+
+  if (data == null) return h + '<div class="adm-empty">Loading organizations…</div></div>';
+  var leaders = data.filter(function (o) { return o.account_type === 'leader'; }).length, users = 0;
+  data.forEach(function (o) { users += (o.users || []).length; });
+  h += '<div class="adm-stats">'
+    + '<div class="adm-stat"><b>' + (data.length - leaders) + '</b><span>Organizations</span></div>'
+    + '<div class="adm-stat"><b>' + leaders + '</b><span>Leaders</span></div>'
+    + '<div class="adm-stat"><b>' + users + '</b><span>Users</span></div></div>';
+  if (UI.adminError) h += '<div class="entry-err adm-err">' + esc(UI.adminError) + ' <button class="org-btn-cancel admin-mini-btn" onclick="fetchAdminData()">Retry</button></div>';
+
+  var o = v.orgId ? adminOrgById(v.orgId) : null;
+  if (o) return h + adminOrgDetailHtml(o) + '</div>';
+  v.orgId = null;
+  h += adminToolbarHtml();
+  if (UI.adminNewOrg && UI.adminNewOrg.open) h += adminNewOrgFormHtml();
+  return h + '<div id="admList">' + adminListHtml() + '</div></div>';
+}
+
+/* Paints the page, or clears it when it is closed. Every console action calls
+   this to repaint (it kept its old name: it was the modal's). The scroll
+   position and the caret in a search box survive the repaint. */
+function renderAdminModal() {
+  var root = adminPageRoot();
+  if (!adminPageShowing()) {
+    if (root.innerHTML) root.innerHTML = '';
+    root.className = ''; document.documentElement.classList.remove('adm-open');
+    return;
+  }
+  var a = document.activeElement, fid = a && root.contains(a) ? a.id : '', s0 = null, s1 = null;
+  try { if (fid) { s0 = a.selectionStart; s1 = a.selectionEnd; } } catch (e) { }
+  var top = root.scrollTop;
+  root.className = 'adm-root'; document.documentElement.classList.add('adm-open');
+  root.innerHTML = adminPageHtml();
+  root.scrollTop = top;
+  if (fid === 'admQ' || fid === 'admMq') {
+    var el = document.getElementById(fid);
+    if (el) { el.focus(); try { if (s0 != null) el.setSelectionRange(s0, s1); } catch (e) { } }
+  }
+  Array.prototype.forEach.call(root.querySelectorAll('input[data-ai-mixed]'), function (el) { el.indeterminate = true; });
+}
+
+/* ── Admin: the AI Guide and Voice, per organization (29 Oct 2026) ──────────────
+   One pair of switches on each organization's card, for every program it has opened that carries them
+   (OrganizationController::aiFeatures). Programs that disagree show as Mixed until a switch is set. The
+   organization's own administrators still set them per program on its Organization & Team page. */
+function adminAiFeaturesRowHtml(o) {
+  var ai = o.ai; if (!ai) return '';
+  var row = 'display:flex;flex-wrap:wrap;align-items:center;gap:6px 18px;padding:8px 16px 10px;font-family:var(--sans);font-style:normal;font-size:13px;color:var(--paper)';
+  var cap = '<span style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--stone)">AI features</span>';
+  if (!ai.programs || !ai.programs.length) {
+    if (o.account_type === 'leader') return '';
+    return '<div class="admin-org-ai" style="' + row + '">' + cap + '<span style="color:var(--stone)">On when its first program opens.</span></div>';
+  }
+  function sw(key, label) {
+    var v = ai[key];
+    return '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:600">'
+      + '<input type="checkbox" role="switch" style="width:16px;height:16px;margin:0;accent-color:var(--gold);cursor:pointer"'
+      + (v === true ? ' checked' : '') + (v === null ? ' data-ai-mixed="1"' : '')
+      + ' onchange="adminSetAiFeature(\'' + o.id + '\',\'' + key + '\',this.checked)"/> ' + label
+      + (v === null ? ' <span style="font-weight:400;color:var(--stone)">(mixed)</span>' : '') + '</label>';
+  }
+  return '<div class="admin-org-ai" style="' + row + '">' + cap + sw('aiGuide', 'AI Guide') + sw('voice', 'Voice') + '</div>';
+}
+function adminSetAiFeature(orgPublicId, key, on) {
+  if (!isAppAdmin || (key !== 'aiGuide' && key !== 'voice')) return;
+  var org = adminOrgById(orgPublicId);
+  if (org && org.ai) { org.ai[key] = !!on; renderAdminModal(); }
+  postJSON(API_BASE + '/organizations/ai-features', { id: orgPublicId, key: key, on: !!on },   /* the app administrator's session authorises it */
+    function () {
+      /* The organization being viewed: read its new settings now rather than at the next poll. */
+      try { if (orgServerId() === orgPublicId && Store.checkRemote) Store.checkRemote(); } catch (e) { }
+    },
+    function (err) { alert((err && err.message) || 'Could not change the AI features for this organization.'); fetchAdminData(); });
 }
 
 // First-run gate: force org/team setup once if it has never been completed
@@ -1437,6 +1917,34 @@ function saveEnterprise() {
   saveData();
 }
 
+/* ── A colleague's change while Organization & Team is open (18 Nov 2026) ──
+   Called from repaintAfterSync (js/app.js) after a sync has brought somebody else's
+   save in. The page behind was repainted; this window is on its own layer and was
+   not, so it went on showing the values from when it was opened.
+
+   The organization's details are read through orgDetails(), which prefers this
+   browser's cached copy of the database record, loaded with the page. A colleague's
+   edit arrives in the workspace (data.enterprise) instead, so when that section has
+   changed in this sync it is copied into the cache, as saveEnterprise does for the
+   person typing. Then the window is drawn again; repaintAfterSync then puts back
+   whatever the reader was typing, and their caret. With a member editor open, whose
+   tick boxes a redraw would reset, only the detail fields are updated, in place,
+   leaving alone the one the reader is in. */
+function orgModalAfterSync(entBefore) {
+  if (currentModal !== 'org') return;
+  try {
+    var now = JSON.stringify((data && data.enterprise) || {});
+    if (entBefore != null && now !== entBefore && data.enterprise) cacheOrgDetails(data.enterprise);
+  } catch (e) { }
+  if (UI.orgEdit || UI.orgEditBusy || UI.orgDetBusy) {
+    var e2 = orgDetails(), a = document.activeElement;
+    ORG_DET_FIELDS.forEach(function (f) { var el = $('ent_' + f); if (el && el !== a && el.value !== (e2[f] || '')) el.value = e2[f] || ''; });
+  } else {
+    renderOrgModal();
+  }
+  try { if (typeof applyLockUI === 'function') applyLockUI(false); } catch (e) { }
+}
+
 /* Mirror organization details into the cached database record, so every
    surface reading orgDetails() sees them at once. */
 function cacheOrgDetails(v) {
@@ -1729,7 +2237,7 @@ function renderOrgModal() {
     return '<label class="form-label">' + esc(label) + (req ? ' <span style="color:#c0392b">*</span>' : '') + '</label>';
   }
   function derr(field) { return de[field] ? '<div class="org-field-err" style="color:#c0392b;font-size:12px;margin-top:4px">' + esc(de[field]) + '</div>' : ''; }
-  function dhandlers(field) { return canEdit ? ' onchange="saveEnterprise()" oninput="clearOrgDetErr(\'' + field + '\')"' : ''; }
+  function dhandlers(field) { return canEdit ? ' data-live="1" onchange="saveEnterprise()" oninput="clearOrgDetErr(\'' + field + '\')"' : ''; }   /* data-live (18 Nov 2026): saved while typing, so colleagues see it */
   function dinp(field, label, ph, type) {
     return '<div>' + dlab(label, field)
       + '<input id="ent_' + field + '" class="field-input" type="' + (type || 'text') + '" value="' + esc(e[field] || '') + '" placeholder="' + esc(ph) + '"' + dstyle(field) + roDis + dhandlers(field) + '/>'
@@ -1784,5 +2292,14 @@ function renderOrgModal() {
     h += '<div class="u-ea28b89"><button class="btn-gold" onclick="closeModal()">Close</button></div>';
   }
   h += '</div></div>';
+  /* Drawn again while open — a colleague's change arriving, a profile opened, a switch flipped — it stays
+     where the reader had scrolled to (18 Nov 2026). Opened afresh, it starts at the top as before. */
+  var oldBox = mr.querySelector('.modal'), oldBg = mr.querySelector('.modal-bg');
+  var keepTop = oldBox ? oldBox.scrollTop : 0, keepBgTop = oldBg ? oldBg.scrollTop : 0;
   mr.innerHTML = h;
+  if (keepTop || keepBgTop) {
+    var box = mr.querySelector('.modal'), bg = mr.querySelector('.modal-bg');
+    if (box) box.scrollTop = keepTop;
+    if (bg) bg.scrollTop = keepBgTop;
+  }
 }

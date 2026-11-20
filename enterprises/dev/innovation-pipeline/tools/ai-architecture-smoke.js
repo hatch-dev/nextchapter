@@ -355,7 +355,7 @@ try {
   const d = G.Modules.emptyData();
   ['dataEstate', 'integrations', 'aiModels', 'completedSteps', 'assigns', 'reportDefs', 'settings', 'startDate', 'notes']
     .forEach(k => { if (!(k in d)) broken.push('emptyData() has no "' + k + '"'); });
-  if (d.settings && (d.settings.aiGuide || d.settings.voice)) broken.push('emptyData(): the AI features must start off');
+  if (!d.settings || !d.settings.aiGuide || !d.settings.voice) broken.push('emptyData(): the AI features must start on');
   const ph = G.Modules.PH();
   if (!ph || ph.length !== 5) broken.push('PH: expected 5 phases, got ' + (ph && ph.length));
   const ids = [].concat.apply([], ph.map(p => p.steps.map(s => s.id))).filter(s => s !== '5.1');

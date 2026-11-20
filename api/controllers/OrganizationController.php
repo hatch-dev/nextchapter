@@ -205,8 +205,17 @@ class OrganizationController extends Controller
             Response::error('Organization not found.', 404, ['reason' => 'no-org']);
         }
 
+        /* One program (18 Nov 2026), or every program when none is named. Resetting one program clears that
+           program's work for the whole organization and keeps its members: they are the organization's, shared
+           with its other programs. Only the reset of everything removes the members who are not administrators. */
+        $only = isset($input['module']) ? trim((string) $input['module']) : '';
+        if ($only !== '' && !in_array($only, self::RESET_MODULES, true)) {
+            Response::error('That program cannot be reset.', 422, ['reason' => 'bad-module']);
+        }
+        $modules = $only !== '' ? [$only] : self::RESET_MODULES;
+
         $templates = json_decode((string) @file_get_contents(dirname(__DIR__) . '/config/empty-docs.json'));
-        foreach (self::RESET_MODULES as $m) {
+        foreach ($modules as $m) {
             if (!is_object($templates) || !isset($templates->{$m}) || !is_object($templates->{$m})) {
                 Response::error('The empty document of ' . $m . ' is missing (run tools/build-empty-docs.js).', 500, ['reason' => 'no-template']);
             }
@@ -224,7 +233,7 @@ class OrganizationController extends Controller
            rows of the administrators (their local ids are what the document's other records point at);
            with no stored document there is nothing to keep and the app rebuilds it from the database. */
         $plans = [];
-        foreach (self::RESET_MODULES as $module) {
+        foreach ($modules as $module) {
             $stored = $workspace->findByOrg($orgId, $module);
             if ($stored === null && $module !== 'pipeline') continue;
             $was   = $stored !== null ? json_decode((string) $stored['doc']) : null;
@@ -234,7 +243,7 @@ class OrganizationController extends Controller
                 foreach ($was->roster as $row) {
                     if (!is_object($row)) continue;
                     $sid = isset($row->serverId) ? (string) $row->serverId : '';
-                    if (($sid !== '' && in_array($sid, $adminIds, true)) || ($sid === '' && !empty($row->admin))) {
+                    if ($only !== '' || ($sid !== '' && in_array($sid, $adminIds, true)) || ($sid === '' && !empty($row->admin))) {
                         unset($row->passcode);
                         $keepRoster[] = $row;
                     }
@@ -259,14 +268,21 @@ class OrganizationController extends Controller
         $revs = [];
         $db->beginTransaction();
         try {
-            $del = $db->prepare('DELETE FROM users WHERE organization_id = ? AND is_admin = 0');   /* their notes, assignments and program grants go with them (FK cascade) */
-            $del->execute([$orgId]);
-            $removed = $del->rowCount();
-            foreach (self::RESET_MODULES as $module) {
+            $removed = 0;
+            if ($only === '') {
+                $del = $db->prepare('DELETE FROM users WHERE organization_id = ? AND is_admin = 0');   /* their notes, assignments and program grants go with them (FK cascade) */
+                $del->execute([$orgId]);
+                $removed = $del->rowCount();
+            }
+            foreach ($modules as $module) {
                 foreach (['step_answers', 'step_assignments', 'messages', 'workspace_locks'] as $table) {
                     $db->prepare('DELETE FROM ' . $table . ' WHERE organization_id = ? AND module = ?')->execute([$orgId, $module]);
                 }
-                if ($adminIds) {
+                if ($only !== '') {
+                    /* Everyone stays, so everyone's notes in this program go, not only the administrators'. */
+                    $db->prepare('DELETE n FROM notes n JOIN users u ON u.public_id = n.user_public_id WHERE u.organization_id = ? AND n.module = ?')
+                        ->execute([$orgId, $module]);
+                } elseif ($adminIds) {
                     $in = implode(',', array_fill(0, count($adminIds), '?'));
                     $db->prepare('DELETE FROM notes WHERE module = ? AND user_public_id IN (' . $in . ')')->execute(array_merge([$module], $adminIds));
                 }
@@ -285,7 +301,7 @@ class OrganizationController extends Controller
         }
 
         Response::success(['reset' => true, 'removed' => $removed, 'administrators' => count($adminIds),
-            'rev' => $revs['pipeline'] ?? null, 'module' => 'pipeline', 'modules' => $revs]);
+            'rev' => $revs['pipeline'] ?? null, 'module' => 'pipeline', 'modules' => $revs, 'program' => $only !== '' ? $only : null]);
     }
 
     public function members(): void
