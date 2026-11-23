@@ -874,7 +874,11 @@ var Store = (function () {
        FIRST save uses (no baseline to diff against yet) and what an older
        deployment without /workspace/patch falls back to. Both paths end in the
        same place: server.revs and the baseline advanced to what was accepted. */
-    var patch = confirmedNow && !server.noPatch ? changedSections(confirmedNow, doc) : null;
+    /* Diffed from `sent`, never from `doc` (23 Nov 2026). changedSections() hands back references into the document
+       it is given, and these are laid over the baseline when the response lands: taken from the live replica, they
+       carried whatever had been typed meanwhile, so the baseline claimed the server held it and it was never sent —
+       on screen until the next reload, then gone. */
+    var patch = confirmedNow && !server.noPatch ? changedSections(confirmedNow, sent) : null;
     var usePatch = !!(patch && patch.count);
     var body = usePatch
       ? { org: orgServer, module: moduleId(id), actor_id: actor, sections: patch.sections, records: patch.records, removed: patch.removed, schema_version: SCHEMA_VERSION }

@@ -118,6 +118,21 @@
 
   function ready() { seedUiState(); normalize(); installOnce(); preRender(); }
 
+  /* 5. What the reference's render() did after every paint for a page showing the full-width diagram
+     (Architecture-app.js, render(): sizeDiagFullBleed() and .map-open; added 23 Nov 2026). Without it the map
+     opened at the column's width until the window was resized, and the column was not centred on the map.
+     .map-open is set before measuring, because it moves the column the map is measured against; the second
+     measure follows the column's and the sidebar's .25s transitions. Home and Learn mount a moment after the
+     paint, so the page being left may still be in the document: they are answered by name. */
+  function afterPaint() {
+    var open = currentPage !== 'home' && currentPage !== 'learn' && !!document.querySelector('#app .diag-full-bleed');
+    var mc = document.querySelector('.main-content');
+    if (mc) mc.classList.toggle('map-open', open);
+    if (!open) return;
+    ARC.sizeDiagFullBleed();
+    setTimeout(ARC.sizeDiagFullBleed, 320);
+  }
+
   /* Every page also carries the fullscreen Review Board overlay, as the
      reference's render() appended it to every inline page. */
   function page(fn) {
@@ -329,6 +344,8 @@
       stdApp: page(function () { return ARC.renderAppGovernancePage(); }),
       jurmap: page(function () { return ARC.renderJurMap(); })
     },
+
+    afterPaint: afterPaint,
 
     /* Which pages keep the sidebar — the reference's renderSidebar() list verbatim (5 Sep 2026, Paul's
        browser pass: "the porthole and the standing review keep the sidebar"), with its 'readiness' and

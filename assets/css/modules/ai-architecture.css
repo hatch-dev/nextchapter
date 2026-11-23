@@ -486,3 +486,16 @@ svg [stroke="#B8B0A5"] {stroke:var(--stone)
 }
 .trace-name-row .btn {white-space:nowrap
 }
+
+/* ── By hand, 23 Nov 2026 ──────────────────────────────────────
+   The header stays on one row down to the width where the reference's does (1558px). The shell's header carries
+   the module switcher, which the reference's has not; in this range it shows as "Module" alone, the program's
+   name being in the wordmark, and the bar gives up some of its side padding and gaps. */
+@media (min-width:1550px) and (max-width:1699px) {
+  nav {padding-right:32px;gap:10px
+  }
+  .nav-module-name {display:none
+  }
+  .nav-tab {padding-left:8px;padding-right:8px
+  }
+}
