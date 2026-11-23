@@ -249,7 +249,21 @@ function hydrateRosterFromRegistry(orgId, userId) {
     }
   }
 
-  data.roster = rosterFromDbOrg(dbOrg);
+  /* Somebody already in this program's list keeps their own row (23 Nov 2026): it holds what the database does not —
+     their acceptance of the Terms of Use, their colour, and the local id the program's records name them by. The whole
+     list used to be rebuilt, so the first visit of a new member erased everybody else's acceptance and the terms were
+     asked again. Matched by the database's id, or by username for a row made before rows carried one. Only the people
+     missing are added; the demo team (never matched: its usernames are real people's) and rows the database no longer
+     has still go, as before. */
+  var demo = DEFAULT_ROSTER.map(function (u) { return u.id; });
+  var kept = (Array.isArray(data.roster) ? data.roster : []).filter(function (u) { return u && (u.serverId || demo.indexOf(u.id) < 0); });
+  data.roster = rosterFromDbOrg(dbOrg).map(function (row) {
+    var uname = String(row.username || '').trim().toLowerCase();
+    var old = kept.filter(function (u) { return (u.serverId === row.serverId || u.id === row.serverId); })[0]
+      || kept.filter(function (u) { return !u.serverId && uname && String(u.username || '').trim().toLowerCase() === uname; })[0];
+    if (!old) return row;
+    return Object.assign({}, old, row, { id: old.id, color: old.color || row.color });   /* what the database says about them, over what only this list holds */
+  });
   /* The details are org-level truth too, so top up the workspace's fallback
      copy from the record — field by field. The old test was "does the copy
      have a name", and a fresh workspace is stamped with exactly `{name}` and
