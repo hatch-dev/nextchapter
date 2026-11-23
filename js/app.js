@@ -217,6 +217,11 @@ var Store = (function () {
     var t = nowMs(); if (t - _authCheckAt < 15000) return; _authCheckAt = t;
     try { if (typeof confirmSessionWithServer === 'function') confirmSessionWithServer(); } catch (e) { }
   }
+  /* What the server says about this program and this person (23 Nov 2026): programAccessAnswer, below the Store,
+     tells someone whose access was taken away while they are in it, and takes that back if it is given again. */
+  function accessAnswer(status, body, path) {
+    try { if (typeof programAccessAnswer === 'function') programAccessAnswer(status, body, path); } catch (e) { }
+  }
   /* A refusal is an answer, not a dropped connection: callers keep the Offline bar for a request that never got one. */
   function refused(status) { return status === 401 || status === 403; }
   function getJSON(path, cb) {
@@ -224,7 +229,7 @@ var Store = (function () {
     try {
       fetch(apiUrl(path))
         .then(function (r) { st = r.status; authRefused(r.status); return r.json(); })
-        .then(function (res) { cb(res && res.success ? res.data : null, st); })
+        .then(function (res) { accessAnswer(st, res, path); cb(res && res.success ? res.data : null, st); })
         .catch(function () { cb(null, st); });
     } catch (e) { cb(null, 0); }
   }
@@ -1000,6 +1005,7 @@ var Store = (function () {
         // 403/404/422: a real rejection, not a blip. Keep the local copy and
         // surface it — retrying identical bad data would just spin.
         authRefused(res.status);
+        accessAnswer(res.status, res.body, '/workspace');
         console.error('Workspace save rejected:', res.status, res.body.message || '');
         done(false);
       })
@@ -6950,6 +6956,43 @@ function confirmSessionWithServer() {
     if (stands) return;
     sessionEnded();
   });
+}
+/* ── Access to this program taken away while it is open (23 Nov 2026) ──
+   An administrator can take a program from a member who is in it. Every request was then refused (403), which
+   nothing on the page said: it stayed editable, and what was typed went nowhere until a reload sent them to
+   their programs. The refusal names its reason and its program, so the page says what happened and stops
+   taking typing. Only for the program on screen: the launchpad and the sign-in pages ask about programs too.
+   The notice sits on <body>, so a repaint of the page behind cannot remove it; the first workspace answer that
+   succeeds again does. */
+function programAccessAnswer(status, body, path) {
+  if (SAMPLE_MODE) return;
+  var el = document.getElementById('accessEnded');
+  if (status === 200) {
+    if (el && body && body.success && String(path || '').indexOf('/workspace') === 0 && el.parentNode) el.parentNode.removeChild(el);
+    return;
+  }
+  var why = body && body.reason;
+  if (status !== 403 || (why !== 'user-grant' && why !== 'org-entitlement')) return;
+  if (el || !currentUserId || isAppAdmin || UI.entry) return;
+  if (!window.Router || Router.kind() !== 'module' || !window.Modules || body.module !== Modules.activeId()) return;
+  var mod = Modules.active && Modules.active(), name = (mod && mod.name) || 'this program';
+  el = document.createElement('div');
+  el.id = 'accessEnded'; el.className = 'access-ended';
+  el.setAttribute('role', 'alertdialog'); el.setAttribute('aria-modal', 'true');
+  el.setAttribute('aria-labelledby', 'accessEndedT'); el.setAttribute('aria-describedby', 'accessEndedD');
+  el.innerHTML = '<div class="access-ended-card"><h2 id="accessEndedT">You no longer have access to ' + esc(name) + '</h2>'
+    + '<p id="accessEndedD">' + (why === 'user-grant' ? 'An administrator of your organization has changed which programs you can open.' : 'This program is no longer part of your organization\u2019s plan.')
+    + ' Anything you typed after that has not been saved. Ask your administrator if you think this is a mistake.</p>'
+    + '<button type="button" class="btn-gold" id="accessEndedGo">Go to your programs</button></div>';
+  document.body.appendChild(el);
+  try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (e) { }
+  var go = document.getElementById('accessEndedGo');
+  if (go) {
+    go.addEventListener('click', function () { Router.openLaunchpad(); });
+    /* The only control here: Tab stays on it, so the page behind cannot be reached from the keyboard. */
+    el.addEventListener('keydown', function (ev) { if (ev.key === 'Tab') { ev.preventDefault(); go.focus(); } });
+    try { go.focus(); } catch (e) { }
+  }
 }
 /* The server says this browser is not signed in (or not as this person): clear the
    local records and show sign-in, the way signing out does, without asking. */

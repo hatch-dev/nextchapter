@@ -189,6 +189,10 @@
 
     var id = window.Modules && Modules.activeId();
     if (id && typeof canOpenModule === 'function' && !canOpenModule(id)) {
+      /* Never to the page already open (23 Nov 2026): the dev install has no launchpad, its root IS the Pipeline, so a
+         member without the Pipeline was sent from it to itself, reloading for ever. The server still refuses every
+         request, and the page says so (programAccessAnswer, js/app.js). */
+      try { if (new URL(launchpadUrl(), document.baseURI).pathname.replace(/[/]+$/, '') === location.pathname.replace(/[/]+$/, '')) return false; } catch (e) { }
       openLaunchpad();
       return true;
     }

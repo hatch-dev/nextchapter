@@ -1789,7 +1789,9 @@ function saveProfile(id) {
   /* The temporary password: only in an administrator's editor for someone else
      (5.10 — your own password is Change password), read once, never stored. */
   var tEl = $('ru_' + id + '_temporary'); vals.temporary = tEl ? tEl.value : '';
-  if (tEl) tEl.value = '';
+  /* Not emptied here (23 Nov 2026): the redraws below — a refused Save, and "Saving…" — read it back from the field,
+     and an empty one was replaced by a newly generated password, so the one on screen was not the one sent. It
+     goes when the editor closes. */
   if (u.name) u.initials = orgInitials(u.name);
 
   /* The access picker, read off the DOM for the same reason as the fields

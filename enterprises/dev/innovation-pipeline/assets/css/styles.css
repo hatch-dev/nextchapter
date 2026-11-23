@@ -12614,3 +12614,34 @@ a.lp-card:hover {
 .terms-screen .terms-actions .btn-gold,.terms-screen .terms-actions .btn-ghost{font-family:var(--sans);font-size:14px;font-weight:400;letter-spacing:.14em;text-transform:uppercase;padding:12px 28px}
 .terms-modal .h-sub-lg{font-family:var(--serif);font-weight:400;font-size:26px}
 @media (max-width:640px){.terms-screen .login-title{font-size:40px}.terms-card{padding:28px 22px}}
+
+/* Access to the open program was taken away (23 Nov 2026, programAccessAnswer in js/app.js). Above every layer. */
+.access-ended {
+  position: fixed;
+  inset: 0;
+  z-index: 100001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(var(--bg-rgb), .94)
+}
+
+.access-ended-card {
+  max-width: 520px;
+  padding: 32px;
+  border: 1px solid var(--rule);
+  background: var(--ink);
+  color: var(--paper)
+}
+
+.access-ended-card h2 {
+  margin: 0 0 12px;
+  font-size: 22px
+}
+
+.access-ended-card p {
+  margin: 0 0 24px;
+  line-height: 1.6;
+  color: var(--stone)
+}

@@ -293,6 +293,19 @@ class NotifyController extends Controller
      */
     private function resolveOrg(string $orgName): array
     {
+        /* The signed-in member's own organization (23 Nov 2026), never one named by the request. The name a browser
+           sends is the workspace's copy, which changes as it is typed in Organization & Team — the database's only on
+           Get Started — and which sample data replaces; a name that did not match refused every reminder and
+           step-complete email without a word. The app administrator belongs to no organization, so only their
+           request is still matched by name. */
+        $member = $this->sessionUser();
+        if ($member !== null) {
+            $own = (new Organization())->findById((int) $member['organization_id']);
+            if ($own !== null) {
+                return $own;
+            }
+        }
+
         $found = (new Organization())->resolve($orgName);
         if (($found['status'] ?? '') !== 'ok' || !isset($found['organization'])) {
             Response::error(
