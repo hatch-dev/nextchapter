@@ -916,10 +916,11 @@
 
   function renderDashboard(){return renderDashboardBody()}
 
-  function renderInsights(){   var h='<div class="u-70c6b34">'+'<div style="margin-bottom:24px">'+backBtn()+'</div>'; /* F-34 */
+  function renderInsights(){   var h='<div class="u-70c6b34">';
 
     // ── Hero bar ──────────────────────────────────────────────────────────────
     h+='<div class="u-4f90335">';
+    h+='<div>'+backBtn()+'</div>'; /* F-34; by hand, 23 Nov 2026: inside the block that holds the page's margins, so it lines up with the text at every width (it sat at the window's edge) */
     h+='<div class="section-label">Insights</div>';
     h+='<div class="u-3536245">';
     h+='<div>';
