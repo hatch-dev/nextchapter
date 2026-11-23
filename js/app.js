@@ -1657,8 +1657,23 @@ function orgModules(orgId) {
   return (window.Modules ? Modules.list(accountType(orgId)) : []).map(function (m) { return m.id; });
 }
 
+/* The signed-in member's grant as the database holds it (23 Nov 2026): GET /organizations, read on every load before
+   anything is drawn, carries it for each member. The roster's copy lives in each program's workspace document, and
+   can be older than the database: a member given a program was sent back to the launchpad, which said "No access",
+   until that copy caught up. null when the database's list is not here (offline), and then the roster's copy stands. */
+function serverGrant(orgId) {
+  try {
+    var u = getCurrentUser(); if (!u) return null;
+    var o = getOrg(orgId || currentOrgId), sid = (o && o.serverId) || orgId || currentOrgId, me = u.serverId || u.id;
+    var row = Store.dbUsers(sid).filter(function (m) { return m && m.public_id === me; })[0];
+    return (row && Array.isArray(row.modules)) ? row.modules : null;
+  } catch (e) { return null; }
+}
+
 function grantedModules(orgId) {
   var pool = orgModules(orgId);
+  var known = serverGrant(orgId);
+  if (known) return pool.filter(function (id) { return known.indexOf(id) >= 0; });
   var u = getCurrentUser();
   /* No one signed in yet (boot, the entry screens): the organization's pool is
      the most anyone in it can have, and is the right answer for chrome. */
@@ -1829,10 +1844,12 @@ var Auth = (function () {
     var local = findLocalUserByServerIds(ids.orgId, ids.userId, (data && data.user && data.user.username) || '');
     if (local) {
       try { linkLocalToServer(local, data); } catch (e) { } // back-fill serverId links
-      return cb({ ok: true, orgId: local.orgId, userId: local.userId });
+      /* The organization list was asked for before this sign-in, when it is empty: read it again, so where they land
+         is decided by what they may open now and not by this browser's older copy (serverGrant, 23 Nov 2026). */
+      return Store.refreshOrgs(function () { cb({ ok: true, orgId: local.orgId, userId: local.userId }); });
     }
     hydrateLocalOrgFromServer(data, function (built) {
-      if (built && built.orgId) return cb({ ok: true, orgId: built.orgId, userId: built.userId });
+      if (built && built.orgId) return Store.refreshOrgs(function () { cb({ ok: true, orgId: built.orgId, userId: built.userId }); });   /* as above */
       return cb({ ok: false, reason: 'no-local' });
     });
   }

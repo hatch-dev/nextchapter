@@ -1494,6 +1494,9 @@ function pullOrgMembers(cb) {
              org-level truth that every program's document would otherwise keep
              its own drifting copy of. */
           if (res.data.modules) adoptOrgModules(res.data.modules);
+          /* The same rows the registry carries: keep its copy, which says what each person may open, up to date
+             (serverGrant in app.js, 23 Nov 2026). */
+          try { Store.patchDbOrg(sid, { users: res.data.members }); } catch (e) { }
           changed = reconcileRosterFromServer(res.data.members);
           if (changed) { try { render(); } catch (e) { } if (currentModal === 'org') renderOrgModal(); }
         }
