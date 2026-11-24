@@ -129,3 +129,33 @@ test('a member opening the program keeps the team and their acceptance across a 
   const names = (await t.doc()).doc.roster.map((r) => [r.name, r.admin === true, !!r.terms]);
   expect(names).toEqual(expect.arrayContaining([[account.name, true, true], ['Plain Member', false, true]]));
 });
+
+/* P-10 (24 Nov 2026): each request counted the administrators, found two, and went ahead. Half the runs left none. */
+for (const how of ['demote each other', 'remove each other', 'each demote themselves']) {
+  test('two administrators who ' + how + ' at once leave one', async ({ account, playwright, baseURL }) => {
+    test.setTimeout(120_000);
+    const t = await ownerAndMember(account, playwright, baseURL);
+    const second = { id: t.memberId, name: 'Plain Member', username: t.who.username, email: t.who.username + '@example.test' };
+    const first = { id: t.ownerId, name: account.name, username: account.username, email: account.email };
+    const set = (by, p, is_admin) => by.post('api/users/update', { data: { ...p, role: 'Tester', scope: 'All', department: 'QA', is_admin } });
+    const people = async () => {
+      for (const who of [t.owner, t.member]) {
+        const orgs = (await (await who.get('api/organizations')).json()).data.organizations;
+        if (orgs.length) return orgs[0].users;
+      }
+      return [];
+    };
+    for (let i = 0; i < (how === 'remove each other' ? 1 : 6); i++) {
+      const admins = (await people()).filter((u) => u.is_admin).map((u) => u.public_id);
+      if (!admins.includes(t.ownerId)) await set(t.member, first, true);
+      if (!admins.includes(t.memberId)) await set(t.owner, second, true);
+      expect((await people()).filter((u) => u.is_admin).length).toBe(2);
+      const go = how === 'demote each other' ? [set(t.owner, second, false), set(t.member, first, false)]
+        : how === 'remove each other' ? [t.owner.post('api/users/delete', { data: { id: t.memberId } }), t.member.post('api/users/delete', { data: { id: t.ownerId } })]
+          : [set(t.owner, first, false), set(t.member, second, false)];
+      const answers = (await Promise.all(go)).map((r) => r.status());
+      const left = (await people()).filter((u) => u.is_admin).length;
+      expect(left, 'answers ' + answers.join(' / ')).toBe(1);
+    }
+  });
+}

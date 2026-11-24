@@ -1835,9 +1835,13 @@ function clearMemberFieldErr(field) {
   if (el) { el.style.borderColor = ''; var err = el.parentNode && el.parentNode.querySelector('.org-field-err'); if (err) err.parentNode.removeChild(err); }
 }
 
-function deleteMemberOnServer(serverId) {
-  if (!serverId) return;
-  postJSON(API_BASE + '/users/delete', { id: serverId, actor_id: actorId() }, null, null);
+/* cb() when they are gone from the database, cb(message) when they are not (P-11). */
+function deleteMemberOnServer(serverId, cb) {
+  if (!serverId || !orgServerId()) { cb(); return; }
+  postJSON(API_BASE + '/users/delete', { id: serverId, actor_id: actorId() }, function () { cb(); }, function (err) {
+    if (err && err.reason === 'no-user') { cb(); return; }   /* a colleague removed them first */
+    cb((err && err.reason === 'network') ? 'The server could not be reached, so nobody was removed. Try again.' : ((err && err.message) || 'This team member could not be removed.'));
+  });
 }
 
 /* Small POST-JSON helper that unwraps the API's { success, data } envelope. */
@@ -1987,12 +1991,15 @@ function removeProfile(id) {
   var u = USERS.find(function (x) { return x.id === id });
   var label = (u && u.name) ? (' \u2014 ' + u.name) : '';
   if (!confirm('Delete this team member' + label + '? They will also be removed from sign-in and task assignments.')) return;
-  var serverId = u && u.serverId;
-  var i = USERS.findIndex(function (x) { return x.id === id });
-  if (i >= 0) USERS.splice(i, 1);
-  if (UI.orgEdit === id) UI.orgEdit = null;
-  persistRoster(); render(); renderOrgModal();
-  deleteMemberOnServer(serverId); // remove from MySQL too
+  /* They leave the team once the server has removed them (P-11, 24 Nov 2026). A refusal used to be ignored, after
+     they had already been taken off the screen and out of the stored roster. */
+  deleteMemberOnServer(u && u.serverId, function (problem) {
+    if (problem) { alert(problem); pullOrgMembers(); return; }
+    var i = USERS.findIndex(function (x) { return x.id === id });
+    if (i >= 0) USERS.splice(i, 1);
+    if (UI.orgEdit === id) { UI.orgEdit = null; UI.orgEditOrig = null; }
+    persistRoster(); render(); renderOrgModal();
+  });
 }
 
 /* The per-field draft save behind each input's onchange. DONE (doneOrgDetails)

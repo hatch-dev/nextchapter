@@ -2,6 +2,7 @@
 namespace Controllers;
 
 use Core\Controller;
+use Core\Database;
 use Core\MemberInvite;
 use Core\Password;
 use Core\Response;
@@ -140,9 +141,25 @@ class UserController extends Controller
             'initials'   => initials_from($data['name']),
         ];
 
-        $userModel->updateByPublicId($publicId, $attrs);
-        if ($wantAdmin !== null) {
-            $userModel->setAdmin($publicId, $wantAdmin);
+        /* P-10: the check above reads what is about to change under it when two administrators act at once. Taking
+           somebody's rights away is decided again, and made, with the organization's administrators held still. */
+        $db = Database::connection();
+        if ($wantAdmin === false) {
+            $db->beginTransaction();
+            if ($userModel->isLastAdminLocked($publicId, (int) $target['organization_id'])) {
+                $db->rollBack();
+                Response::error('An organization needs at least one administrator. Make someone else an administrator first.', 409, ['reason' => 'last-admin']);
+            }
+        }
+        try {
+            $userModel->updateByPublicId($publicId, $attrs);
+            if ($wantAdmin !== null) {
+                $userModel->setAdmin($publicId, $wantAdmin);
+            }
+            if ($db->inTransaction()) { $db->commit(); }
+        } catch (\Throwable $e) {
+            if ($db->inTransaction()) { $db->rollBack(); }
+            throw $e;
         }
 
         /* Program access is the ADMIN'S to change, not the member's. update()
@@ -192,7 +209,20 @@ class UserController extends Controller
             Response::error('An organization needs at least one administrator. Make someone else an administrator first.', 409, ['reason' => 'last-admin']);
         }
 
-        $userModel->deleteByPublicId($publicId);
+        /* P-10: decided again, and done, with the organization's administrators held still. */
+        $db = Database::connection();
+        $db->beginTransaction();
+        try {
+            $last = $userModel->isLastAdminLocked($publicId, (int) $target['organization_id']);
+            if (!$last) { $userModel->deleteByPublicId($publicId); }
+            $db->commit();
+        } catch (\Throwable $e) {
+            if ($db->inTransaction()) { $db->rollBack(); }
+            throw $e;
+        }
+        if ($last) {
+            Response::error('An organization needs at least one administrator. Make someone else an administrator first.', 409, ['reason' => 'last-admin']);
+        }
         Response::success(['deleted' => true]);
     }
 

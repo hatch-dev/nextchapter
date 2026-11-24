@@ -1,6 +1,6 @@
 // @ts-check
 /* ─────────────────────────────────────────────────────────────
-   member-form.spec.js — adding and editing a member (P-04, P-05 and P-07, 24 Nov 2026)
+   member-form.spec.js — adding and editing a member (P-04, P-05, P-07 and P-11, 24 Nov 2026)
    ─────────────────────────────────────────────────────────────
    Someone could be saved with no program and no word about it, the
    generated temporary password was cut off in its box, and the message
@@ -209,4 +209,49 @@ test.describe('leaving the editor after the server refused a save leaves nothing
     await m.save.click();
     await expect.poll(async () => (await everywhere(page)).stored).toContain('Casey Tester');
   });
+});
+
+test.describe('removing a member waits for the server (P-11)', () => {
+  const setUp = async (page, account, answer) => {
+    await signIn(page, PROGRAM, account);
+    await page.route('**/api/organizations/members**', (route) => route.abort());
+    await page.route('**/api/users/delete', answer);
+    await page.evaluate(() => {
+      openOrg();
+      USERS.push({ id: 'zz_col', serverId: 'zz_col', name: 'Second Person', username: 'second.person', role: 'Lead', scope: 'All', email: 'second@example.test', dept: 'QA', admin: false, modules: ['pipeline'] });
+      persistRoster(); renderOrgModal();
+    });
+  };
+  const team = (page) => page.evaluate(() => ({ people: USERS.map((u) => u.name), stored: (data.roster || []).map((u) => u.name) }));
+  const said = (page) => { const d = []; page.on('dialog', (x) => { d.push(x.message()); x.accept(); }); return d; };
+
+  for (const [what, answer, message] of [
+    ['a refusal', (r) => r.fulfill({ status: 409, json: { success: false, message: 'An organization needs at least one administrator.', reason: 'last-admin' } }), 'needs at least one administrator'],
+    ['no connection', (r) => r.abort(), 'nobody was removed'],
+  ]) {
+    test('after ' + what + ' they are still in the team, and it says why', async ({ page, account }) => {
+      test.setTimeout(60_000);
+      const dialogs = said(page);
+      await setUp(page, account, answer);
+      await page.evaluate(() => removeProfile('zz_col'));
+      await expect.poll(() => dialogs.join(' | ')).toContain(message);
+      const now = await team(page);
+      expect(now.people).toContain('Second Person');
+      expect(now.stored).toContain('Second Person');
+    });
+  }
+
+  for (const [what, answer] of [
+    ['the server has removed them', (r) => r.fulfill({ json: { success: true, data: { deleted: true } } })],
+    ['a colleague already had', (r) => r.fulfill({ status: 404, json: { success: false, message: 'Team member not found.', reason: 'no-user' } })],
+  ]) {
+    test('once ' + what + ' they leave the team', async ({ page, account }) => {
+      test.setTimeout(60_000);
+      said(page);
+      await setUp(page, account, answer);
+      await page.evaluate(() => removeProfile('zz_col'));
+      await expect.poll(async () => (await team(page)).people).not.toContain('Second Person');
+      expect((await team(page)).stored).not.toContain('Second Person');
+    });
+  }
 });

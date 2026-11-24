@@ -229,6 +229,20 @@ class User extends Model
         return (int) ($row['n'] ?? 0);
     }
 
+    /**
+     * Hold this organization's administrators still until the transaction ends, and say whether this person is the
+     * last of them (P-10, 24 Nov 2026). Two administrators removing or demoting each other at the same moment were
+     * both counted before either change landed, and both went ahead: nobody was left to manage the organization.
+     * Call it inside a transaction, and make the change in that transaction. FOR UPDATE reads the rows as they stand
+     * now, not as the transaction first saw them.
+     */
+    public function isLastAdminLocked(string $publicId, int $orgId): bool
+    {
+        $this->selectOne('SELECT id FROM organizations WHERE id = :o FOR UPDATE', [':o' => $orgId]);
+        $admins = array_column($this->select('SELECT public_id FROM users WHERE organization_id = :o AND is_admin = 1 FOR UPDATE', [':o' => $orgId]), 'public_id');
+        return in_array($publicId, $admins, true) && count($admins) <= 1;
+    }
+
     /** Sweep 4R item 2: make someone an administrator, or not. The caller checks the last-administrator rule first. */
     public function setAdmin(string $publicId, bool $on): void
     {
