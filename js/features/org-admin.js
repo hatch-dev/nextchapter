@@ -1534,6 +1534,7 @@ function syncMemberToServer(u, cb, temporary) {
   if (u.serverId) {
     p.id = u.serverId;
     postJSON(API_BASE + '/users/update', p, function (res) {
+      _teamChanges++;
       var d = (res && res.data) || {};
       if (d.modules) { u.modules = d.modules; persistRoster(); }
       if (u.id in _pendingAdmin) { u.admin = (d.is_admin !== undefined) ? !!d.is_admin : _pendingAdmin[u.id]; delete _pendingAdmin[u.id]; persistRoster(); }   /* Sweep 4R item 2 */
@@ -1542,6 +1543,7 @@ function syncMemberToServer(u, cb, temporary) {
   } else {
     p.organization_id = orgSid;
     postJSON(API_BASE + '/users', p, function (res) {
+      _teamChanges++;
       var d = (res && res.data) || {};
       if (d.id) { u.serverId = d.id; }
       delete u._draft;   /* the database has them now: a real member */
@@ -1562,13 +1564,19 @@ function syncMemberToServer(u, cb, temporary) {
 /* Pull the org's members from the DB (source of truth) and reconcile the local
    roster so the app reflects what's actually stored — fixes local/DB drift such
    as a stale username. Re-renders if anything changed. */
+/* A list asked for before this browser added, changed or removed somebody is out of date when it arrives (P-12,
+   24 Nov 2026): it put a removed person back, and stored them, and would have dropped one just added. Each change the
+   server has taken counts here; a list that began before the latest one is thrown away and asked for again. */
+var _teamChanges = 0;
 function pullOrgMembers(cb) {
   var sid = orgServerId();
   if (!sid) { if (cb) cb(false); return; }
+  var began = _teamChanges;
   try {
     fetch(API_BASE + '/organizations/members?org=' + encodeURIComponent(sid))
       .then(function (r) { return r.json(); })
       .then(function (res) {
+        if (began !== _teamChanges) { pullOrgMembers(cb); return; }
         var changed = false;
         if (res && res.success && res.data && Array.isArray(res.data.members)) {
           /* The organization's own entitlement comes back with the roster. It
@@ -1838,8 +1846,8 @@ function clearMemberFieldErr(field) {
 /* cb() when they are gone from the database, cb(message) when they are not (P-11). */
 function deleteMemberOnServer(serverId, cb) {
   if (!serverId || !orgServerId()) { cb(); return; }
-  postJSON(API_BASE + '/users/delete', { id: serverId, actor_id: actorId() }, function () { cb(); }, function (err) {
-    if (err && err.reason === 'no-user') { cb(); return; }   /* a colleague removed them first */
+  postJSON(API_BASE + '/users/delete', { id: serverId, actor_id: actorId() }, function () { _teamChanges++; cb(); }, function (err) {
+    if (err && err.reason === 'no-user') { _teamChanges++; cb(); return; }   /* a colleague removed them first */
     cb((err && err.reason === 'network') ? 'The server could not be reached, so nobody was removed. Try again.' : ((err && err.message) || 'This team member could not be removed.'));
   });
 }

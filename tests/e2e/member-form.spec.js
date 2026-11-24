@@ -1,6 +1,6 @@
 // @ts-check
 /* ─────────────────────────────────────────────────────────────
-   member-form.spec.js — adding and editing a member (P-04, P-05, P-07 and P-11, 24 Nov 2026)
+   member-form.spec.js — adding and editing a member (P-04, P-05, P-07, P-11 and P-12, 24 Nov 2026)
    ─────────────────────────────────────────────────────────────
    Someone could be saved with no program and no word about it, the
    generated temporary password was cut off in its box, and the message
@@ -254,4 +254,69 @@ test.describe('removing a member waits for the server (P-11)', () => {
       expect((await team(page)).stored).not.toContain('Second Person');
     });
   }
+});
+
+test.describe('a team list that began before a change does not undo it (P-12)', () => {
+  /** Organization & Team open, with a colleague the server lists; the next list the page asks for is held back. */
+  const setUp = async (page, account) => {
+    await signIn(page, PROGRAM, account);
+    const me = (await (await page.request.get('api/session')).json()).data.user;
+    const person = (id, name, admin) => ({ public_id: id, name, username: name.toLowerCase().replace(/ /g, '.'), role: 'Lead', scope: 'All', email: name.replace(/ /g, '') + '@example.test', department: 'QA', is_admin: admin, modules: ['pipeline'] });
+    const s = { members: [person(me.id, me.name, true), person('zz_col', 'Second Person', false)], asked: 0, hold: false, let_go: () => { } };
+    await page.route('**/api/organizations/members**', async (route) => {
+      s.asked++;
+      const body = { success: true, data: { members: JSON.parse(JSON.stringify(s.members)) } };
+      if (s.hold) { s.hold = false; await new Promise((r) => { s.let_go = r; }); }
+      await route.fulfill({ json: body }).catch(() => { });
+    });
+    await page.evaluate(() => openOrg());
+    await expect.poll(() => page.evaluate(() => USERS.map((u) => u.name))).toContain('Second Person');
+    s.person = person;
+    s.startSlowList = async () => { const n = s.asked; s.hold = true; await page.evaluate(() => pullOrgMembers()); await expect.poll(() => s.asked).toBe(n + 1); };
+    s.arrive = async () => { const n = s.asked; s.let_go(); await expect.poll(() => s.asked).toBe(n + 1); await page.waitForTimeout(500); };   // and is asked for again
+    return s;
+  };
+  const team = (page) => page.evaluate(() => ({ people: USERS.map((u) => u.name), stored: (data.roster || []).map((u) => u.name) }));
+
+  test('a removed person stays removed', async ({ page, account }) => {
+    test.setTimeout(60_000);
+    page.on('dialog', (d) => d.accept());
+    const s = await setUp(page, account);
+    await page.route('**/api/users/delete', (r) => r.fulfill({ json: { success: true, data: { deleted: true } } }));
+    await s.startSlowList();
+    await page.evaluate(() => removeProfile('zz_col'));
+    await expect.poll(async () => (await team(page)).people).not.toContain('Second Person');
+    s.members = s.members.filter((x) => x.public_id !== 'zz_col');
+    await s.arrive();
+    const now = await team(page);
+    expect(now.people.concat(now.stored)).not.toContain('Second Person');
+  });
+
+  test('a person just added stays', async ({ page, account }) => {
+    test.setTimeout(60_000);
+    const s = await setUp(page, account);
+    await page.route('**/api/users', (r) => r.fulfill({ status: 201, json: { success: true, data: { id: 'zz_new', modules: ['pipeline'], invite: { status: 'no-transport' } } } }));
+    await s.startSlowList();
+    await page.evaluate(() => addProfile());
+    const temp = page.locator('input[id^="ru_"][id$="_temporary"]');
+    const id = (await temp.getAttribute('id') || '').replace(/^ru_|_temporary$/g, '');
+    for (const [k, v] of Object.entries({ name: 'New Person', username: 'pwn_' + Date.now().toString(36), role: 'Tester', scope: 'All', email: 'new' + Date.now() + '@example.test', dept: 'QA' })) await page.locator(`#ru_${id}_${k}`).fill(v);
+    await page.locator(`input[type="checkbox"][id^="rm_${id}_"]:not(:disabled)`).first().check();
+    await page.locator('#modalRoot .org-btn-save').first().click();
+    await expect.poll(async () => (await team(page)).stored).toContain('New Person');
+    s.members.push(s.person('zz_new', 'New Person', false));
+    await s.arrive();
+    const now = await team(page);
+    expect(now.people).toContain('New Person');
+    expect(now.stored).toContain('New Person');
+  });
+
+  test('a colleague\'s change still arrives', async ({ page, account }) => {
+    test.setTimeout(60_000);
+    const s = await setUp(page, account);
+    s.members = s.members.filter((x) => x.public_id !== 'zz_col').concat(s.person('zz_third', 'Third Person', false));
+    await page.evaluate(() => pullOrgMembers());
+    await expect.poll(async () => (await team(page)).people).toContain('Third Person');
+    expect((await team(page)).people).not.toContain('Second Person');
+  });
 });
