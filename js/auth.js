@@ -700,12 +700,14 @@
   /* POST the setup form to the PHP + MySQL API. Callback-shaped:
      cb({ok:true,data}) | cb({ok:false,errors,message}) | cb({ok:false,reason:'network'}). */
   function saveSetupToServer(payload, cb) {
+    if (window.Auth && Auth.afterSignOut && !payload._after) { payload._after = true; Auth.afterSignOut(function () { saveSetupToServer(payload, cb); }); return; }   /* P-13: it signs them in, so it waits for a sign-out in flight */
+    delete payload._after;
     try {
       fetch(API_BASE + '/setup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(payload) })
         .then(function (r) { return r.json().then(function (j) { return { status: r.status, body: (j || {}) }; }, function () { return { status: r.status, body: {} }; }); })
         .then(function (res) {
           var b = res.body;
-          if (res.status >= 200 && res.status < 300 && b.success) { cb({ ok: true, data: b.data }); return; }
+          if (res.status >= 200 && res.status < 300 && b.success) { try { Auth.signedIn(); } catch (x) { } cb({ ok: true, data: b.data }); return; }
           if (b && b.errors) { cb({ ok: false, errors: b.errors, message: b.message }); return; }
           cb({ ok: false, message: (b && b.message) || ('Server error (' + res.status + ').') });
         })

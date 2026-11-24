@@ -1827,10 +1827,13 @@ var Auth = (function () {
      `accountType` is the role space of the door (auth.js roleKey()). It is not
      a credential and the server ignores it; Router.landAfterAuth uses it. */
   function signIn(username, password, remember, cb, accountType) {
-    req('POST', '/session', { username: username, password: password, remember: !!remember }, function (res) {
-      if (!res || !res.ok) return cb(res || { ok: false, reason: 'network' });
-      if (res.mustChange) return cb({ ok: true, mustChange: true, data: res });
-      openVerified(res, cb);
+    afterSignOut(function () {
+      req('POST', '/session', { username: username, password: password, remember: !!remember }, function (res) {
+        if (!res || !res.ok) return cb(res || { ok: false, reason: 'network' });
+        signedIn();
+        if (res.mustChange) return cb({ ok: true, mustChange: true, data: res });
+        openVerified(res, cb);
+      });
     });
   }
 
@@ -1866,7 +1869,7 @@ var Auth = (function () {
      The account exists from installation (admin / NextChapter2026!, which works
      once). Every Super Admin action is authorised by the session this starts —
      nothing is re-sent with each request any more. */
-  function signInAdmin(username, password, cb) { req('POST', '/admin-session', { username: username, password: password }, cb); }
+  function signInAdmin(username, password, cb) { afterSignOut(function () { req('POST', '/admin-session', { username: username, password: password }, function (res) { if (res && res.ok) signedIn(); if (cb) cb(res); }); }); }
   function currentSession(cb) { req('GET', '/session', undefined, cb); }
   function changePassword(current, next, cb) { req('POST', '/password', { current: current, next: next }, cb); }
   function changeAdminPassword(current, next, cb) { req('POST', '/admin/password', { current: current, next: next }, cb); }
@@ -1874,8 +1877,36 @@ var Auth = (function () {
   /* An organization administrator (or the app administrator) gives a member a
      temporary password; the member chooses their own at their next sign-in (5.7). */
   function setTemporaryPassword(orgId, userId, temporary, cb) { req('POST', '/admin/temporary-password', { orgId: orgId, userId: userId, temporary: temporary }, cb); }
-  /* End the server session. Callback-shaped so a caller can navigate after it. */
-  function serverSignOut(cb) { req('POST', '/sign-out', {}, cb || function () { }); }
+  /* End the server session. Callback-shaped so a caller can navigate after it.
+
+     ── A sign-out the server never heard (P-13, 24 Nov 2026) ──
+     The request outlives the page (keepalive) but not the browser: signed out and closed within half a second, the
+     session went on, for up to 30 days with Remember me, behind a sign-in screen. So a sign-out is noted until the
+     server has answered it, and one left over is finished the next time this copy of the app is opened. Signing in
+     waits for that: the answer takes the session cookie away, and must not take the new one. The note is per
+     installation (live and dev share an origin) and says nothing about who. */
+  var _ending = null;                         // what is waiting for a sign-out in flight
+  function pendingKey() { var p = API_BASE; try { p = new URL(API_BASE, document.baseURI).pathname; } catch (e) { } return 'nc-signout-pending::' + p; }
+  function signedIn() { try { localStorage.removeItem(pendingKey()); } catch (e) { } }
+  function afterSignOut(fn) { if (_ending) _ending.push(fn); else fn(); }
+  function serverSignOut(cb) {
+    try { localStorage.setItem(pendingKey(), '1'); } catch (e) { }
+    if (!_ending) _ending = [];
+    var waiting = _ending;
+    var go = function () { if (_ending === waiting) _ending = null; var q = waiting.splice(0); q.forEach(function (fn) { try { fn(); } catch (e) { } }); };
+    var late = setTimeout(go, 10000);         // a server that never answers must not keep anybody out
+    req('POST', '/sign-out', {}, function (res) {
+      clearTimeout(late);
+      if (!(res && res.reason === 'network')) signedIn();   // answered: nothing is left to finish
+      if (cb) cb(res);
+      go();
+    });
+  }
+  function finishSignOut() {
+    if (typeof SAMPLE_MODE !== 'undefined' && SAMPLE_MODE) return;
+    var left = null; try { left = localStorage.getItem(pendingKey()); } catch (e) { }
+    if (left) serverSignOut();
+  }
 
   /* -- kept for generated program code that still calls them (no passwords live in the roster any more) -- */
   function defaultPasscode() { return ''; }
@@ -1899,12 +1930,13 @@ var Auth = (function () {
   return {
     signIn: signIn, openVerified: openVerified, signInAdmin: signInAdmin, currentSession: currentSession,
     changePassword: changePassword, changeAdminPassword: changeAdminPassword, changeAdminUsername: changeAdminUsername,
-    setTemporaryPassword: setTemporaryPassword, serverSignOut: serverSignOut,
+    setTemporaryPassword: setTemporaryPassword, serverSignOut: serverSignOut, finishSignOut: finishSignOut, afterSignOut: afterSignOut, signedIn: signedIn,
     defaultPasscode: defaultPasscode, ensurePasscode: ensurePasscode,
     setSession: setSession, setAdminSession: setAdminSession, clearSession: clearSession,
     sessionRecord: sessionRecord
   };
 })();
+try { Auth.finishSignOut(); } catch (e) { }   /* before anything asks the server who is signed in (P-13) */
 
 function getCurrentUser() {
   return USERS.find(function (u) { return u.id === currentUserId }) || null;
