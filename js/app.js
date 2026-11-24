@@ -43,7 +43,8 @@ var Store = (function () {
   function rawSet(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } }
   function rawDel(k) { try { localStorage.removeItem(k); } catch (e) { } }
   function readJSON(k, f) { var s = rawGet(k); if (s == null) return f; try { return JSON.parse(s); } catch (e) { return f; } }
-  function writeJSON(k, v) { return rawSet(k, JSON.stringify(v)); }
+  var _closed = false;   /* signed out: this page writes no workspace back into the browser (forgetSent, P-15) */
+  function writeJSON(k, v) { if (_closed && /^pipeline-org-(data|base)::/.test(k)) return true; return rawSet(k, JSON.stringify(v)); }
   /* sessionStorage = a session that survives refresh but not a browser close
      (the "stay signed in by default" tier). "Remember me" uses localStorage above. */
   function sessGet(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } }
@@ -434,6 +435,7 @@ var Store = (function () {
      held the edit, the server did not, and boot could not tell which of the two
      documents was ahead. Now it can. */
   function baseKey(id) { return 'pipeline-org-base::' + id + moduleSuffix(id); }
+  function whoKey(id) { return 'pipeline-org-who::' + id + moduleSuffix(id); }   /* a person's public id, nothing else */
   /* `owned` says the caller is handing over a private copy nobody else holds a
      reference to (flushOrg's `sent`), so it need not be cloned again — this runs
      on every successful save and the document can be tens of kilobytes. */
@@ -1127,6 +1129,8 @@ var Store = (function () {
     if (obj && typeof obj === 'object') { obj.schemaVersion = SCHEMA_VERSION; obj.rev = (obj.rev || 0) + 1; }
     var okW = writeJSON(orgKey(id), obj);   // offline mirror
     if (okW && obj) rawSet(revKey(id), String(obj.rev || 0));
+    if (okW && server.enabled) { try { var mine = (typeof actorId === 'function') ? actorId() : ''; if (mine && !_closed) rawSet(whoKey(id), mine); } catch (e) { } }   /* whose edits these are: see loadOrg */
+    if (_baseGone[id] && has(server.base, id)) { delete _baseGone[id]; writeJSON(baseKey(id), server.base[id]); }   /* see forgetSent */
     if (server.enabled && obj) { server.docs[id] = obj; scheduleFlush(id); }
     /* An open collision notice reads "now stored" from the document, and the
        document has just moved — by this browser's own hand, which is the case
@@ -1135,8 +1139,51 @@ var Store = (function () {
     try { if (typeof collabReportRefresh === 'function') collabReportRefresh(); } catch (e) { }
     return okW;
   }
+  /* ── Nothing of the organization's work stays in the browser after signing out (P-15, 24 Nov 2026) ──
+     The mirror and the baseline are whole copies of the workspace, team names and addresses included. They are what
+     brings back an edit the server never had, so a copy is dropped only when it says exactly what the server last
+     confirmed; one that holds something unsent is kept, and sent at the next sign-in here, as before.
+
+     Every workspace in the browser is looked at, not only the one just left: this covers other programs, and whoever
+     used the browser before. Without a server the mirror is the only record, and nothing is dropped.
+
+     Another tab may still be signed in, for the moment it takes to hear otherwise. Its baseline has gone from storage
+     and an edit made there would be mirrored without one, which the next load takes as nothing unsent. So a tab that
+     sees its baseline go puts it back with its next write (_baseGone), and clears up for itself when it ends. */
+  var DATA_PREFIX = 'pipeline-org-data::', BASE_PREFIX = 'pipeline-org-base::', _baseGone = {};
+  function storedKeys(prefix) {
+    var out = [];
+    try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf(prefix) === 0) out.push(k.slice(prefix.length)); } } catch (e) { }
+    return out;
+  }
+  function forgetSent() {
+    if (!server.enabled) return;
+    _closed = true;
+    storedKeys(DATA_PREFIX).forEach(function (s) {
+      var doc = readJSON(DATA_PREFIX + s, null), was = readJSON(BASE_PREFIX + s, null);
+      if (doc && (!was || !sameContent(doc, was))) return;      // something here the server has not confirmed
+      rawDel(DATA_PREFIX + s); rawDel(BASE_PREFIX + s); rawDel('pipeline-org-who::' + s);
+      rawDel('pipeline-org-rev::' + s.split('::')[0]);
+    });
+    storedKeys(BASE_PREFIX).forEach(function (s) { if (rawGet(DATA_PREFIX + s) == null) rawDel(BASE_PREFIX + s); });
+  }
+  /* Does this browser hold anything of the open workspace the server has not confirmed? */
+  function hasUnsent() {
+    var id = (typeof currentOrgId !== 'undefined') ? currentOrgId : null;
+    if (!id || !server.enabled) return false;
+    var doc = server.docs[id], was = getBase(id);
+    return !!(doc && was && !sameContent(doc, was));
+  }
+  try {
+    window.addEventListener('storage', function (ev) {
+      if (_closed || !ev || ev.newValue !== null || !ev.key) return;
+      var at = ev.key.indexOf(BASE_PREFIX), id = (typeof currentOrgId !== 'undefined') ? currentOrgId : null;   /* the dev copy's keys carry its own prefix */
+      if (at >= 0 && id && ev.key.slice(at) === baseKey(id)) _baseGone[id] = true;
+    });
+  } catch (e) { }
+
   function removeOrg(id) {
-    rawDel(orgKey(id)); rawDel(revKey(id)); rawDel(baseKey(id));
+    rawDel(orgKey(id)); rawDel(revKey(id)); rawDel(baseKey(id)); rawDel(whoKey(id));
     delete server.docs[id]; delete server.revs[id]; delete server.base[id];
   }
 
@@ -1529,7 +1576,23 @@ var Store = (function () {
         }
         setOnline(true);
         server.revs[id] = w.rev || 0;
-        if (w.doc) { server.docs[id] = w.doc; setBase(id, w.doc); writeJSON(orgKey(id), w.doc); cb(true); return; }
+        if (w.doc) {
+          /* The mirror can hold what its owner could not send before signing out (P-15): this is the next sign-in they
+             were told about, and it used to be overwritten here. Sent only for the person who wrote it — somebody else
+             signing in to the same organization on the same computer must not save it in their own name, and it is not
+             theirs to see. */
+          var mirrored = readJSON(orgKey(id), null), confirmed = readJSON(baseKey(id), null), who = '';
+          try { who = (typeof workspaceActorId === 'function') ? workspaceActorId(id) : ''; } catch (e) { }
+          if (mirrored && confirmed && who && who === rawGet(whoKey(id)) && !sameContent(mirrored, confirmed)) {
+            var res = mergeDocs(confirmed, mirrored, w.doc);
+            server.docs[id] = res.doc; setBase(id, w.doc); writeJSON(orgKey(id), res.doc);
+            if (!sameContent(res.doc, w.doc)) scheduleFlush(id);
+            if (res.conflicts.length) reportConflicts(id, res.conflicts);
+          } else {
+            server.docs[id] = w.doc; setBase(id, w.doc); writeJSON(orgKey(id), w.doc);
+          }
+          cb(true); return;
+        }
         cb(false);
       });
     },
@@ -1549,7 +1612,7 @@ var Store = (function () {
     },
     orgKey: orgKey,
     readOrg: readOrg, orgRaw: orgRaw, writeOrg: writeOrg, removeOrg: removeOrg, commitSeed: commitSeed,
-    flushNow: flushNow,
+    flushNow: flushNow, forgetSent: forgetSent, hasUnsent: hasUnsent, reopen: function () { _closed = false; },
     patch: patch, setPath: setPath, removeRec: removeRec, commit: commit, persistActive: persistActive,
     dirtyRecords: function () { return Object.keys(_dirty); }, clearDirty: function () { _dirty = {}; },
     refreshOrg: refreshOrg, orgRev: orgRev, checkRemote: checkRemote, startChangeSignal: startChangeSignal, ready: ready,
@@ -1887,7 +1950,7 @@ var Auth = (function () {
      installation (live and dev share an origin) and says nothing about who. */
   var _ending = null;                         // what is waiting for a sign-out in flight
   function pendingKey() { var p = API_BASE; try { p = new URL(API_BASE, document.baseURI).pathname; } catch (e) { } return 'nc-signout-pending::' + p; }
-  function signedIn() { try { localStorage.removeItem(pendingKey()); } catch (e) { } }
+  function signedIn() { try { localStorage.removeItem(pendingKey()); } catch (e) { } try { Store.reopen(); } catch (e) { } }
   function afterSignOut(fn) { if (_ending) _ending.push(fn); else fn(); }
   function serverSignOut(cb) {
     try { localStorage.setItem(pendingKey(), '1'); } catch (e) { }
@@ -1897,7 +1960,7 @@ var Auth = (function () {
     var late = setTimeout(go, 10000);         // a server that never answers must not keep anybody out
     req('POST', '/sign-out', {}, function (res) {
       clearTimeout(late);
-      if (!(res && res.reason === 'network')) signedIn();   // answered: nothing is left to finish
+      if (!(res && res.reason === 'network')) { try { localStorage.removeItem(pendingKey()); } catch (e) { } }   // answered: nothing is left to finish
       if (cb) cb(res);
       go();
     });
@@ -3008,10 +3071,30 @@ function signOutNow() {
   var leave = function () { if (left) return; left = true; if (window.Router && Router.served()) { Router.openAuth('login'); return; } render(); };
   setTimeout(leave, 1500);
   Auth.serverSignOut(leave);
+  try { Store.forgetSent(); } catch (e) { }   /* P-15 */
+}
+/* Send what has not been sent, then carry on (P-15). The person is already leaving, so this waits four seconds at most;
+   when something still has not reached the server they are told, and may stay. */
+function sendThenLeave(go) {
+  try { var a = document.activeElement; if (a && a.blur) a.blur(); } catch (e) { }
+  var gone = false;
+  var next = function () {
+    if (gone) return; gone = true;
+    var unsent = false; try { unsent = Store.hasUnsent(); } catch (e) { }
+    if (unsent && !confirm('Some of your work has not reached the server yet. If you sign out now it stays on this device, and is sent when you next sign in here. Sign out anyway?')) return;
+    go();
+  };
+  var waiting = false; try { waiting = Store.hasUnsent(); } catch (e) { }
+  if (!waiting) { next(); return; }
+  setTimeout(next, 4000);
+  try { Store.flushNow(function () { next(); }); } catch (e) { next(); }
 }
 function signOut() {
   if (SAMPLE_MODE) { closeSample(); return; }   /* Sweep 4R item 9 (addendum 5 Oct 2026; amends Part 3): in the sample tab Sign Out closes the tab; it never signs anyone out, never opens sign-in and writes nothing */
   if (!confirm('Sign out? Your work is saved.')) return;
+  sendThenLeave(signOutAndLeave);
+}
+function signOutAndLeave() {
   try { Collab.leave(); } catch (e) { }
   try { chatShutdown(); } catch (e) { }
   notesData = [];
@@ -3032,6 +3115,7 @@ function signOut() {
   };
   setTimeout(leave, 1500);
   Auth.serverSignOut(leave);
+  try { Store.forgetSent(); } catch (e) { }   /* P-15 */
 }
 
 function userAv(u, size) {
@@ -3445,7 +3529,7 @@ function adminConsoleDelete(orgId) { if (!isAppAdmin) return;   /* Sweep 4R item
    organization that exists only in this browser is gone on the next load: the
    registry is re-read from the database, which never heard of it. */
 function adminConsoleNewOrg() { if (!isAppAdmin) return;   /* Sweep 4R item 10: the app administrator's console checks its caller itself, not only by hiding its button */ persistAdminSession(); UI.entry = { step: 'admin' }; adminNewOrgOpen(); }
-function exitAdmin() { try { Auth.serverSignOut(); } catch (e) { } Auth.setAdminSession(false); UI.adminNewOrg = null; UI.adminCreated = null; UI.adminPage = false; try { renderAdminModal(); } catch (e) { } try { Store.setSession(null); } catch (e) { } UI.entry = { step: 'login', err: '' }; render(); }
+function exitAdmin() { try { Auth.serverSignOut(); } catch (e) { } Auth.setAdminSession(false); UI.adminNewOrg = null; UI.adminCreated = null; UI.adminPage = false; try { renderAdminModal(); } catch (e) { } try { Store.setSession(null); } catch (e) { } try { Store.forgetSent(); } catch (e) { } /* P-15 */ UI.entry = { step: 'login', err: '' }; render(); }
 /* ── Change password (5.6), and the administrator's username (5.12.3) ──────────
    One dialog for both kinds of account: a member changes their own (POST /password),
    the app administrator theirs (POST /admin/password). Changing it ends the person's
@@ -7056,6 +7140,7 @@ function sessionEnded() {
   Auth.clearSession();
   try { Store.resetConnection(); } catch (e) { }   /* the refusals that led here were not a dropped connection */
   UI.adminNewOrg = null; UI.adminCreated = null;
+  try { Store.forgetSent(); } catch (e) { }   /* P-15: what the server never had stays, for when they sign in again */
   UI.entry = { step: 'login', err: 'Your session has ended. Sign in again.', errors: {} };
   /* The sign-in page is a new load: carry the reason across so it can say why. */
   try { sessionStorage.setItem('nc-session-ended', '1'); } catch (e) { }
