@@ -159,3 +159,62 @@ for (const how of ['demote each other', 'remove each other', 'each demote themse
     }
   });
 }
+
+/* P-17 (24 Nov 2026): the screen lets only a step's assignee, or an administrator, complete it. The server took it from any member. */
+test('a member completes only the steps that are theirs, and puts none back', async ({ account, playwright, baseURL }) => {
+  const t = await ownerAndMember(account, playwright, baseURL);
+  const done = async () => { const d = (await t.doc()).doc; return { steps: d.completedSteps || {}, at: d.stepDoneAt || {} }; };
+  const own = (sections) => t.owner.post('api/workspace/patch', { data: { org: t.org, module: MODULE, actor_id: t.ownerId, schema_version: 1, sections } });
+  await own({ completedSteps: { '1.1': true }, stepDoneAt: { '1.1': '2026-11-01' } });
+
+  /* not theirs: not completed, whatever shape it is sent in, and what is complete stays so */
+  await t.patch({ sections: { completedSteps: { '1.1': true, '1.2': true, '1.3': true }, stepDoneAt: { '1.1': '2020-01-01', '1.2': '2026-11-24' } } });
+  expect(await done()).toEqual({ steps: { '1.1': true }, at: { '1.1': '2026-11-01' } });
+  await t.patch({ sections: {}, records: { completedSteps: { fields: { set: { 1.2: true }, unset: ['1.1'] } } } });
+  expect((await done()).steps).toEqual({ '1.1': true });
+  await t.patch({ sections: { completedSteps: {} } });
+  await t.patch({ sections: {}, removed: ['completedSteps', 'stepDoneAt'] });
+  expect(await done()).toEqual({ steps: { '1.1': true }, at: { '1.1': '2026-11-01' } });
+  const now = await t.doc();
+  await t.member.post('api/workspace', { data: { org: t.org, module: MODULE, actor_id: t.memberId, base_rev: now.rev, schema_version: 1, doc: { ...now.doc, completedSteps: { '2.1': true } } } });
+  expect((await done()).steps).toEqual({ '1.1': true });
+
+  /* theirs: completed, beside somebody else's step that is not, and a program's own entries are left alone */
+  expect((await t.owner.post('api/assignments', { data: { org: t.org, module: MODULE, actor_id: t.ownerId, step: '1.2', user: t.memberId, assigned: true } })).ok()).toBe(true);
+  await t.patch({ sections: { completedSteps: { '1.1': true, '1.2': true, '1.3': true, 'out-bluesky': true }, stepDoneAt: { '1.1': '2026-11-01', '1.2': '2026-11-24' } } });
+  expect(await done()).toEqual({ steps: { '1.1': true, '1.2': true, 'out-bluesky': true }, at: { '1.1': '2026-11-01', '1.2': '2026-11-24' } });
+
+  /* taken away again, it is no longer theirs to put back; an administrator may do either */
+  await t.owner.post('api/assignments', { data: { org: t.org, module: MODULE, actor_id: t.ownerId, step: '1.2', user: t.memberId, assigned: false } });
+  await t.patch({ sections: { completedSteps: { '1.1': true } } });
+  expect((await done()).steps['1.2']).toBe(true);
+  await own({ completedSteps: { '1.1': true, '1.3': true } });
+  expect((await done()).steps).toEqual({ '1.1': true, '1.3': true });
+
+  /* ordinary work in the same save is untouched */
+  await t.patch({ sections: { completedSteps: { '4.4': true }, purpose: { mission: 'A member’s edit' } } });
+  expect((await t.doc()).doc.purpose.mission).toBe('A member’s edit');
+  expect((await done()).steps['4.4']).toBeUndefined();
+});
+
+test('the assignee completes their step on screen, once, and it stays complete', async ({ page, account, playwright, baseURL }) => {
+  test.setTimeout(90_000);
+  const t = await ownerAndMember(account, playwright, baseURL);
+  await t.owner.post('api/workspace/patch', { data: { org: t.org, module: MODULE, actor_id: t.ownerId, schema_version: 1, sections: { ideas: [1, 2, 3].map((i) => ({ id: 'i' + i, name: 'Idea ' + i, desc: 'x', dept: 'Operations' })) } } });
+  await t.owner.post('api/assignments', { data: { org: t.org, module: MODULE, actor_id: t.ownerId, step: '1.2', user: t.memberId, assigned: true } });
+  page.on('dialog', (d) => d.accept());
+  await page.goto('login');
+  await page.locator('#loginUser').fill(t.who.username); await page.locator('#loginPassword').fill(t.who.password); await page.locator('[data-submit]').click();
+  await acceptTermsIfShown(page);
+  await expect(page.locator('.nav-tab[data-tab="home"]')).toBeVisible({ timeout: 20_000 });
+  await page.goto('step/1.2');
+  const button = page.locator('#app .done-btn').first();
+  await expect(button).toBeEnabled({ timeout: 20_000 });
+  await button.click();
+  await expect.poll(async () => ((await t.doc()).doc.completedSteps || {})['1.2'], { timeout: 15_000 }).toBe(true);
+  expect(((await t.doc()).doc.stepDoneAt || {})['1.2']).toMatch(/^\d{4}-\d\d-\d\d$/);
+  await page.waitForTimeout(8_000);                       // through a sync or two
+  expect(((await t.doc()).doc.completedSteps || {})['1.2']).toBe(true);
+  await page.reload();
+  expect(await page.evaluate(() => !!(data.completedSteps || {})['1.2'])).toBe(true);
+});

@@ -28,6 +28,16 @@ class Assignment extends Model
     }
 
     /** Is this member already on this step? */
+    /** The steps of one program given to one person. */
+    public function stepsOf(int $organizationId, string $module, string $userPublicId): array
+    {
+        return array_column($this->select(
+            'SELECT step_id FROM step_assignments
+              WHERE organization_id = :oid AND module = :mod AND user_public_id = :uid',
+            [':oid' => $organizationId, ':mod' => $module, ':uid' => $userPublicId]
+        ), 'step_id');
+    }
+
     public function isAssigned(int $organizationId, string $module, string $stepId, string $userPublicId): bool
     {
         $rows = $this->select(

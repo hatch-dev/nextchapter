@@ -5,6 +5,7 @@ use Core\AnswerProjector;
 use Core\Controller;
 use Core\DocPrivacy;
 use Core\Response;
+use Models\Assignment;
 use Models\Organization;
 use Models\StepAnswer;
 use Models\User;
@@ -112,7 +113,8 @@ class WorkspaceController extends Controller
         $mayEditAdmin = $this->isAppAdmin() || (int) ($actor['is_admin'] ?? 0) === 1;
         $orgId = (int) ($actor['organization_id'] ?? 0);
         return new DocPrivacy($module, (string) (($actor['public_id'] ?? '')), $mayEditAdmin,
-            static fn(): array => $orgId > 0 ? (new User())->byOrganization($orgId) : []);   /* P-06: read only when somebody else's roster row is being written */
+            static fn(): array => $orgId > 0 ? (new User())->byOrganization($orgId) : [],   /* P-06: read only when somebody else's roster row is being written */
+            static fn(): array => $orgId > 0 ? (new Assignment())->stepsOf($orgId, $module, (string) ($actor['public_id'] ?? '')) : []);   /* P-17: read only when a completion is */
     }
 
     /** Just the rev — lets clients poll for "did anything change?" cheaply. */

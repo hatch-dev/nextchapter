@@ -49,9 +49,13 @@ class DocPrivacy
     /** The organization's people as the database has them, read only when a member's write carries the roster. */
     private ?\Closure $people;
 
-    public function __construct(string $module, string $actorPublicId, bool $mayEditAdminSections = true, ?\Closure $people = null)
+    /** The steps given to this person, read only when their write carries a completion. */
+    private ?\Closure $steps;
+
+    public function __construct(string $module, string $actorPublicId, bool $mayEditAdminSections = true, ?\Closure $people = null, ?\Closure $steps = null)
     {
         $this->people = $people;
+        $this->steps  = $steps;
         $this->mayEditAdminSections = $mayEditAdminSections;
         $rules          = config('privacy.' . $module);
         $this->byLeader = is_array($rules) && isset($rules['byLeader']) && is_array($rules['byLeader'])
@@ -132,6 +136,10 @@ class DocPrivacy
                 else { unset($out->$key); }
             }
             $out->roster = $this->memberRoster($out->roster ?? null, $stored->roster ?? null);
+            foreach (self::COMPLETION as $key) {
+                $kept = $this->memberCompletion($out->$key ?? null, $stored->$key ?? null);
+                if ($kept === null) { unset($out->$key); } else { $out->$key = $kept; }
+            }
         }
 
         self::stripRosterCredentials($out);
@@ -178,6 +186,11 @@ class DocPrivacy
         if (!$this->mayEditAdminSections) {   /* Sweep 4R item 3: an administrator-only section in the patch is left as stored */
             foreach (self::ADMIN_ONLY as $key) { unset($out->$key); }
             if (property_exists($out, 'roster')) { $out->roster = $this->memberRoster($out->roster, $stored->roster ?? null); }
+            foreach (self::COMPLETION as $key) {
+                if (!property_exists($out, $key)) { continue; }
+                $kept = $this->memberCompletion($out->$key, $stored->$key ?? null);
+                if ($kept === null) { unset($out->$key); } else { $out->$key = $kept; }
+            }
         }
 
         self::stripRosterCredentials($out);
@@ -187,7 +200,39 @@ class DocPrivacy
     /** Sweep 4R item 3: may this caller name these sections for deletion? (A patch's `removed` list.) */
     public function removable(array $keys): array
     {
-        return $this->mayEditAdminSections ? $keys : array_values(array_diff($keys, self::ADMIN_ONLY, ['roster', 'termsLog', 'termsOrg']));
+        return $this->mayEditAdminSections ? $keys : array_values(array_diff($keys, self::ADMIN_ONLY, ['roster', 'termsLog', 'termsOrg'], self::COMPLETION));
+    }
+
+    /** Which steps are complete, and when each was. */
+    private const COMPLETION = ['completedSteps', 'stepDoneAt'];
+
+    /**
+     * Who may complete a step: its assignee or an administrator (ruled 9 Sep 2026). The buttons have said so since; a
+     * member's save sent straight here could mark any step complete, or put one back (P-17, 24 Nov 2026). What they
+     * sent stands for the steps that are theirs; every other step stays as stored.
+     *
+     * Only ids that can be assigned ("1.2") are judged. A program's own entries beside them are nobody's step, and
+     * refusing what cannot be given to anybody would stop everybody.
+     */
+    private function memberCompletion($sent, $held)
+    {
+        if (!is_object($sent)) {
+            return is_object($held) ? $held : ($sent === null ? $held : $sent);
+        }
+        $out  = self::copy($sent);
+        $was  = is_object($held) ? $held : new \stdClass();
+        $mine = null;
+        $ids  = array_unique(array_map('strval', array_merge(array_keys(get_object_vars($out)), array_keys(get_object_vars($was)))));
+        foreach ($ids as $id) {
+            if (!preg_match('/^[0-9]+\.[0-9]+$/', $id)) { continue; }
+            $same = property_exists($out, $id) === property_exists($was, $id)
+                && json_encode($out->{$id} ?? null) === json_encode($was->{$id} ?? null);
+            if ($same) { continue; }
+            $mine = $mine ?? ($this->steps !== null ? ($this->steps)() : []);
+            if (in_array($id, $mine, true)) { continue; }
+            if (property_exists($was, $id)) { $out->{$id} = $was->{$id}; } else { unset($out->{$id}); }
+        }
+        return $out;
     }
 
     /**
