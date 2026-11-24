@@ -25,9 +25,9 @@ use Models\User;
  * then recreate the current set — so re-seeding is clean and idempotent and
  * never touches real (is_seed = 0) members.
  *
- * Access. The caller must be a member of the organization (the seed lives in
- * the signed-in "More" menu). It is a developer/demo convenience, so it does not
- * demand org-admin the way the normal team editor does.
+ * Access. An administrator of the organization, or the app administrator (P-06,
+ * 24 Nov 2026). It used to take any member, as a demo convenience, but it adds
+ * people and comes with a replacement of the whole program's work.
  */
 class SeedController extends Controller
 {
@@ -49,6 +49,7 @@ class SeedController extends Controller
            membership check had been commented out, so had it ever loaded it
            would have accepted any actor id at all. */
         $this->requireOrgMember($input, (int) $org['id']);
+        $this->requireOrgAdmin($input, (int) $org['id']);   /* P-06 */
         /* A seed builds ONE program's sample workspace, so the assignments that
            come with it belong to that program — see Controller::moduleFrom. */
         $module = $this->moduleFrom($input, $org);

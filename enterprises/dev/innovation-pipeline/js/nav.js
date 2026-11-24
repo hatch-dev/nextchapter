@@ -281,7 +281,7 @@
     /* js/dev/seed.js is the dev-only file that runs them, and its own header
        says it need not ship. Without it there is nothing to run, so offer
        nothing — rather than a menu item that throws when pressed. */
-    if (typeof runSeed !== 'function') return [];
+    if (typeof runSeed !== 'function' || !canManageOrg()) return [];   /* P-06: it replaces everybody's work, so administrators only (the server refuses anyone else) */
     return (window.Modules && Modules.seeds()) || [];
   }
 
@@ -416,7 +416,7 @@
       (SAMPLE_MODE ? sampleDrawerRowsHtml() : seedRowsHtml()) +
       moduleRowsHtml() +
       (SAMPLE_MODE ? '' : drawerRow('export', '&#8595;', 'Export state') +
-      drawerRow('import', '&#8593;', 'Import state')) + /* Sweep 4R item 9 (addendum 5 Oct 2026; amends Part 3): not in the sample tab */
+      (canManageOrg() ? drawerRow('import', '&#8593;', 'Import state') : '')) +   /* P-06: administrators only */ /* Sweep 4R item 9 (addendum 5 Oct 2026; amends Part 3): not in the sample tab */
       ((SAMPLE_MODE || !canManageOrg() || (window.resetMovedToConsole && resetMovedToConsole())) ? '' : drawerRow('reset',   /* Sweep 4R item 10: Reset is offered to administrators only */ '&#10005;', 'Reset all data', '', false, 'nav-dr-danger'));
 
     var view = '<div class="nav-dr-zoom">'
@@ -518,7 +518,7 @@
       (SAMPLE_MODE ? sampleMoreItemsHtml() : seedItemsHtml()) +
       moduleItemsHtml() +
       (SAMPLE_MODE ? '' : '<button class="nav-more-item" role="menuitem" data-act="export"><span class="nav-more-ic">&#8595;</span> Export state</button>' +
-      '<button class="nav-more-item" role="menuitem" data-act="import"><span class="nav-more-ic">&#8593;</span> Import state</button>') + /* Sweep 4R item 9 (addendum 5 Oct 2026; amends Part 3): not in the sample tab */
+      (canManageOrg() ? '<button class="nav-more-item" role="menuitem" data-act="import"><span class="nav-more-ic">&#8593;</span> Import state</button>' : '')) +   /* P-06: administrators only */ /* Sweep 4R item 9 (addendum 5 Oct 2026; amends Part 3): not in the sample tab */
       ((SAMPLE_MODE || !canManageOrg() || (window.resetMovedToConsole && resetMovedToConsole())) ? '' : /* Sweep 4R item 10: administrators only */ '<button class="nav-more-item nav-more-danger" role="menuitem" data-act="reset"><span class="nav-more-ic">&#10005;</span> Reset all data</button>') +
       '</div>';
   }

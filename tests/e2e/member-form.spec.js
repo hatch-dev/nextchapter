@@ -1,6 +1,6 @@
 // @ts-check
 /* ─────────────────────────────────────────────────────────────
-   member-form.spec.js — adding and editing a member (P-04 and P-05, 24 Nov 2026)
+   member-form.spec.js — adding and editing a member (P-04, P-05 and P-07, 24 Nov 2026)
    ─────────────────────────────────────────────────────────────
    Someone could be saved with no program and no word about it, the
    generated temporary password was cut off in its box, and the message
@@ -158,5 +158,55 @@ test.describe('the Administrator tick after the server refuses a save (P-05)', (
       renderOrgModal();
     });
     await expect(page.locator('#ru_zz_col_admin')).not.toBeChecked();
+  });
+});
+
+test.describe('leaving the editor after the server refused a save leaves nothing behind (P-07)', () => {
+  const TAKEN = { status: 422, json: { success: false, message: 'The submitted data was invalid.', errors: { username: ['That username is already taken. Choose another.'] } } };
+  const everywhere = (page) => page.evaluate(() => ({ people: USERS.map((u) => u.name), stored: (data.roster || []).map((u) => u.name) }));
+
+  for (const how of ['Cancel', 'closing the window', 'adding somebody else']) {
+    test('a new person is not in the team after ' + how, async ({ page, account }) => {
+      test.setTimeout(60_000);
+      const m = await newMember(page, account);
+      await page.route('**/api/users', (route) => route.fulfill(TAKEN));
+      await m.boxes.first().check();
+      await m.save.click();
+      await expect(page.locator('#modalRoot .org-field-err')).toContainText('already taken');
+      expect((await everywhere(page)).stored).not.toContain('Casey Tester');
+      await page.evaluate((h) => { if (h === 'Cancel') cancelEditProfile(); else if (h === 'adding somebody else') addProfile(); else closeModal(); }, how);
+      const now = await everywhere(page);
+      expect(now.people).not.toContain('Casey Tester');
+      expect(now.stored).not.toContain('Casey Tester');
+    });
+  }
+
+  test('an existing member goes back to what they were', async ({ page, account }) => {
+    test.setTimeout(60_000);
+    await signIn(page, PROGRAM, account);
+    await page.route('**/api/organizations/members**', (route) => route.abort());
+    await page.route('**/api/users/update', (route) => route.fulfill(TAKEN));
+    await page.evaluate(() => {
+      openOrg();
+      USERS.push({ id: 'zz_col', serverId: 'zz_col', name: 'Second Person', username: 'second.person', role: 'Lead', scope: 'All', email: 'second@example.test', dept: 'QA', admin: false, modules: ['pipeline'] });
+      editProfile('zz_col');
+    });
+    await page.locator('#ru_zz_col_name').fill('Changed Name');
+    await page.locator('#modalRoot .org-btn-save').first().click();
+    await expect(page.locator('#modalRoot .org-field-err')).toContainText('already taken');
+    await expect(page.locator('#ru_zz_col_name')).toHaveValue('Changed Name');   // still there to correct
+    await page.evaluate(() => cancelEditProfile());
+    const now = await everywhere(page);
+    expect(now.people).toContain('Second Person');
+    expect(now.people.concat(now.stored)).not.toContain('Changed Name');
+  });
+
+  test('once the server takes them they are in the team and stored', async ({ page, account }) => {
+    test.setTimeout(60_000);
+    const m = await newMember(page, account);
+    await page.route('**/api/organizations/members**', (route) => route.abort());
+    await m.boxes.first().check();
+    await m.save.click();
+    await expect.poll(async () => (await everywhere(page)).stored).toContain('Casey Tester');
   });
 });

@@ -257,6 +257,11 @@ class OrganizationController extends Controller
                 ? (string) $was->enterprise->name
                 : (string) $org['name']];
             $fresh->orgSetup   = true;
+            /* P-08 (24 Nov 2026): the roster rows keep each person's Terms of Use acceptance, so nobody is asked again;
+               the log of those acceptances and the organization's own stay with them. */
+            foreach (['termsLog', 'termsOrg'] as $record) {
+                if (is_object($was) && isset($was->$record)) { $fresh->$record = $was->$record; }
+            }
             $fresh->startDate  = date('Y-m-d');   /* as a new organization starts its program (createOrg) */
             $fresh->bf12       = true;
             $plans[$module] = [

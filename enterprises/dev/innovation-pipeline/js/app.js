@@ -4670,7 +4670,7 @@ function render() {
 
    So these keys are carried across the reset, and only the program's content is
    rebuilt. */
-var ORG_LEVEL_KEYS = ['roster', 'members', 'enterprise', 'orgSetup', 'settings'];   /* settings: the AI switches (Part 2) survive a reset (Part 4.2.2) */
+var ORG_LEVEL_KEYS = ['roster', 'members', 'enterprise', 'orgSetup', 'settings', 'termsLog', 'termsOrg'];   /* P-08: the record of who accepted the Terms of Use stays with the roster that says they did */   /* settings: the AI switches (Part 2) survive a reset (Part 4.2.2) */
 
 function clearData() { if (!canManageOrg()) return;   /* Sweep 4R item 10: resetting the program's data is for administrators; it checks its caller itself */
   if (!confirm('Reset all ' + stateModuleName() + ' progress for this organization?\n\n'
@@ -4734,6 +4734,7 @@ function exportState() {
   } catch (e) { alert('Export failed: ' + ((e && e.message) || e)); }
 }
 function importState() {
+  if (!canManageOrg()) return;   /* P-06: it replaces the program's work; it checks its caller itself */
   var inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'application/json,.json';
   inp.onchange = function () {
     var f = inp.files && inp.files[0]; if (!f) return;
@@ -4745,6 +4746,7 @@ function importState() {
   inp.click();
 }
 function applyImportedState(text) {
+  if (!canManageOrg()) return;
   var parsed;
   try { parsed = JSON.parse(text); } catch (e) { alert('That file is not valid JSON.'); return; }
   var d = (parsed && typeof parsed === 'object' && parsed.data) ? parsed.data : parsed;
@@ -6818,6 +6820,7 @@ function renderOutcome() {
 var currentModal = null;
 // openHelp() → js/features/help.js
 function closeModal() {
+  if (currentModal === 'org' && typeof dropMemberEdit === 'function') dropMemberEdit();   /* P-07 */
   currentModal = null;
   var mr = $('modalRoot'); if (mr) mr.innerHTML = '';
   /* A module that paints its own modals paints them into the page, not into

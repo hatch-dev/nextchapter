@@ -540,6 +540,7 @@ function syncSeedToServer(seedDoc, actorOverride) {
    stamps the active module on the request, so a seed lands in the workspace of
    the program that produced it and nowhere else. */
 function runSeed(seedId) {
+  if (!canManageOrg()) return;   /* P-06: it replaces the program's work; it checks its caller itself */
   var list = (window.Modules && Modules.seeds()) || [];
   var seed = list.filter(function (s) { return s.id === seedId; })[0];
   if (!seed) return;

@@ -7,6 +7,7 @@ use Core\DocPrivacy;
 use Core\Response;
 use Models\Organization;
 use Models\StepAnswer;
+use Models\User;
 use Models\Workspace;
 use Models\WorkspaceLock;
 use Models\WorkspaceRevision;
@@ -109,7 +110,9 @@ class WorkspaceController extends Controller
     {
         /* Sweep 4R item 3: the app administrator, or an administrator of the organization, may change its details */
         $mayEditAdmin = $this->isAppAdmin() || (int) ($actor['is_admin'] ?? 0) === 1;
-        return new DocPrivacy($module, (string) (($actor['public_id'] ?? '')), $mayEditAdmin);
+        $orgId = (int) ($actor['organization_id'] ?? 0);
+        return new DocPrivacy($module, (string) (($actor['public_id'] ?? '')), $mayEditAdmin,
+            static fn(): array => $orgId > 0 ? (new User())->byOrganization($orgId) : []);   /* P-06: read only when somebody else's roster row is being written */
     }
 
     /** Just the rev — lets clients poll for "did anything change?" cheaply. */
@@ -184,6 +187,12 @@ class WorkspaceController extends Controller
            path already is: base_rev. If somebody committed between this read and
            the UPDATE, save() refuses and the client merges and retries. */
         $stored = $workspace->findByOrg((int) $org['id'], $module);
+
+        /* P-06 (24 Nov 2026): throwing away what everybody has done — Import state, the sample-data seed — is for an
+           administrator. The buttons are hidden from anyone else; this is what makes it true. */
+        if ($replace && $stored !== null && !$this->isAppAdmin() && (int) ($actor['is_admin'] ?? 0) !== 1) {
+            Response::error('Only the organization administrator can replace this program’s work.', 403, ['reason' => 'forbidden']);
+        }
 
         // The refusal the block above describes. Reported exactly like any other
         // stale write, because that is what it is — the client has no basis for

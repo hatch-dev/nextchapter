@@ -46,8 +46,12 @@ class DocPrivacy
     private const ADMIN_ONLY = ['enterprise', 'settings'];   /* Sweep 4R item 10: 'settings' holds only the AI Guide and Voice switches, which only administrators set */
     private bool $mayEditAdminSections;
 
-    public function __construct(string $module, string $actorPublicId, bool $mayEditAdminSections = true)
+    /** The organization's people as the database has them, read only when a member's write carries the roster. */
+    private ?\Closure $people;
+
+    public function __construct(string $module, string $actorPublicId, bool $mayEditAdminSections = true, ?\Closure $people = null)
     {
+        $this->people = $people;
         $this->mayEditAdminSections = $mayEditAdminSections;
         $rules          = config('privacy.' . $module);
         $this->byLeader = is_array($rules) && isset($rules['byLeader']) && is_array($rules['byLeader'])
@@ -127,6 +131,7 @@ class DocPrivacy
                 if (isset($stored->$key)) { $out->$key = json_decode((string) json_encode($stored->$key)); }
                 else { unset($out->$key); }
             }
+            $out->roster = $this->memberRoster($out->roster ?? null, $stored->roster ?? null);
         }
 
         self::stripRosterCredentials($out);
@@ -172,6 +177,7 @@ class DocPrivacy
 
         if (!$this->mayEditAdminSections) {   /* Sweep 4R item 3: an administrator-only section in the patch is left as stored */
             foreach (self::ADMIN_ONLY as $key) { unset($out->$key); }
+            if (property_exists($out, 'roster')) { $out->roster = $this->memberRoster($out->roster, $stored->roster ?? null); }
         }
 
         self::stripRosterCredentials($out);
@@ -181,7 +187,74 @@ class DocPrivacy
     /** Sweep 4R item 3: may this caller name these sections for deletion? (A patch's `removed` list.) */
     public function removable(array $keys): array
     {
-        return $this->mayEditAdminSections ? $keys : array_values(array_diff($keys, self::ADMIN_ONLY));
+        return $this->mayEditAdminSections ? $keys : array_values(array_diff($keys, self::ADMIN_ONLY, ['roster', 'termsLog', 'termsOrg']));
+    }
+
+    /**
+     * The roster to store when someone who is not an administrator writes it (P-06, 24 Nov 2026).
+     *
+     * Ordinary saves carry the roster: a person's own Terms of Use acceptance is on their row, and a browser that has
+     * just read the team from the database writes what it learned. So it cannot simply be refused. But it could be
+     * rewritten: the owner's row dropped, or one's own marked administrator. Nothing here grants a right — those are
+     * checked against the database on every request — but everybody's screen is drawn from it.
+     *
+     *   your own row    as you sent it, except who you are and what you may do
+     *   anyone else's   as stored; somebody the database has and the document lacks may be added
+     *   nobody          is dropped while the database still has them, and nobody unknown to it is added
+     *
+     * Who a person is (name, username, role, administrator…) is always the database's answer.
+     */
+    private function memberRoster($sent, $held)
+    {
+        $held = is_array($held) ? $held : null;
+        if (!is_array($sent)) {
+            return $held;
+        }
+        $people = [];
+        foreach ($this->people !== null ? ($this->people)() : [] as $p) {
+            $people[(string) $p['public_id']] = $p;
+        }
+        if ($people === []) {
+            return $held;   // nothing to check it against: what is stored stands
+        }
+        $sid     = static fn($row): string => is_object($row) ? (string) ($row->serverId ?? '') : '';
+        $sentFor = [];
+        foreach ($sent as $row) {
+            if ($sid($row) !== '') { $sentFor[$sid($row)] = $row; }
+        }
+        $out = [];
+        $had = [];
+        foreach ($held ?? [] as $row) {
+            $id = $sid($row);
+            if ($id === '' || !is_object($row)) { $out[] = $row; continue; }            // not a database person: as stored
+            $had[$id] = true;
+            if (!isset($people[$id]) && !isset($sentFor[$id])) { continue; }              // gone from the database, and the sender knows
+            if ($id === $this->actorPublicId && isset($sentFor[$id])) {
+                $mine = self::copy($sentFor[$id]);
+                $mine->id = $row->id ?? ($mine->id ?? $id);
+                if (property_exists($row, 'modules')) { $mine->modules = $row->modules; } else { unset($mine->modules); }
+                $row = $mine;
+            } else {
+                $row = self::copy($row);
+            }
+            $out[] = isset($people[$id]) ? self::asInDatabase($row, $people[$id]) : $row;
+        }
+        foreach ($sentFor as $id => $row) {
+            if (isset($had[$id]) || !isset($people[$id])) { continue; }
+            $new = self::copy($row);
+            if ($id !== $this->actorPublicId) { unset($new->terms); }                      // nobody accepts for somebody else
+            $out[] = self::asInDatabase($new, $people[$id]);
+        }
+        return $out;
+    }
+
+    private static function asInDatabase(object $row, array $p): object
+    {
+        foreach (['name' => 'name', 'username' => 'username', 'role' => 'role', 'scope' => 'scope', 'email' => 'email', 'dept' => 'department'] as $to => $from) {
+            if (array_key_exists($from, $p)) { $row->$to = (string) ($p[$from] ?? ''); }
+        }
+        $row->admin = (int) ($p['is_admin'] ?? 0) === 1;
+        return $row;
     }
 
     /* ── internals ──────────────────────────────────────────────────────── */

@@ -55,7 +55,7 @@ function closeNavMore() { if (UI.navMore) { UI.navMore = false; if (window.Nav) 
 // Module switcher (registry in js/features/modules.js, markup in nav.js)
 function toggleNavModules(e) { if (e && e.stopPropagation) e.stopPropagation(); UI.navModules = !UI.navModules; if (UI.navModules) { UI.navMore = false; UI.userMenu = false; } render(); }
 function closeNavModules() { if (UI.navModules) { UI.navModules = false; render(); } }
-function openOrg() { orgSetupMode = false; currentModal = 'org'; UI.orgEdit = null; UI.orgDetErrors = {}; UI.orgDetBusy = false; renderOrgModal(); pullOrgMembers(); }
+function openOrg() { dropMemberEdit(); orgSetupMode = false; currentModal = 'org'; UI.orgEdit = null; UI.orgDetErrors = {}; UI.orgDetBusy = false; renderOrgModal(); pullOrgMembers(); }
 
 /* The same panel, opened as a WELCOME rather than as an edit screen: the
    "let's get set up" eyebrow, "Set Up Your Organization & Team", and the line
@@ -1462,10 +1462,21 @@ function scrollEditorIntoView(focus) {
     }
   }, 60);
 }
-function editProfile(id) { if (!canEditMember(id)) return; discardDraftMember(); UI.orgEdit = id; UI.orgEditErrors = {}; UI.orgEditBusy = false; renderOrgModal(); scrollEditorIntoView(false); }
+function editProfile(id) { if (!canEditMember(id)) return; dropMemberEdit(); UI.orgEdit = id; UI.orgEditErrors = {}; UI.orgEditBusy = false; renderOrgModal(); scrollEditorIntoView(false); }
+/* An editor left without saving leaves nothing behind (P-07, 24 Nov 2026). A Save the server refused had already put
+   what was typed on the member and stored it: a new person stayed in the team as a ghost the database never had, and
+   an existing one kept the refused details. Now the stored roster changes when the server has said yes, and leaving
+   the editor puts the member back. Not while a save is in flight: its answer decides. */
+var MEMBER_EDIT_FIELDS = ['name', 'username', 'role', 'scope', 'email', 'dept', 'initials', 'modules'];
+function dropMemberEdit() {
+  if (UI.orgEditBusy) return;
+  var o = UI.orgEditOrig; UI.orgEditOrig = null;
+  var u = o && USERS.find(function (x) { return x.id === o.id; });
+  if (u && !u._draft) MEMBER_EDIT_FIELDS.forEach(function (f) { if (f in o.was) u[f] = o.was[f]; else delete u[f]; });
+  discardDraftMember();
+}
 function cancelEditProfile() {
-  var u = USERS.find(function (x) { return x.id === UI.orgEdit; });
-  if (u && u._draft) { var i = USERS.indexOf(u); if (i >= 0) USERS.splice(i, 1); } // throw away the unsaved draft
+  dropMemberEdit();   // throw away the unsaved draft, or put the member back
   UI.orgEdit = null; UI.orgEditErrors = {}; UI.orgEditBusy = false; render(); renderOrgModal();
 }
 
@@ -1497,7 +1508,7 @@ function memberPayload(u) {
 }
 
 function memberSyncError(err, action) {
-  if (err && err.reason === 'network') return 'Saved on this device, but the server was unreachable — this team member is not in the database yet.';
+  if (err && err.reason === 'network') return 'The server could not be reached, so nothing was saved. Try again.';
   return (err && err.message) || ('Could not ' + action + ' this team member on the server.');
 }
 
@@ -1533,6 +1544,7 @@ function syncMemberToServer(u, cb, temporary) {
     postJSON(API_BASE + '/users', p, function (res) {
       var d = (res && res.data) || {};
       if (d.id) { u.serverId = d.id; }
+      delete u._draft;   /* the database has them now: a real member */
       if (u.id in _pendingAdmin) { u.admin = _pendingAdmin[u.id]; delete _pendingAdmin[u.id]; }   /* Sweep 4R item 2: created as asked */
       /* The server clamps the requested grant to what the organization holds,
          so adopt what it stored rather than what was asked for — otherwise the
@@ -1853,6 +1865,7 @@ function saveProfile(id) {
   // Read the typed values and reflect them in memory immediately, so any
   // re-render (including a validation error) keeps exactly what was typed.
   var isNew = !u.serverId;
+  if (!UI.orgEditOrig || UI.orgEditOrig.id !== id) UI.orgEditOrig = { id: id, was: Object.assign({}, u) };   /* P-07: what leaving the editor goes back to */
   var vals = {};
   ['name', 'username', 'role', 'scope', 'email', 'dept'].forEach(function (f) {
     var el = $('ru_' + id + '_' + f); vals[f] = el ? el.value.trim() : '';
@@ -1885,14 +1898,15 @@ function saveProfile(id) {
     delete _pendingAdmin[u.id]; return;
   }
 
-  // Valid → it's a real member now; save locally.
-  delete u._draft;
-  persistRoster();
+  // Valid. It is stored, and a new person is a real member, once the server has taken it (P-07).
 
   // Persist to MySQL; show server validation errors inline (no alert).
   UI.orgEditErrors = {}; UI.orgEditBusy = true; renderOrgModal();
   syncMemberToServer(u, function (result) {
     if (result && result.ok) {
+      delete u._draft; UI.orgEditOrig = null;
+      if (USERS.indexOf(u) < 0) USERS.push(u);   /* another editor was opened while it was being saved */
+      persistRoster();
       /* Then an edited member's new temporary password, if one was typed (5.7). A new member's went with the add. */
       sendTemporaryPassword(orgServerId(), u.serverId, (result.localOnly || isNew) ? '' : vals.temporary, function (problem) {
         UI.orgEditBusy = false;
@@ -1935,7 +1949,7 @@ function inviteMessage(invite, u, withPassword) {
 
 function addProfile() {
   if (!canManageOrg()) return;
-  discardDraftMember();       // never keep more than one unsaved draft
+  dropMemberEdit();           // never keep more than one unsaved draft, nor another member's unsaved details (P-07)
   var id = uid();
   // A DRAFT: held in memory only (not persisted) until it's saved with a name,
   // so clicking "Add team member" no longer leaves empty "Unnamed" rows behind.
