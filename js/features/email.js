@@ -92,16 +92,16 @@ function notifyMemberEmails(list) { return (list || USERS || []).map(function (u
    carries its own copy, and the Governance reference already had this form. */
 function notifyAdmins() { return (USERS || []).filter(function (u) { return u && (u.admin === true || /admin/i.test(u.role || '')) }) }
 function notifyStepName(id) { var nm = id; (PH || []).forEach(function (p) { (p.steps || []).forEach(function (st) { if (st.id === id) nm = 'Step ' + st.id + ' \u2013 ' + st.name }) }); return nm }
-function notifyQueue(kind, subject, to, stepId, pdf) {
+function notifyQueue(kind, subject, to, stepId, pdf, dueFor) {
   if (!to || !to.length) return;
   if (!data.notifications) data.notifications = [];
-  var n = { at: Date.now(), kind: kind, subject: subject, to: to, stepId: stepId || '', pdf: !!pdf, status: NOTIFY_ENDPOINT ? 'sending' : 'pending \u2013 endpoint not configured' };
+  var n = { at: Date.now(), kind: kind, subject: subject, to: to, stepId: stepId || '', pdf: !!pdf, dueFor: dueFor || '', status: NOTIFY_ENDPOINT ? 'sending' : 'pending \u2013 endpoint not configured' };
   data.notifications.push(n); if (data.notifications.length > 50) data.notifications = data.notifications.slice(-50);
   Store.commit('notifications');
   notifyDispatch(n); return n
 }
 function notifyEmailHtml(n) {
-  var head = '<h2 style="font-family:Helvetica,Arial,sans-serif">' + esc(n.subject) + '</h2><p>' + (n.kind === 'step-complete' ? esc(notifyStepName(n.stepId)) + ' was marked complete on ' + fmtDate(n.at) + '. The current Module Management analytics report is attached.' : 'The assigned step ' + esc(notifyStepName(n.stepId)) + ' is due within one week (' + esc(((data.stepDue || {})[n.stepId] ? fmtDate((data.stepDue || {})[n.stepId]) : '')) + ').') + '</p>';
+  var head = '<h2 style="font-family:Helvetica,Arial,sans-serif">' + esc(n.subject) + '</h2><p>' + (n.kind === 'step-complete' ? esc(notifyStepName(n.stepId)) + ' was marked complete on ' + fmtDate(n.at) + '. The current Module Management analytics report is attached.' : esc(notifyStepName(n.stepId)) + ' is assigned and due on ' + esc(((data.stepDue || {})[n.stepId] ? fmtDate((data.stepDue || {})[n.stepId]) : '')) + '.') + '</p>';
   /* Pin the analytics tab (1). A bare mgmtHubContent() renders whichever tab
      UI.mgTab happens to hold in this browser, so leaving Track Program on
      Assignments used to mail the assignment list under a subject line
@@ -114,15 +114,29 @@ function notifyDispatch(n) {
   if (!url) return; /* inert until wired \u2013 outbox holds the record */
   try {
     fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kind: n.kind, subject: n.subject, to: n.to, stepId: n.stepId, orgName: (data.enterprise || {}).name || '', sentAt: new Date(n.at).toISOString(), pdf: n.pdf, html: notifyEmailHtml(n) }) })
-      .then(function (r) { n.status = r.ok ? 'sent' : 'failed (' + r.status + ')'; Store.commit('notifications'); render() })
-      .catch(function () { n.status = 'failed (network)'; Store.commit('notifications'); render() })
-  } catch (e) { n.status = 'failed'; Store.commit('notifications') }
+      .then(function (r) { n.status = r.ok ? 'sent' : 'failed (' + r.status + ')'; notifySettled(n, r.status); Store.commit('notifications'); render() })
+      .catch(function () { n.status = 'failed (network)'; notifySettled(n, 0); Store.commit('notifications'); render() })
+  } catch (e) { n.status = 'failed'; notifySettled(n, 0); Store.commit('notifications') }
 }
 function notifyStepComplete(id) {
   try {
     var to = notifyMemberEmails(); if (!to.length) return;
     notifyQueue('step-complete', notifyStepName(id) + ' complete \u2013 analytics report', to, id, true)
   } catch (e) { }
+}
+/* A reminder counts as sent when the server has it (P-21, 24 Nov 2026). It used to count the moment it was tried, so
+   one raised while this browser was offline was lost for good. Not marked, it is tried again, by this browser after
+   five minutes or by anybody else's; a refusal (4xx) would be refused again, so it is marked. This page never has
+   two of the same on their way: the sweep runs with every render. */
+var _remindTried = {};
+function notifySettled(n, status) {
+  if (!n || n.kind !== 'deadline-reminder' || !n.dueFor) return;
+  var key = n.stepId + '|' + n.dueFor;
+  if ((status >= 200 && status < 300) || (status >= 400 && status < 500 && status !== 401 && status !== 408 && status !== 429)) {
+    if (!data.remind7) data.remind7 = {};
+    if ((data.stepDue || {})[n.stepId] === n.dueFor) { data.remind7[n.stepId] = n.dueFor; Store.commit('remind7'); }
+    delete _remindTried[key];
+  } else _remindTried[key] = Date.now();
 }
 function notifySweepDeadlines() {
   try {
@@ -142,9 +156,12 @@ function notifySweepDeadlines() {
       var admins = notifyAdmins();
       var to = notifyMemberEmails(admins.concat((USERS || []).filter(function (u) { return who.indexOf(u.id) >= 0 && admins.indexOf(u) < 0 })));
       if (!to.length) return;
-      var n = notifyQueue('deadline-reminder', notifyStepName(id) + ' due ' + due[id], to, id, false);
+      var key = id + '|' + due[id];
+      if (_remindTried[key] && Date.now() - _remindTried[key] < 300000) return;   /* on its way, or failed a moment ago */
+      _remindTried[key] = Date.now();
+      var n = notifyQueue('deadline-reminder', notifyStepName(id) + ' due ' + due[id], to, id, false, due[id]);
       if (n && !admins.length) n.status += ' \u00b7 no administrator on the roster';
-      data.remind7[id] = due[id]; Store.commit('remind7')
+      if (!NOTIFY_ENDPOINT || window.SAMPLE_MODE) { data.remind7[id] = due[id]; Store.commit('remind7') }   /* nowhere to send it: raised once, as before */
     })
   } catch (e) { }
 }
