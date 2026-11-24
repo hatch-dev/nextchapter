@@ -3252,6 +3252,10 @@ function migrateLegacyData() {
     Store.writeOrg(id, d);
   } catch (e) { }
 }
+/* The date on the calendar of whoever is at this screen, for what they do: a step completed at 8 pm in New York was
+   recorded as the next day, because toISOString is the UTC date (P-18, 24 Nov 2026). What is overdue stays on one
+   changeover for the whole team. */
+function localDay() { var d = new Date(); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
 function fmtDate(ts) { try { var d = (typeof ts === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(ts)) ? new Date(ts + 'T12:00:00') : new Date(ts); return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }); } catch (e) { return ''; } }
 
 /* ═══════════════════════════════════════════════════════════════

@@ -252,7 +252,7 @@ function chartZoomOverlay() {
    burn-up and velocity charts (adapted from the companion Governance
    module), team load, and derived signals. Phase 5 (Navigate) is ongoing
    work, not a step to burn down, so it stays out of the counts. */
-function stampStepDone(id) { try { if (!data.stepDoneAt) data.stepDoneAt = {}; if (!data.stepDoneAt[id]) { data.stepDoneAt[id] = new Date().toISOString().split('T')[0]; Store.commit('stepDoneAt'); notifyStepComplete(id) } } catch (e) { } }
+function stampStepDone(id) { try { if (!data.stepDoneAt) data.stepDoneAt = {}; if (!data.stepDoneAt[id]) { data.stepDoneAt[id] = localDay(); Store.commit('stepDoneAt'); notifyStepComplete(id) } } catch (e) { } }
 function mgSteps() { var out = []; PH.forEach(function (p) { if (p.id === 5) return; p.steps.forEach(function (st) { out.push({ id: st.id, name: st.name, icon: st.icon, ph: p }) }) }); return out }
 function mgDueSave(id, v) { data.stepDue = data.stepDue || {}; if (v) data.stepDue[id] = v; else delete data.stepDue[id]; Store.commit('stepDue'); render() }
 function mgAssignToggle(id, uid2) { toggleAssign(id, uid2) } /* delegates to the existing assignment system */

@@ -792,7 +792,7 @@
 
   function markStepComplete(sid) { if (!confirmStepDone(sid)) return; if (!data.completedSteps) data.completedSteps = {}; data.completedSteps[sid] = true; stampStepDone(sid); saveData(); render() }
 
-  function stampStepDone(id) { try { if (!data.stepDoneAt) data.stepDoneAt = {}; if (!data.stepDoneAt[id]) { data.stepDoneAt[id] = new Date().toISOString().split('T')[0]; Store.commit('stepDoneAt'); notifyStepComplete(id) } } catch (e) { } }
+  function stampStepDone(id) { try { if (!data.stepDoneAt) data.stepDoneAt = {}; if (!data.stepDoneAt[id]) { data.stepDoneAt[id] = localDay(); Store.commit('stepDoneAt'); notifyStepComplete(id) } } catch (e) { } }
 
   function confirmStepDone(sid) { if ((data.completedSteps || {})[sid]) return true; if (typeof completeBlocked === 'function' && completeBlocked(sid)) return false; return confirm('Mark this step complete? This will notify the team and can\u2019t be undone.') }
 
