@@ -51,8 +51,14 @@ final class MailRetry
                 if (!$stillFor) $outbox->markCancelled((string) $row['public_id'], 'Not sent: the reminder no longer applies to this person.');
                 array_push($rows, ...DeadlineReminders::handOver($row));
                 if (!$stillFor) continue;
+                $notice = AssignmentNotice::review($row);                /* nor an assignment that is no longer theirs (P-24) */
+                array_push($rows, ...$notice['instead']);
+                if (!$notice['send']) {
+                    $outbox->markCancelled((string) $row['public_id'], 'Not sent: the assignment has changed since.');
+                    continue;
+                }
             } catch (\Throwable $e) {
-                error_log('a waiting reminder could not be checked: ' . $e->getMessage());
+                error_log('a waiting message could not be checked: ' . $e->getMessage());
             }
             /* Every message here is to a member about their organization; one who has left gets no more of it (P-16). */
             if ($row['organization_id'] !== null && !$outbox->isForMember((int) $row['organization_id'], (string) $row['to_email'])) {

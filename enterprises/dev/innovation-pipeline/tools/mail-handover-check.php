@@ -1,11 +1,13 @@
 <?php
 /*
- * mail-handover-check.php — a waiting reminder is checked again before it is retried (P-23, 24 Nov 2026).
+ * mail-handover-check.php — a waiting reminder or assignment notice is checked again before it is retried (P-23 and P-24,
+ * 24 Nov 2026).
  *
  *   php tools/mail-handover-check.php
  *
  * Makes an organization inside a transaction that is always rolled back, and sends nothing: it calls the two questions
- * MailRetry asks of each waiting reminder, DeadlineReminders::stillFor and ::handOver.
+ * MailRetry asks of each waiting reminder, DeadlineReminders::stillFor and ::handOver, and the one it asks of a notice,
+ * AssignmentNotice::review.
  */
 declare(strict_types=1);
 
@@ -93,6 +95,40 @@ try {
     $save(['stepDue' => ['1.1' => $due]]);
     $db->prepare('DELETE FROM user_modules WHERE user_public_id = ?')->execute([$b['public_id']]);
     $check('without the program: not for them', !$still($row($mail('b'))));
+
+    /* Assignment notices (P-24) */
+    $note = static function (array $u, ?string $kind = null, string $to = '') use ($box, $org): array {
+        return $box->findByPublicId($box->queue(['kind' => $kind ?? Core\AssignmentNotice::kind('pipeline', '1.1'), 'to_email' => $to !== '' ? $to : (new Models\User())->findByPublicId($u['public_id'])['email'], 'to_name' => 'x', 'subject' => 'You have been assigned X',
+            'body_html' => '<a href="http://x/pipeline/step/1.1">x</a>', 'body_text' => 'x', 'organization_id' => $org, 'user_public_id' => $u['public_id']]));
+    };
+    $review = static fn(array $r): array => Core\AssignmentNotice::review($r);
+    $check('the longest program and step fit the column whole', strlen(Core\AssignmentNotice::kind('ai-architecture', '10.10')) <= 40 && substr(Core\AssignmentNotice::kind('ai-architecture', '10.10'), -5) === '10.10');
+    $assign([$a]);
+    $n1 = $note($a);
+    $check('assigned: it goes', $review($n1) === ['send' => true, 'instead' => []]);
+    $check('mail that is not a notice is left alone', $review(['kind' => 'member-invite', 'user_public_id' => $b['public_id'], 'organization_id' => $org] + $n1)['send']);
+    $assign([]);
+    $check('taken off the step: it does not', !$review($n1)['send']);
+    $assign([$a]);
+    $n2 = $note($a);
+    $check('given back, which queued another: the first does not', !$review($n1)['send']);
+    $check('and the second does', $review($n2)['send']);
+    $save(['completedSteps' => ['1.1' => true]]);
+    $check('complete: it does not', !$review($n2)['send']);
+    $save(['completedSteps' => new stdClass()]);
+    $old = $note($a, 'step-assignment');
+    $check('queued before its kind named the step: the same answers', $review($old)['send']);
+    $assign([]);
+    $check('  taken off', !$review($old)['send']);
+    $assign([$a]);
+    $db->prepare('UPDATE users SET email = ? WHERE public_id = ?')->execute(['new' . $tag . '@example.test', $a['public_id']]);
+    $moved = $review($n2);
+    $check('their address changed: to the new one instead', !$moved['send'] && array_column($moved['instead'], 'to_email') === ['new' . $tag . '@example.test']);
+    $check('  which goes', $review($box->findByPublicId($moved['instead'][0]['public_id']))['send']);
+    $db->prepare('DELETE FROM user_modules WHERE user_public_id = ?')->execute([$a['public_id']]);
+    $check('without the program: it does not', !$review($box->findByPublicId($moved['instead'][0]['public_id']))['send']);
+    $users->deleteByPublicId($a['public_id']);
+    $check('removed: it does not', !$review($n2)['send']);
 } finally {
     $db->rollBack();
 }

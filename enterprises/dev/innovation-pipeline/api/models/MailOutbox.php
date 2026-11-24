@@ -144,7 +144,7 @@ class MailOutbox extends Model
     {
         $limit = max(1, min(200, $limit));
         return $this->select(
-            "SELECT public_id, kind, to_email, to_name, subject, body_html, body_text, attempts, organization_id, created_at
+            "SELECT public_id, kind, to_email, to_name, subject, body_html, body_text, attempts, organization_id, user_public_id, created_at
                FROM mail_outbox
               WHERE status = 'queued' AND attempts < " . max(1, $maxAttempts) . '
                 AND created_at >= (NOW() - INTERVAL ' . max(1, $days) . ' DAY)
@@ -189,6 +189,18 @@ class MailOutbox extends Model
             "UPDATE mail_outbox SET status = 'cancelled', error = :why WHERE public_id = :pid AND status = 'queued'",
             [':why' => $why, ':pid' => $publicId]
         );
+    }
+
+    /** Has the same message to the same person been queued again since, and not cancelled (P-24)? */
+    public function hasNewerCopy(string $publicId): bool
+    {
+        return $this->selectOne(
+            "SELECT 1 AS hit FROM mail_outbox m JOIN mail_outbox n
+                 ON n.organization_id = m.organization_id AND n.kind = m.kind AND n.subject = m.subject
+                AND n.user_public_id = m.user_public_id AND n.id > m.id AND n.status <> 'cancelled'
+              WHERE m.public_id = :pid LIMIT 1",
+            [':pid' => $publicId]
+        ) !== null;
     }
 
     /** Every copy of one message, whoever to and whatever came of it, from an hour before $since on (P-23). */

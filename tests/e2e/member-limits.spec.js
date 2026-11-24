@@ -216,7 +216,7 @@ test('the assignee completes their step on screen, once, and it stays complete',
   await page.waitForTimeout(8_000);                       // through a sync or two
   expect(((await t.doc()).doc.completedSteps || {})['1.2']).toBe(true);
   await page.reload();
-  expect(await page.evaluate(() => !!(data.completedSteps || {})['1.2'])).toBe(true);
+  await expect.poll(() => page.evaluate(() => !!(data.completedSteps || {})['1.2']), { timeout: 15_000 }).toBe(true);   // once the workspace has loaded
 });
 
 /* P-19 (24 Nov 2026): a step-complete report went to every member with an email, whether or not they had the program. The dev copy

@@ -90,7 +90,7 @@ class AssignmentNotice
         $outbox = new MailOutbox();
         try {
             $mailId = $outbox->queue([
-                'kind'            => 'step-assignment',
+                'kind'            => self::kind($module, $step),
                 'to_email'        => $email,
                 'to_name'         => $name,
                 'subject'         => $subject,
@@ -122,6 +122,72 @@ class AssignmentNotice
             'status'  => 'send-failed',
             'error'   => (string) ($result['error'] ?? 'unknown'),
         ];
+    }
+
+    /* ── Asked again before a retry (P-24, 24 Nov 2026) ─────────── */
+
+    /** The outbox kind names the program and the step, so a waiting notice can be looked at again; 40 is the column's width. */
+    public static function kind(string $module, string $step): string
+    {
+        $kind = 'step-assignment:' . $module . ':' . $step;
+        return strlen($kind) <= 40 ? $kind : 'step-assignment';
+    }
+
+    /**
+     * May this waiting message still go out? Between the assignment and a retry the step may have been taken off the
+     * person, completed, or the program taken from them; it may have been given back, which queued a newer copy; or
+     * their address may have changed, and then the message goes to the new one. Any other message: yes.
+     *
+     * @return array{send:bool, instead:array[]} instead: rows queued in its place, for sending at once
+     */
+    public static function review(array $row): array
+    {
+        $yes = ['send' => true, 'instead' => []];
+        $no  = ['send' => false, 'instead' => []];
+        $kind = (string) ($row['kind'] ?? '');
+        $uid  = (string) ($row['user_public_id'] ?? '');
+        if (strncmp($kind, 'step-assignment', 15) !== 0 || $uid === '' || ($row['organization_id'] ?? null) === null) {
+            return $yes;
+        }
+        $org  = (int) $row['organization_id'];
+        $user = (new \Models\User())->findByPublicId($uid);
+        if ($user === null || (int) $user['organization_id'] !== $org) {
+            return $no;
+        }
+
+        /* Queued before its kind said which step: the link in the message does, though not which program. */
+        $part = explode(':', $kind);
+        $module = $part[1] ?? '';
+        $step = $part[2] ?? (preg_match('~/step/([0-9]+\.[0-9]+)\b~', (string) ($row['body_text'] ?? '') . (string) ($row['body_html'] ?? ''), $m) ? $m[1] : '');
+        if ($step === '') {
+            return $yes;
+        }
+
+        $access = new \Models\Access();
+        $mine   = $access->forUsers([$uid])[$uid] ?? [];
+        $live   = false;
+        foreach ($module !== '' ? [$module] : $access->forOrg($org) as $program) {
+            if (!in_array($program, $mine, true) || !(new \Models\Assignment())->isAssigned($org, $program, $step, $uid)) continue;
+            $stored = (new \Models\Workspace())->findByOrg($org, $program);
+            $doc    = $stored === null ? null : json_decode((string) $stored['doc']);
+            $done   = is_object($doc) && isset($doc->completedSteps) && is_object($doc->completedSteps) ? ($doc->completedSteps->{$step} ?? false) : false;
+            if (empty($done)) { $live = true; break; }
+        }
+        $outbox = new MailOutbox();
+        if (!$live || $outbox->hasNewerCopy((string) $row['public_id'])) {
+            return $no;
+        }
+
+        $email = trim((string) ($user['email'] ?? ''));
+        if (strcasecmp($email, trim((string) $row['to_email'])) === 0) {
+            return $yes;
+        }
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return $no;
+        }
+        $new = ['kind' => $kind, 'to_email' => $email, 'to_name' => (string) ($user['name'] ?? ''), 'subject' => $row['subject'], 'body_html' => $row['body_html'],
+            'body_text' => $row['body_text'] ?? '', 'organization_id' => $org, 'user_public_id' => $uid];
+        return ['send' => false, 'instead' => [['public_id' => $outbox->queue($new)] + $new + $row]];
     }
 
     /**
