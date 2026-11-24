@@ -363,6 +363,25 @@ class ReportMail
             . self::e(self::readable($bg)) . '">' . self::e(mb_substr($initials, 0, 2)) . '</td></tr></table>';
     }
 
+    /** What a copy without its PDF says in place of the line about it. */
+    private const NO_PDF = 'The report is below. Its printable PDF could not be sent with this message; print it from Track Program.';
+
+    /**
+     * A stored message (HTML or text) as it can be sent again: the PDF is not kept, so nothing may say it is here
+     * (P-20, 24 Nov 2026). Only the app's own sentences about the attachment are changed.
+     */
+    public static function withoutAttachment(string $message): string
+    {
+        $out = preg_replace([
+            '~<strong[^>]*>[^<]*\.pdf</strong>\s+is attached —\s+the full report, laid out for print, with both charts drawn in full\.~u',
+            '~Attached:\s+\S+\.pdf\s+—\s+the full report, with the charts\.~u',
+            '~(analytics\s+report\s+is)\s+attached\.~u',
+            '~This chart is in the attached PDF\.~u',
+        ], [self::NO_PDF, self::NO_PDF, '$1 below.', 'This chart is in Track Program.'], $message);
+
+        return is_string($out) ? $out : $message;
+    }
+
     private static function attachmentNote(string $attachment, string $note): string
     {
         if ($attachment === '' && $note === '') {

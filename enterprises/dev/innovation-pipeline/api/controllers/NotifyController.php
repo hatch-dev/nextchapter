@@ -9,6 +9,7 @@ use Core\ReportDocument;
 use Core\ReportMail;
 use Core\ReportPdf;
 use Core\Response;
+use Models\Access;
 use Models\MailOutbox;
 use Models\Organization;
 use Models\User;
@@ -119,12 +120,30 @@ class NotifyController extends Controller
         $org = $this->resolveOrg($orgName);
         $roster = (new User())->byOrganization((int) $org['id']);
 
+        /* Only to people who have this program (P-19, 24 Nov 2026). The browser names everybody in the organization; the
+           report carries the program's progress and its people's workload, and a program somebody was not given is
+           meant to stay out of their reach. A request that names no program cannot be judged, and is not. */
+        $program = $this->program();
+        $hasIt   = null;
+        if ($program !== '') {
+            $access = new Access();
+            $hasIt  = in_array($program, $access->forOrg((int) $org['id']), true)
+                ? array_filter($access->forUsers(array_column($roster, 'public_id')), static fn(array $mods): bool => in_array($program, $mods, true))
+                : [];
+        }
+
         $recipients = [];
+        $withoutIt  = 0;
         foreach ($roster as $member) {
             $email = strtolower(trim((string) ($member['email'] ?? '')));
-            if ($email !== '' && isset($requested[$email])) {
-                $recipients[$email] = (string) ($member['name'] ?? '');
-            }
+            if ($email === '' || !isset($requested[$email])) { continue; }
+            if ($hasIt !== null && !isset($hasIt[(string) $member['public_id']])) { $withoutIt++; continue; }
+            $recipients[$email] = (string) ($member['name'] ?? '');
+        }
+        if ($recipients === [] && $withoutIt > 0) {
+            /* Members, every one, but none with this program: nothing to send, and nothing wrong. */
+            Response::success(['accepted' => true, 'kind' => $kind, 'stepId' => $stepId, 'queued' => 0, 'sent' => 0, 'failed' => 0, 'duplicates' => 0,
+                'configured' => Mailer::configured(), 'pdfPending' => false, 'attached' => '']);
         }
         if ($recipients === []) {
             /* Every address the app named is a stranger to this organization.

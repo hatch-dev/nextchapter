@@ -218,3 +218,26 @@ test('the assignee completes their step on screen, once, and it stays complete',
   await page.reload();
   expect(await page.evaluate(() => !!(data.completedSteps || {})['1.2'])).toBe(true);
 });
+
+/* P-19 (24 Nov 2026): a step-complete report went to every member with an email, whether or not they had the program. The dev copy
+   sends nothing: the answer counts what it queued. */
+test('a program’s notifications go only to people who have it', async ({ account, playwright, baseURL }) => {
+  const t = await ownerAndMember(account, playwright, baseURL);
+  const elsewhere = t.who.username + 'x@example.test';
+  const added = await t.owner.post('api/users', { data: { organization_id: t.org, name: 'Elsewhere', username: t.who.username + 'x', role: 'Tester', scope: 'All', email: elsewhere, department: 'QA', modules: ['ai-culture'], temporary: t.who.temporary } });
+  expect(added.status()).toBe(201);
+  const member = t.who.username + '@example.test';
+  let n = 0;
+  const notify = async (by, to, kind = 'step-complete', program = MODULE) => {
+    const r = await by.post('api/notify/' + program, { data: { kind, subject: 'Step 1.2 complete ' + (n++), to, stepId: '1.2', orgName: '', html: '<h2>x</h2><p>x</p>', pdf: false } });
+    return { status: r.status(), ...((await r.json()).data || {}) };
+  };
+  expect(await notify(t.owner, [account.email, member, elsewhere])).toMatchObject({ status: 200, queued: 2 });
+  expect(await notify(t.member, [account.email, member, elsewhere], 'deadline-reminder')).toMatchObject({ status: 200, queued: 2 });
+  expect(await notify(t.owner, [elsewhere])).toMatchObject({ status: 200, queued: 0 });
+  expect(await notify(t.owner, [account.email, member, elsewhere], 'step-complete', 'ai-culture')).toMatchObject({ status: 200, queued: 2 });   // the owner and Elsewhere
+  expect((await notify(t.owner, ['stranger@example.test'])).status).toBe(422);                                                                   // still refused
+
+  await t.owner.post('api/users/update', { data: { id: (await added.json()).data.id, name: 'Elsewhere', username: t.who.username + 'x', role: 'Tester', scope: 'All', email: elsewhere, department: 'QA', modules: ['ai-culture', MODULE] } });
+  expect(await notify(t.owner, [account.email, member, elsewhere])).toMatchObject({ status: 200, queued: 3 });
+});

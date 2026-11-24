@@ -50,6 +50,10 @@ final class MailRetry
                 continue;
             }
             $out['tried']++;
+            if (str_ends_with((string) $row['kind'], '-pdf')) {   /* the PDF is not kept, so the copy must not say it is here (P-20) */
+                $row['body_html'] = ReportMail::withoutAttachment((string) $row['body_html']);
+                $row['body_text'] = ReportMail::withoutAttachment((string) ($row['body_text'] ?? ''));
+            }
             $result = $mailer->send(
                 (string) $row['to_email'],
                 (string) ($row['to_name'] ?? ''),
