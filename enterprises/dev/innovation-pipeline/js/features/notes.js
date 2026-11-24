@@ -53,10 +53,32 @@ function notesLoad(cb) {
     notesData = (data.notes || []).slice().reverse().map(function (n) { return { id: n.id, body: n.text, step: n.step, created_at: n.createdAt }; });
     updateNotesCount(); if (cb) cb(); return;
   }
-  fetch(API_BASE + '/notes?actor_id=' + encodeURIComponent(actor) + '&module=' + encodeURIComponent(notesModule()))
+  /* An answer to a question asked before this device's own last change, or by somebody else, or in another program,
+     is out of date: it would take back what was just written (P-14). */
+  var began = _notesChanges, module = notesModule();
+  fetch(API_BASE + '/notes?actor_id=' + encodeURIComponent(actor) + '&module=' + encodeURIComponent(module))
     .then(function (r) { return r.json(); })
-    .then(function (res) { if (res && res.success && res.data) notesData = res.data.notes || []; updateNotesCount(); if (cb) cb(); })
+    .then(function (res) {
+      if (began !== _notesChanges || actor !== notesActor() || module !== notesModule()) { if (cb) cb(); return; }
+      if (res && res.success && res.data) notesData = res.data.notes || [];
+      updateNotesCount(); if (cb) cb();
+    })
     .catch(function () { if (cb) cb(); });
+}
+
+/* ── The same person's notes, written on another device (P-14, 24 Nov 2026) ──
+   An open panel only ever showed what it read when it was opened. While it is open and on screen the list is read
+   again every few seconds; only the list is redrawn, and only when it changed, so nothing being typed is touched. */
+var _notesChanges = 0, _notesTimer = null;
+function notesWatch() {
+  if (_notesTimer) { clearInterval(_notesTimer); _notesTimer = null; }
+  if (!notesOpen) return;
+  _notesTimer = setInterval(function () {
+    if (!notesOpen) { notesWatch(); return; }
+    if ((typeof SAMPLE_MODE !== 'undefined' && SAMPLE_MODE) || !notesActor() || document.hidden) return;
+    var was = JSON.stringify(notesData);
+    notesLoad(function () { if (notesOpen && JSON.stringify(notesData) !== was) renderNotesList(); });
+  }, 5000);
 }
 
 function toggleNotes() {
@@ -65,18 +87,29 @@ function toggleNotes() {
   var navBtn = document.getElementById('notesNavBtn'); if (navBtn) navBtn.classList.toggle('nav-action-on', notesOpen);
   var np = $('notesPanel'); np.className = 'notes-panel' + (notesOpen ? ' open' : '');
   if (notesOpen) np.style.top = anchorBelowNav();
-  if (notesOpen) { renderNotesPanel(); notesLoad(function () { renderNotesPanel(); }); }
+  if (notesOpen) { renderNotesPanel(); notesLoad(function () { renderNotesList(); }); }
+  notesWatch();
 }
 
 function updateNotesCount() { var el = $('notesCount'); if (el) { var n = notesData.length; el.textContent = n; el.style.display = n ? '' : 'none' } }
 
+function notesListHtml() {
+  var h = '';
+  if (!notesData.length) h += '<div class="notes-empty">Capture insights as you work through the pipeline.</div>';
+  else for (var i = 0; i < notesData.length; i++) { var n = notesData[i]; h += '<div class="note-card"><div class="note-text">' + esc(n.body) + '</div><div class="note-meta"><span class="note-date">' + (n.step ? esc(notesScopeLabel(n.step)) + ' · ' : '') + esc(notesDate(n.created_at)) + '</span><button class="note-del" onclick="deleteNote(\'' + n.id + '\')">×</button></div></div>'; }
+  return h;
+}
+/* The list alone: what is being typed below it, and the caret, are left as they are. */
+function renderNotesList() {
+  var panel = $('notesPanel'), list = panel && panel.querySelector('.notes-list');
+  if (!list) { renderNotesPanel(); return; }
+  list.innerHTML = notesListHtml();
+}
+
 function renderNotesPanel() {
   var panel = $('notesPanel'); if (!panel) return;
   var h = '<div class="notes-header"><div class="notes-header-title">&#9998; Notes</div><button class="notes-close" onclick="toggleNotes()">×</button></div>';
-  h += '<div class="notes-list">';
-  if (!notesData.length) h += '<div class="notes-empty">Capture insights as you work through the pipeline.</div>';
-  else for (var i = 0; i < notesData.length; i++) { var n = notesData[i]; h += '<div class="note-card"><div class="note-text">' + esc(n.body) + '</div><div class="note-meta"><span class="note-date">' + (n.step ? esc(notesScopeLabel(n.step)) + ' · ' : '') + esc(notesDate(n.created_at)) + '</span><button class="note-del" onclick="deleteNote(\'' + n.id + '\')">×</button></div></div>'; }
-  h += '</div>';
+  h += '<div class="notes-list">' + notesListHtml() + '</div>';
   h += '<div class="notes-input-row"><textarea id="notesInput" placeholder="Write a note..." onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();addNote()}"></textarea><button class="notes-send" onclick="addNote()">&#9998;</button></div>';
   panel.innerHTML = h;
 }
@@ -94,8 +127,8 @@ function addNote() {
   }
   inp.value = '';
   postJSON(API_BASE + '/notes', { actor_id: actor, body: text, step: notesScope().key, module: notesModule() },
-    function (res) { var saved = res && res.data && res.data.note; if (saved) { notesData.unshift(saved); renderNotesPanel(); updateNotesCount(); } },
-    function (err) { inp.value = text; showToast((err && err.message) || 'Could not save the note.', 'error'); });
+    function (res) { var saved = res && res.data && res.data.note; _notesChanges++; if (saved) { notesData = notesData.filter(function (n) { return String(n.id) !== String(saved.id); }); notesData.unshift(saved); renderNotesList(); updateNotesCount(); } },
+    function (err) { var box = document.getElementById('notesInput'); if (box && !box.value) box.value = text; showToast((err && err.message) || 'Could not save the note.', 'error'); });   /* put back, unless another has been started */
 }
 
 function deleteNote(id) {
@@ -106,6 +139,6 @@ function deleteNote(id) {
     renderNotesPanel(); updateNotesCount(); return;
   }
   postJSON(API_BASE + '/notes/delete', { actor_id: actor, id: id },
-    function () { notesData = notesData.filter(function (n) { return String(n.id) !== String(id); }); renderNotesPanel(); updateNotesCount(); },
+    function () { _notesChanges++; notesData = notesData.filter(function (n) { return String(n.id) !== String(id); }); renderNotesList(); updateNotesCount(); },
     function (err) { showToast((err && err.message) || 'Could not delete the note.', 'error'); });
 }
