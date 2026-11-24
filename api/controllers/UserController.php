@@ -8,6 +8,7 @@ use Core\Password;
 use Core\Response;
 use Core\SignInGuard;
 use Models\Access;
+use Models\MailOutbox;
 use Models\Organization;
 use Models\User;
 use Validation\Validator;
@@ -222,6 +223,13 @@ class UserController extends Controller
         }
         if ($last) {
             Response::error('An organization needs at least one administrator. Make someone else an administrator first.', 409, ['reason' => 'last-admin']);
+        }
+        /* P-16: what was waiting to be sent to them is not sent. The removal stands whatever happens here: the retry asks
+           again before sending. */
+        try {
+            (new MailOutbox())->cancelForFormerMembers((int) $target['organization_id']);
+        } catch (\Throwable $e) {
+            error_log('queued mail could not be cancelled: ' . $e->getMessage());
         }
         Response::success(['deleted' => true]);
     }

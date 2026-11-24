@@ -44,6 +44,11 @@ final class MailRetry
         $outbox = new MailOutbox();
         $mailer = new Mailer();
         foreach ($outbox->retryable($limit, self::MAX_ATTEMPTS, self::MAX_AGE_DAYS, $orgId, $minAgeSeconds) as $row) {
+            /* Every message here is to a member about their organization; one who has left gets no more of it (P-16). */
+            if ($row['organization_id'] !== null && !$outbox->isForMember((int) $row['organization_id'], (string) $row['to_email'])) {
+                $outbox->markCancelled((string) $row['public_id']);
+                continue;
+            }
             $out['tried']++;
             $result = $mailer->send(
                 (string) $row['to_email'],

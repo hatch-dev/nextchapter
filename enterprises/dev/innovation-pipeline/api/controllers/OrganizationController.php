@@ -163,6 +163,7 @@ class OrganizationController extends Controller
 
         $this->requireOrgAdmin($input, (int) $org['id']);
         $orgModel->deleteByPublicId($publicId);
+        try { (new \Models\MailOutbox())->cancelForFormerMembers((int) $org['id']); } catch (\Throwable $e) { error_log('queued mail could not be cancelled: ' . $e->getMessage()); }   /* P-16 */
 
         Response::success(['deleted' => true]);
     }
@@ -303,6 +304,9 @@ class OrganizationController extends Controller
         } catch (\Throwable $e) {
             $db->rollBack();
             Response::error('The reset could not be completed; nothing was changed.', 409, ['reason' => 'reset-failed']);
+        }
+        if ($removed > 0) {
+            try { (new \Models\MailOutbox())->cancelForFormerMembers($orgId); } catch (\Throwable $e) { error_log('queued mail could not be cancelled: ' . $e->getMessage()); }   /* P-16 */
         }
 
         Response::success(['reset' => true, 'removed' => $removed, 'administrators' => count($adminIds),

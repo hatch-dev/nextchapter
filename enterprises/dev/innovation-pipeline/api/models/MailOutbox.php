@@ -154,6 +154,44 @@ class MailOutbox extends Model
         );
     }
 
+    /**
+     * Nothing still waiting goes to somebody who is no longer in the organization (P-16, 24 Nov 2026).
+     *
+     * A removed member's reminders, assignment notices and invitation stayed queued, and a retry sent them up to a week
+     * later. Called after anyone is removed; by address, because a reminder's row does not say which person it is for,
+     * and addresses are unique across the installation. The rows are kept, marked 'cancelled', so the record still
+     * says what was never sent and why.
+     */
+    public function cancelForFormerMembers(int $orgId): void
+    {
+        $this->execute(
+            "UPDATE mail_outbox m
+                SET m.status = 'cancelled', m.error = 'Not sent: the recipient is no longer in the organization.'
+              WHERE m.organization_id = :org AND m.status = 'queued'
+                AND NOT EXISTS (SELECT 1 FROM users u
+                                 WHERE u.organization_id = m.organization_id AND LOWER(TRIM(u.email)) = LOWER(TRIM(m.to_email)))",
+            [':org' => $orgId]
+        );
+    }
+
+    /** May this message still go out? Asked at the moment of sending, for whatever removed them without being asked. */
+    public function isForMember(int $orgId, string $email): bool
+    {
+        return $this->selectOne(
+            'SELECT 1 AS hit FROM users WHERE organization_id = :org AND LOWER(TRIM(email)) = LOWER(TRIM(:email)) LIMIT 1',
+            [':org' => $orgId, ':email' => $email]
+        ) !== null;
+    }
+
+    public function markCancelled(string $publicId): void
+    {
+        $this->execute(
+            "UPDATE mail_outbox SET status = 'cancelled', error = 'Not sent: the recipient is no longer in the organization.'
+              WHERE public_id = :pid AND status = 'queued'",
+            [':pid' => $publicId]
+        );
+    }
+
     /** Everything still waiting to go out, oldest first. */
     public function queued(int $limit = 25): array
     {
