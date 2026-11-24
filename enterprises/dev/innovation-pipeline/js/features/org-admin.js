@@ -488,8 +488,18 @@ function temporaryProblem(temp, isNew) {
    is held in _pendingAdmin until it answers, so a refusal never leaves this browser believing something the server does not. ── */
 var LAST_ADMIN_MSG = 'An organization needs at least one administrator. Make someone else an administrator first.';
 function adminCountIn(list) { return (list || []).filter(function (x) { return x && x.admin === true; }).length; }
-function adminTickHtml(id, on) { return '<label class="admin-tick"><input type="checkbox" id="' + id + '"' + (on ? ' checked' : '') + '/> <span>Administrator</span></label>'; }
+function adminTickHtml(id, on, was) { return '<label class="admin-tick"><input type="checkbox" id="' + id + '"' + (was === undefined ? '' : ' data-was="' + (was ? '1' : '0') + '"') + (on ? ' checked' : '') + '/> <span>Administrator</span></label>'; }
 var _pendingAdmin = {};   /* local member id -> the administrator flag asked for, until the server answers */
+/* The team editor's Administrator box (P-05, 24 Nov 2026). A Save the SERVER refused redrew it from the stored flag
+   and dropped the tick, so the next Save made a plain member. A box somebody changed is read back from the page, as
+   the temporary password is; one nobody touched follows the stored flag, so it never undoes a colleague's change.
+   data-was is the flag it was drawn against. Closing the editor drops it. */
+function memberAdminTickHtml(u) {
+  var id = 'ru_' + u.id + '_admin', el = document.getElementById(id);
+  var on = (u.id in _pendingAdmin) ? _pendingAdmin[u.id] : u.admin === true;
+  if (el && el.checked !== (el.getAttribute('data-was') === '1')) on = el.checked;
+  return adminTickHtml(id, on, u.admin === true);
+}
 
 /** Send it; cb(null) on success, cb(message) otherwise. */
 function sendTemporaryPassword(orgPublicId, userPublicId, temp, cb) {
@@ -2253,7 +2263,7 @@ function renderOrgModal() {
          (Directive 2 Oct 2026, 5.7 and 5.10). Your own password is Change
          password, in the account menu; nobody's is ever shown back. */
       if (canEdit && !isMe) h += temporaryFieldHtml('ru_' + u.id + '_temporary', !u.serverId, fe.temporary);
-      if (canEdit) h += adminTickHtml('ru_' + u.id + '_admin', (u.id in _pendingAdmin) ? _pendingAdmin[u.id] : u.admin === true);   /* Sweep 4R item 2 (A.5.29): administrators only; new members too */
+      if (canEdit) h += memberAdminTickHtml(u);   /* Sweep 4R item 2 (A.5.29): administrators only; new members too */
       h += '</div>';
       /* Which programs this person may open. Admin-only: a member editing
          their own profile is shown what they have, not a set of switches over

@@ -1,10 +1,12 @@
 // @ts-check
 /* ─────────────────────────────────────────────────────────────
-   member-form.spec.js — adding and editing a member (P-04, 24 Nov 2026)
+   member-form.spec.js — adding and editing a member (P-04 and P-05, 24 Nov 2026)
    ─────────────────────────────────────────────────────────────
    Someone could be saved with no program and no word about it, the
    generated temporary password was cut off in its box, and the message
    called it the password "you chose".
+
+   P-05 (same day): a Save the server refused dropped the Administrator tick.
 
    Members are @example.test and go with the organization when the fixture
    deletes it. POST /api/users is answered here wherever it would send an
@@ -91,4 +93,70 @@ test('the whole temporary password is readable in its box', async ({ page, accou
     const over = await m.temp.evaluate((el) => el.scrollWidth - el.clientWidth);
     expect(over, `hidden pixels at ${width}px wide`).toBeLessThanOrEqual(0);
   }
+});
+
+test.describe('the Administrator tick after the server refuses a save (P-05)', () => {
+  const TAKEN = { status: 422, json: { success: false, message: 'The submitted data was invalid.', errors: { username: ['That username is already taken. Choose another.'] } } };
+
+  test('a new member stays an administrator', async ({ page, account }) => {
+    test.setTimeout(60_000);
+    const m = await newMember(page, account);
+    const sent = [];
+    await page.route('**/api/users', (route) => {                          // refused twice, then taken
+      sent.push(route.request().postDataJSON());
+      return route.fulfill(sent.length < 3 ? TAKEN : { status: 201, json: { success: true, data: { id: 'usr_test', modules: [], invite: { status: 'no-transport' } } } });
+    });
+    const tick = page.locator(`#ru_${m.id}_admin`);
+    await m.boxes.first().check();
+    await tick.check();
+    for (const n of [1, 2]) {
+      await m.save.click();
+      await expect.poll(() => sent.length).toBe(n);
+      await expect(page.locator('#modalRoot .org-field-err')).toContainText('already taken');
+      await expect(tick).toBeChecked();
+    }
+    await m.save.click();
+    await expect.poll(() => sent.length).toBe(3);
+    expect(sent.map((s) => s.is_admin)).toEqual([true, true, true]);
+  });
+
+  test('taking someone\'s rights away is not undone, and Cancel forgets it', async ({ page, account }) => {
+    test.setTimeout(60_000);
+    await signIn(page, PROGRAM, account);
+    await page.route('**/api/organizations/members**', (route) => route.abort());   // keeps the colleague below in the list
+    const sent = [];
+    await page.route('**/api/users/update', (route) => { sent.push(route.request().postDataJSON()); return route.fulfill(TAKEN); });
+    await page.evaluate(() => {
+      openOrg();
+      USERS.push({ id: 'zz_col', serverId: 'zz_col', name: 'Second Admin', username: 'second.admin', role: 'Lead', scope: 'All', email: 'second@example.test', dept: 'QA', admin: true, modules: ['pipeline'] });
+      editProfile('zz_col');
+    });
+    const tick = page.locator('#ru_zz_col_admin');
+    await expect(tick).toBeChecked();
+    await tick.uncheck();
+    for (const n of [1, 2]) {
+      await page.locator('#modalRoot .org-btn-save').first().click();
+      await expect.poll(() => sent.length).toBe(n);
+      await expect(page.locator('#modalRoot .org-field-err')).toContainText('already taken');
+      await expect(tick).not.toBeChecked();
+    }
+    expect(sent.map((s) => s.is_admin)).toEqual([false, false]);
+
+    await page.evaluate(() => { cancelEditProfile(); editProfile('zz_col'); });
+    await expect(tick).toBeChecked();
+  });
+
+  test('a box nobody touched follows a colleague\'s change', async ({ page, account }) => {
+    test.setTimeout(60_000);
+    await signIn(page, PROGRAM, account);
+    await page.route('**/api/organizations/members**', (route) => route.abort());
+    await page.evaluate(() => {
+      openOrg();
+      USERS.push({ id: 'zz_col', serverId: 'zz_col', name: 'Second Admin', username: 'second.admin', role: 'Lead', scope: 'All', email: 'second@example.test', dept: 'QA', admin: true, modules: ['pipeline'] });
+      editProfile('zz_col');
+      USERS.find((u) => u.id === 'zz_col').admin = false;
+      renderOrgModal();
+    });
+    await expect(page.locator('#ru_zz_col_admin')).not.toBeChecked();
+  });
 });
