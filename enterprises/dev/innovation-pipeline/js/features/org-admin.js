@@ -311,6 +311,7 @@ function hydrateOrgsFromServer(cb) {
 }
 
 function adminOpenOrg(orgPublicId) { if (!isAppAdmin) return;   /* Sweep 4R item 10: the app administrator's console checks its caller itself, not only by hiding its button */
+  if (!adminCreatedMayLeave()) return;
   var dbOrg = adminOrgById(orgPublicId); if (!dbOrg) return;
   // Load the workspace from the database before entering it — see openOrgWorkspace.
   openOrgWorkspace(dbOrg.id, function (localId) {
@@ -554,6 +555,15 @@ function validateAdminUserFields(v, isNew) {
   return e;
 }
 
+/* ── Nobody is left without a program by accident (P-04, 24 Nov 2026) ──
+   Asked when the editor offers programs and none is ticked: for someone new, or for
+   someone who had one until now. `picker` is the id prefix of the boxes on screen. */
+function noProgramsOk(name, picker, picked, had) {
+  if (picked.length || (had && !had.length)) return true;
+  if (!document.querySelector('input[type="checkbox"][id^="' + picker + '"]:not(:disabled)')) return true;
+  return confirm((name || 'This person') + ' won\u2019t be able to open any program. Save anyway?');
+}
+
 function adminSaveUser(orgPublicId, userPublicId) { if (!isAppAdmin) return;   /* Sweep 4R item 10: the app administrator's console checks its caller itself, not only by hiding its button */
   if (UI.adminUserBusy) return;
   var isNew = (userPublicId === 'new');
@@ -578,6 +588,10 @@ function adminSaveUser(orgPublicId, userPublicId) { if (!isAppAdmin) return;   /
 
   var errs = validateAdminUserFields(v, isNew);
   if (Object.keys(errs).length) { UI.adminUserErr = errs; renderAdminModal(); return; }
+  if (poolMods.length && UI.adminUserEdit) {
+    var _was = isNew ? null : (((org && org.users) || []).filter(function (x) { return x.public_id === userPublicId; })[0] || {}).modules || [];
+    if (!noProgramsOk(v.name, 'aum_', UI.adminUserEdit.modules || [], _was)) return;
+  }
 
   var payload = { actor_id: actor, name: v.name, username: v.username, role: v.role, scope: v.scope, email: v.email, department: v.dept };
   if (typeof v.admin === 'boolean') payload.is_admin = v.admin;   /* Sweep 4R item 2 */
@@ -944,18 +958,48 @@ function adminNewOrgSave() { if (!isAppAdmin) return;   /* Sweep 4R item 10: the
   UI.adminNewOrg.errors = {}; UI.adminNewOrg.busy = true; adminSurfaceRender();
   postJSON(API_BASE + '/setup', { organization_name: v.organization_name, name: v.name, email: v.email, username: v.username, password: v.password },
     function () {
-      UI.adminNewOrg = null; showToast('✓ Organization created. Give its administrator the temporary password.');
+      UI.adminNewOrg = null;
+      if (!isAppAdmin) return;   /* signed out while it was being created */
+      UI.adminCreated = { org: v.organization_name, name: v.name, username: v.username, password: v.password };
+      showToast('✓ Organization created.'); adminPageRoot().scrollTop = 0;
       if (adminPageShowing()) fetchAdminData();
       // Pull the registry back from the database so the console lists the new
       // org under its real id — the id every later save and sign-in uses.
       hydrateOrgsFromServer(function () { adminSurfaceRender(); });
     },
     function (err) {
+      if (!UI.adminNewOrg) return;
       UI.adminNewOrg.busy = false;
       UI.adminNewOrg.errors = (err && err.errors) ? mapServerFieldErrors(err.errors) : {};
       if (!Object.keys(UI.adminNewOrg.errors).length) UI.adminNewOrg.errors = { _general: (err && err.message) || 'Could not create the organization.' };
       adminSurfaceRender();
     });
+}
+
+/* ── The administrator's sign-in, kept on screen until Done (P-02, 24 Nov 2026) ──
+   Nothing emails a new organization's administrator, so the form closing took the
+   only copy of the temporary password with it. It is held in memory only, never
+   saved, and goes on Done, on signing out and on a reload. Leaving the console
+   with it still up asks first. */
+function adminCreatedHtml() {
+  var c = UI.adminCreated; if (!c) return '';
+  var h = '<div class="org-card editing adm-form adm-created" role="status">';
+  h += '<div class="org-card-head"><div class="org-card-headtxt">' + esc(c.org) + ' is ready</div></div>';
+  h += '<p class="adm-form-lead">Give these to ' + esc(c.name) + ' now. The temporary password isn\u2019t emailed, and it isn\u2019t shown again after you press Done. They choose their own password the first time they sign in.</p>';
+  h += '<div class="org-edit-grid">';
+  [['Username', 'nac_username', c.username], ['Temporary password', 'nac_password', c.password]].forEach(function (x) {
+    h += '<div><label class="org-flabel" for="' + x[1] + '">' + x[0] + '</label><div class="tp-row"><input id="' + x[1] + '" class="field-input tp-val" type="text" readonly spellcheck="false" autocomplete="off" value="' + esc(x[2]) + '"/>'
+      + '<button type="button" class="org-btn-cancel tp-btn" onclick="tempPwCopy(\'' + x[1] + '\', this)">Copy</button></div></div>';
+  });
+  h += '</div><div class="org-edit-actions"><button type="button" class="org-btn-save" onclick="adminCreatedDone()">Done</button></div></div>';
+  return h;
+}
+function adminCreatedDone() { UI.adminCreated = null; adminSurfaceRender(); }
+/** True when the console may be left: nothing is waiting to be copied, or they said to leave it. */
+function adminCreatedMayLeave() {
+  var c = UI.adminCreated; if (!c) return true;
+  if (!confirm('The temporary password for ' + c.name + ' (' + c.org + ') won\u2019t be shown again. Leave without it?')) return false;
+  UI.adminCreated = null; return true;
 }
 
 function adminNewOrgFormHtml() {
@@ -1013,6 +1057,7 @@ function adminPageRoot() {
 /* Signed in to a workspace (the admin acting as one of its members), so there is somewhere to go back to. */
 function adminInWorkspace() { return !!(currentOrgId && currentUserId && getCurrentUser()); }
 function closeAdminPage() {
+  if (!adminCreatedMayLeave()) return;
   UI.adminPage = false; UI.adminUserEdit = null; UI.adminAccess = null; UI.adminNewOrg = null; UI.adminDetEdit = null; UI.adminReset = null;
   renderAdminModal(); render();
 }
@@ -1130,7 +1175,7 @@ function adminToolbarHtml() {
   h += '</select>';
   h += '<select class="field-sel adm-sel" aria-label="Sort" onchange="adminSetFilter(\'sort\',this.value)">'
     + opt('newest', 'Newest first', v.sort) + opt('oldest', 'Oldest first', v.sort) + opt('name', 'Name A–Z', v.sort) + opt('users', 'Most users', v.sort) + '</select>';
-  if (!(UI.adminNewOrg && UI.adminNewOrg.open)) h += '<button class="btn-gold adm-new" onclick="adminNewOrgOpen()">+ New organization</button>';
+  if (!(UI.adminNewOrg && UI.adminNewOrg.open) && !UI.adminCreated) h += '<button class="btn-gold adm-new" onclick="adminNewOrgOpen()">+ New organization</button>';
   return h + '</div>';
 }
 
@@ -1275,6 +1320,7 @@ function adminPageHtml() {
   if (o) return h + adminOrgDetailHtml(o) + '</div>';
   v.orgId = null;
   h += adminToolbarHtml();
+  h += adminCreatedHtml();
   if (UI.adminNewOrg && UI.adminNewOrg.open) h += adminNewOrgFormHtml();
   return h + '<div id="admList">' + adminListHtml() + '</div></div>';
 }
@@ -1817,11 +1863,17 @@ function saveProfile(id) {
      picker at all, so a member saving their own profile leaves `modules`
      untouched and memberPayload() then omits it — which is what tells the
      server to leave the grant alone. */
+  var hadModules = isNew ? null : (u.modules || []);
   if (canManageOrg()) u.modules = readMemberModules(id);
 
   // Client-side validation → inline errors, editor stays open (values preserved).
   var errs = validateMemberFields(vals, id, isNew && !!tEl);
   if (Object.keys(errs).length) { UI.orgEditErrors = errs; UI.orgEditBusy = false; renderOrgModal(); focusFirstMemberErr(id, errs); return; }
+
+  if (canManageOrg() && !noProgramsOk(u.name, 'rm_' + id + '_', u.modules, hadModules)) {
+    if (hadModules) u.modules = hadModules;   /* the editor stays as it is; nothing was saved */
+    delete _pendingAdmin[u.id]; return;
+  }
 
   // Valid → it's a real member now; save locally.
   delete u._draft;
@@ -1861,9 +1913,9 @@ function inviteMessage(invite, u, withPassword) {
     case 'sent':
       return 'Access email sent to ' + (u.email || who) + (withPassword ? ', with their temporary password.' : '.');
     case 'no-transport':
-      return 'Member added. The access email is queued — no mail server is configured yet, so send their sign-in details' + (withPassword ? ', including the temporary password you chose,' : '') + ' on for now.';
+      return 'Member added. The access email is queued — no mail server is configured yet, so send their sign-in details' + (withPassword ? ', including the temporary password,' : '') + ' on for now.';
     case 'send-failed':
-      return 'Member added, but the access email could not be sent (' + ((invite.error || '').slice(0, 80) || 'unknown error') + ').' + (withPassword ? ' Give them the temporary password you chose yourself: a retry will not carry it.' : ' It stays queued for a retry.');
+      return 'Member added, but the access email could not be sent (' + ((invite.error || '').slice(0, 80) || 'unknown error') + ').' + (withPassword ? ' Give them the temporary password yourself: a retry will not carry it.' : ' It stays queued for a retry.');
     case 'no-address':
       return 'Member added. No email address on file, so no access email was sent.';
     default:

@@ -8,7 +8,7 @@
 
 if (!function_exists('load_env')) {
     /**
-     * Read apps/.env into the process environment, once.
+     * Read apps/.env once per request; returns its KEY => value pairs.
      *
      * Everything here has always come from the real environment, which is the
      * right place for a secret and the wrong place for a developer on XAMPP:
@@ -22,18 +22,23 @@ if (!function_exists('load_env')) {
      * accident rather than by design; apps/.env is above the API entirely and
      * is git-ignored. Values are read verbatim — no interpolation, no escapes —
      * except for one optional layer of wrapping quotes.
+     *
+     * The values are kept here, never handed to putenv() (P-03, 24 Nov 2026). On
+     * Windows every request shares one Apache process and putenv() is
+     * process-wide, so a live request running beside a dev one read the dev
+     * copy's DB_NAME and worked in the wrong database.
      */
-    function load_env(): void
+    function load_env(): array
     {
-        static $loaded = false;
-        if ($loaded) {
-            return;
+        static $values = null;
+        if ($values !== null) {
+            return $values;
         }
-        $loaded = true;
+        $values = [];
 
         $file = dirname(__DIR__, 2) . '/.env';
         if (!is_readable($file)) {
-            return;
+            return $values;
         }
         foreach (file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [] as $line) {
             $line = trim($line);
@@ -47,12 +52,11 @@ if (!function_exists('load_env')) {
                 && $value[-1] === $value[0]) {
                 $value = substr($value, 1, -1);
             }
-            // The real environment is authoritative; the file only fills gaps.
-            if ($key !== '' && getenv($key) === false) {
-                putenv($key . '=' . $value);
-                $_ENV[$key] = $value;
+            if ($key !== '' && !array_key_exists($key, $values)) {
+                $values[$key] = $value;
             }
         }
+        return $values;
     }
 }
 
@@ -63,8 +67,11 @@ if (!function_exists('env')) {
      */
     function env(string $key, $default = null)
     {
-        load_env();
+        // The real environment is authoritative; the file only fills gaps.
         $value = getenv($key);
+        if ($value === false) {
+            $value = load_env()[$key] ?? false;
+        }
         if ($value === false) {
             return $default;
         }

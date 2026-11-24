@@ -41,6 +41,7 @@ test('a new member gets a generated temporary password that signs them in', asyn
   await f('scope').fill('All');
   await f('email').fill(uname + '@example.test');
   await f('dept').fill('QA');
+  await page.locator(`input[type="checkbox"][id^="rm_${draftId}_"]:not(:disabled)`).first().check();   // no program would ask first (P-04)
   await page.locator('.org-btn-save').first().click();
   await expect(page.locator('#ru_' + draftId + '_temporary')).toHaveCount(0, { timeout: 20_000 });   // the editor closed: saved
 

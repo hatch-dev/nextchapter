@@ -1,6 +1,6 @@
 // @ts-check
 /* The one sign-up, at /apps/signup (templates/setup.html, js/auth.js → submitSetup). */
-const { test, expect, newAccount, visibleErrors, SETUP_CODE } = require('./fixtures');
+const { test, expect, newAccount, acceptTermsIfShown, visibleErrors, SETUP_CODE } = require('./fixtures');
 
 /** Fill every field. Passwords are filled each time: a re-render after an error clears them by design. */
 async function fillForm(page, acct, overrides = {}) {
@@ -79,8 +79,36 @@ test.describe('creating an account', () => {
     await page.locator('[data-submit]').click();
 
     await expect(page).toHaveURL(/\/enterprises\/innovation-pipeline/);
+    await expect(page.locator('#termsAgree')).toBeVisible({ timeout: 20_000 });   // Terms of Use come before the program
+    await acceptTermsIfShown(page);
     await expect(page.locator('.nav-tab[data-tab="pipeline"]')).toHaveText('Pipeline');
     await expect(page.locator('.nav-user-chip')).toBeVisible();
+  });
+
+  test('the welcome panel after sign-up closes only from Get Started', async ({ page, cleanup }) => {
+    const acct = newAccount('enterprise');
+    cleanup.add(acct);
+    await fillForm(page, acct);
+    await page.locator('[data-submit]').click();
+    await acceptTermsIfShown(page);
+
+    const backdrop = page.locator('#modalRoot .modal-bg');
+    const welcome = page.locator('#modalRoot .modal', { hasText: 'Set Up Your Organization' });
+    await expect(welcome).toBeVisible({ timeout: 20_000 });
+    await backdrop.click({ position: { x: 5, y: 300 } });   // before the fix: closed it, skipping setup
+    await page.keyboard.press('Escape');
+    await expect(welcome).toBeVisible();
+
+    await welcome.getByRole('button', { name: /get started/i }).click();
+    await expect(welcome).toBeHidden();
+    await expect(page.locator('.nav-tab[data-tab="home"]')).toBeVisible();
+
+    /* Opened later, the same panel is an ordinary edit screen and the backdrop does close it. */
+    await page.evaluate(() => window['openOrg']());
+    const edit = page.locator('#modalRoot .modal', { hasText: 'Organization & Team' });
+    await expect(edit).toBeVisible();
+    await backdrop.click({ position: { x: 5, y: 300 } });
+    await expect(edit).toBeHidden();
   });
 
   test('Leaders: lands signed in on Judgment, with its own tabs', async ({ page, cleanup }) => {
@@ -90,6 +118,8 @@ test.describe('creating an account', () => {
     await page.locator('[data-submit]').click();
 
     await expect(page).toHaveURL(/\/leaders\/judgment-critical-thinking/);
+    await expect(page.locator('#termsAgree')).toBeVisible({ timeout: 20_000 });
+    await acceptTermsIfShown(page);
     await expect(page.locator('.nav-tab')).toHaveText(['Home', 'Learn', 'Assess', 'Practice', 'Dashboard', 'Insights']);
   });
 });

@@ -3413,7 +3413,7 @@ function adminConsoleDelete(orgId) { if (!isAppAdmin) return;   /* Sweep 4R item
    organization that exists only in this browser is gone on the next load: the
    registry is re-read from the database, which never heard of it. */
 function adminConsoleNewOrg() { if (!isAppAdmin) return;   /* Sweep 4R item 10: the app administrator's console checks its caller itself, not only by hiding its button */ persistAdminSession(); UI.entry = { step: 'admin' }; adminNewOrgOpen(); }
-function exitAdmin() { try { Auth.serverSignOut(); } catch (e) { } Auth.setAdminSession(false); UI.adminNewOrg = null; UI.adminPage = false; try { renderAdminModal(); } catch (e) { } try { Store.setSession(null); } catch (e) { } UI.entry = { step: 'login', err: '' }; render(); }
+function exitAdmin() { try { Auth.serverSignOut(); } catch (e) { } Auth.setAdminSession(false); UI.adminNewOrg = null; UI.adminCreated = null; UI.adminPage = false; try { renderAdminModal(); } catch (e) { } try { Store.setSession(null); } catch (e) { } UI.entry = { step: 'login', err: '' }; render(); }
 /* ── Change password (5.6), and the administrator's username (5.12.3) ──────────
    One dialog for both kinds of account: a member changes their own (POST /password),
    the app administrator theirs (POST /admin/password). Changing it ends the person's
@@ -6831,10 +6831,11 @@ function closeModal() {
 /* Any open modal closes when its backdrop (the area outside the card) is clicked.
    Delegated on document so it covers every modal — current and future — including
    ones without their own inline handler. Clicks inside the .modal card don't fire
-   (their target isn't the .modal-bg). */
+   (their target isn't the .modal-bg). The sign-up welcome panel (orgSetupMode) is the exception: it
+   closes only from its own Get Started button. */
 document.addEventListener('mousedown', function (e) {
   var t = e.target;
-  if (t && t.classList && t.classList.contains('modal-bg')) closeModal();
+  if (t && t.classList && t.classList.contains('modal-bg') && !(orgSetupMode && currentModal === 'org')) closeModal();
 });
 
 /* Slide-out panels + the More menu close when you click outside them — but not
@@ -7019,7 +7020,7 @@ function sessionEnded() {
   try { sealSession(); } catch (e) { }
   Auth.clearSession();
   try { Store.resetConnection(); } catch (e) { }   /* the refusals that led here were not a dropped connection */
-  UI.adminNewOrg = null;
+  UI.adminNewOrg = null; UI.adminCreated = null;
   UI.entry = { step: 'login', err: 'Your session has ended. Sign in again.', errors: {} };
   /* The sign-in page is a new load: carry the reason across so it can say why. */
   try { sessionStorage.setItem('nc-session-ended', '1'); } catch (e) { }

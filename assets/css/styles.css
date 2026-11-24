@@ -9607,8 +9607,8 @@ html.adm-open .admin-view-bar { display: none }   /* the page has its own way ba
 .adm-detform .org-edit-grid > div:first-child { grid-column: 1 / -1 }   /* the name across the row, the six details in two rows of three */
 .adm-detform-obj { margin-top: 16px }
 /* Generated temporary passwords (18 Nov 2026) */
-.tp-row { display: flex; gap: 8px; align-items: stretch }
-.tp-row .tp-val { flex: 1; min-width: 0; font-family: var(--mono); letter-spacing: .06em; cursor: text }
+.tp-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch }
+.tp-row .tp-val { flex: 1 1 170px; min-width: 0; font-family: var(--mono); letter-spacing: .06em; cursor: text }
 .tp-btn { padding: 0 14px; white-space: nowrap }
 .tp-reset { padding: 9px 16px }
 .tp-keep { display: inline-block; margin-top: 6px; font-size: 12px }
