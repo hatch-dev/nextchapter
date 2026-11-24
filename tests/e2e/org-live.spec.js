@@ -71,11 +71,14 @@ test("a colleague's change does not scroll an open Organization & Team window ba
   await otherDevice.evaluate(() => openOrg());
   await otherDevice.setViewportSize({ width: 1100, height: 600 });   // short enough that the window scrolls
 
+  /* Measured with the lock note already up: the note takes a line of its own when it first shows, and since P-09
+     (24 Nov 2026) it stays while the colleague is editing. What must not move anything is their text arriving. */
+  const site = 'scroll-' + Date.now().toString(36) + '.example';
+  await page.locator('#ent_website').click();
+  await expect(otherDevice.locator('#modalRoot .collab-lock-mark')).toContainText('is editing', { timeout: 30_000 });
   const scrolled = await otherDevice.evaluate(() => { const m = document.querySelector('#modalRoot .modal'); m.scrollTop = m.scrollHeight; return m.scrollTop; });
   expect(scrolled).toBeGreaterThan(50);
 
-  const site = 'scroll-' + Date.now().toString(36) + '.example';
-  await page.locator('#ent_website').click();
   await page.locator('#ent_website').pressSequentially(site, { delay: 30 });
   await expect(otherDevice.locator('#ent_website')).toHaveValue(site, { timeout: 30_000 });
 
@@ -113,5 +116,36 @@ test('two people filling in different organization details both keep what they w
   await page.unroute(POLL);
   await expect(page.locator('#ent_industry')).toHaveValue('Pharma', { timeout: 30_000 });
   await expect(otherDevice.locator('#ent_website')).toHaveValue('first.example.uk', { timeout: 30_000 });
+  await expect(otherDevice.locator('#ent_industry')).toHaveValue('Pharma');
+});
+
+/* P-09 (24 Nov 2026): the colleague's text arriving redraws the window, and the lock went from the screen with it
+   while they were still in the field. The fields looked open and swallowed what was typed. */
+test("the lock stays on show after the colleague's text has arrived, and goes when they are done", async ({ page, otherDevice, account }) => {
+  test.setTimeout(150_000);
+  await signIn(page, GOVERNANCE, account);
+  await signIn(otherDevice, GOVERNANCE, account);
+  await page.evaluate(() => openOrg());
+  await otherDevice.evaluate(() => openOrg());
+  const note = otherDevice.locator('#modalRoot .collab-lock-mark', { hasText: 'is editing' });
+
+  const site = 'lock-' + Date.now().toString(36) + '.example';
+  await page.locator('#ent_website').click();
+  await page.locator('#ent_website').pressSequentially(site, { delay: 30 });
+  await expect(otherDevice.locator('#ent_website')).toHaveValue(site, { timeout: 30_000 });
+  await otherDevice.waitForTimeout(1_000);
+  await expect(note).toHaveCount(1);
+  for (const id of ['ent_website', 'ent_industry', 'ent_objective']) await expect(otherDevice.locator('#' + id)).toBeDisabled();
+
+  // Opened afresh while they are editing, it says so at once.
+  await otherDevice.evaluate(() => { closeModal(); openOrg(); });
+  await expect(note).toHaveCount(1);
+  await expect(otherDevice.locator('#ent_industry')).toBeDisabled();
+
+  await page.evaluate(() => closeModal());
+  await expect(otherDevice.locator('#ent_industry')).toBeEnabled({ timeout: 30_000 });
+  await expect(otherDevice.locator('#modalRoot .collab-lock-mark')).toHaveCount(0);
+  await otherDevice.locator('#ent_industry').click();
+  await otherDevice.locator('#ent_industry').pressSequentially('Pharma', { delay: 30 });
   await expect(otherDevice.locator('#ent_industry')).toHaveValue('Pharma');
 });

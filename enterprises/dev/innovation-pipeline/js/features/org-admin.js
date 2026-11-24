@@ -2392,6 +2392,11 @@ function renderOrgModal() {
   var oldBox = mr.querySelector('.modal'), oldBg = mr.querySelector('.modal-bg');
   var keepTop = oldBox ? oldBox.scrollTop : 0, keepBgTop = oldBg ? oldBg.scrollTop : 0;
   mr.innerHTML = h;
+  /* A colleague's lock, painted back on what was just drawn (P-09, 24 Nov 2026). Their saved text redraws this window,
+     and the lock layer repaints only when the locks themselves change: the note and the disabled fields went while
+     they were still editing, and the fields looked open and swallowed what was typed in them. Before the scroll is put
+     back: the note takes up a line, so the window is only then as tall as it was. */
+  try { applyLockUI(true); } catch (e) { }
   if (keepTop || keepBgTop) {
     var box = mr.querySelector('.modal'), bg = mr.querySelector('.modal-bg');
     if (box) box.scrollTop = keepTop;
