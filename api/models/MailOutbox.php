@@ -128,7 +128,7 @@ class MailOutbox extends Model
         $row = $this->selectOne(
             'SELECT 1 AS hit FROM mail_outbox
               WHERE organization_id = :org AND kind LIKE :kind AND to_email = :to AND subject = :subject
-                AND created_at >= (NOW() - INTERVAL ' . max(1, $seconds) . ' SECOND)
+                AND status <> \'cancelled\' AND created_at >= (NOW() - INTERVAL ' . max(1, $seconds) . ' SECOND)
               LIMIT 1',
             [':org' => $orgId, ':kind' => $kindPrefix . '%', ':to' => $toEmail, ':subject' => $subject]
         );
@@ -183,12 +183,21 @@ class MailOutbox extends Model
         ) !== null;
     }
 
-    public function markCancelled(string $publicId): void
+    public function markCancelled(string $publicId, string $why = 'Not sent: the recipient is no longer in the organization.'): void
     {
         $this->execute(
-            "UPDATE mail_outbox SET status = 'cancelled', error = 'Not sent: the recipient is no longer in the organization.'
-              WHERE public_id = :pid AND status = 'queued'",
-            [':pid' => $publicId]
+            "UPDATE mail_outbox SET status = 'cancelled', error = :why WHERE public_id = :pid AND status = 'queued'",
+            [':why' => $why, ':pid' => $publicId]
+        );
+    }
+
+    /** Every copy of one message, whoever to and whatever came of it, from an hour before $since on (P-23). */
+    public function copies(int $orgId, string $kindPrefix, string $subject, string $since): array
+    {
+        return $this->select(
+            'SELECT to_email, status FROM mail_outbox
+              WHERE organization_id = :org AND kind LIKE :kind AND subject = :subject AND created_at >= (:since - INTERVAL 1 HOUR)',
+            [':org' => $orgId, ':kind' => $kindPrefix . '%', ':subject' => $subject, ':since' => $since]
         );
     }
 

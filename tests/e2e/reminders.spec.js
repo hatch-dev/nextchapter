@@ -51,6 +51,16 @@ test('not reached: not marked, and not asked again with every redraw', async ({ 
   await expect.poll(() => s.asked.length, { timeout: 20_000 }).toBe(2);
 });
 
+test('the server does not bear it out: not marked, and asked again in a moment (P-22)', async ({ page, account }) => {
+  test.setTimeout(60_000);
+  let n = 0;
+  const s = await dueStep(page, account, (r) => n++ ? r.fulfill({ json: { success: true, data: { accepted: true } } }) : r.fulfill({ status: 409, json: { success: false, reason: 'not-current' } }));
+  expect((await marked(page) || {})['1.1']).toBeUndefined();
+  await expect.poll(() => s.asked.length, { timeout: 15_000 }).toBe(2);
+  await expect.poll(() => marked(page), { timeout: 15_000 }).toEqual({ 1.1: s.due });
+  expect(await page.evaluate(() => data.notifications.length)).toBe(1);
+});
+
 test('refused: marked, because it would be refused again', async ({ page, account }) => {
   test.setTimeout(60_000);
   const s = await dueStep(page, account, (r) => r.fulfill({ status: 422, json: { success: false, message: 'No requested recipient belongs to this organization.', reason: 'no-roster-match' } }));

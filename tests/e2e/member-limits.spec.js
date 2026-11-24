@@ -233,11 +233,32 @@ test('a program’s notifications go only to people who have it', async ({ accou
     return { status: r.status(), ...((await r.json()).data || {}) };
   };
   expect(await notify(t.owner, [account.email, member, elsewhere])).toMatchObject({ status: 200, queued: 2 });
-  expect(await notify(t.member, [account.email, member, elsewhere], 'deadline-reminder')).toMatchObject({ status: 200, queued: 2 });
   expect(await notify(t.owner, [elsewhere])).toMatchObject({ status: 200, queued: 0 });
   expect(await notify(t.owner, [account.email, member, elsewhere], 'step-complete', 'ai-culture')).toMatchObject({ status: 200, queued: 2 });   // the owner and Elsewhere
   expect((await notify(t.owner, ['stranger@example.test'])).status).toBe(422);                                                                   // still refused
 
   await t.owner.post('api/users/update', { data: { id: (await added.json()).data.id, name: 'Elsewhere', username: t.who.username + 'x', role: 'Tester', scope: 'All', email: elsewhere, department: 'QA', modules: ['ai-culture', MODULE] } });
   expect(await notify(t.owner, [account.email, member, elsewhere])).toMatchObject({ status: 200, queued: 3 });
+});
+
+/* P-22 (24 Nov 2026): a reminder went to whoever the browser's own, possibly old, copy had assigned. */
+test('a reminder goes to whoever the server has assigned, whatever the browser asks', async ({ account, playwright, baseURL }) => {
+  const t = await ownerAndMember(account, playwright, baseURL);
+  const memberEmail = t.who.username + '@example.test';
+  const me = (await (await t.owner.get('api/session')).json()).data, member = (await (await t.member.get('api/session')).json()).data.user.id;
+  const due = '2099-03-04', name = 'Step 1.1 – Assessment Battery due ';
+  const save = (sections) => t.owner.post('api/workspace/patch', { data: { org: t.org, module: MODULE, actor_id: me.user.id, schema_version: 1, sections } });
+  const assign = (assigned) => t.owner.post('api/assignments', { data: { org: t.org, module: MODULE, actor_id: me.user.id, step: '1.1', user: member, assigned } });
+  const ask = async (date, to, over = {}) => { const r = await t.member.post('api/notify/' + MODULE, { data: { kind: 'deadline-reminder', subject: name + date, to, stepId: '1.1', orgName: '', html: '<h2>x</h2><p>x</p>', pdf: false, ...over } }); const j = await r.json(); return { status: r.status(), reason: j.reason, queued: (j.data || {}).queued }; };
+
+  expect((await save({ stepDue: { 1.1: due } })).ok()).toBe(true);
+  expect(await ask(due, [memberEmail])).toMatchObject({ status: 409, reason: 'not-current' });                 // nobody is assigned
+  expect((await assign(true)).ok()).toBe(true);
+  expect(await ask('2099-03-05', [memberEmail])).toMatchObject({ status: 409 });                                // not its date
+  expect(await ask(due, [memberEmail], { stepId: '1.2' })).toMatchObject({ status: 422 });                      // two steps in one request
+  expect(await ask(due, [account.email])).toMatchObject({ status: 200, queued: 2 });                            // the owner and the assignee, though one was asked for
+  expect(((await t.doc()).doc.remind7 || {})['1.1']).toBe(due);                                                 // and counted by the server
+  expect(await ask(due, [account.email, memberEmail])).toMatchObject({ status: 200, queued: 0 });               // once
+  await save({ stepDue: { 1.1: '2099-03-06' }, completedSteps: { 1.1: true } });
+  expect(await ask('2099-03-06', [memberEmail])).toMatchObject({ status: 409 });                                // complete
 });

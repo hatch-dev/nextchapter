@@ -43,7 +43,17 @@ final class MailRetry
         }
         $outbox = new MailOutbox();
         $mailer = new Mailer();
-        foreach ($outbox->retryable($limit, self::MAX_ATTEMPTS, self::MAX_AGE_DAYS, $orgId, $minAgeSeconds) as $row) {
+        $rows = $outbox->retryable($limit, self::MAX_ATTEMPTS, self::MAX_AGE_DAYS, $orgId, $minAgeSeconds);
+        while (($row = array_shift($rows)) !== null) {
+            /* A reminder that no longer applies to this person is not sent, and whoever it applies to now is (P-23). */
+            try {
+                $stillFor = DeadlineReminders::stillFor($row);
+                if (!$stillFor) $outbox->markCancelled((string) $row['public_id'], 'Not sent: the reminder no longer applies to this person.');
+                array_push($rows, ...DeadlineReminders::handOver($row));
+                if (!$stillFor) continue;
+            } catch (\Throwable $e) {
+                error_log('a waiting reminder could not be checked: ' . $e->getMessage());
+            }
             /* Every message here is to a member about their organization; one who has left gets no more of it (P-16). */
             if ($row['organization_id'] !== null && !$outbox->isForMember((int) $row['organization_id'], (string) $row['to_email'])) {
                 $outbox->markCancelled((string) $row['public_id']);

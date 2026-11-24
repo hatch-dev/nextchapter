@@ -3,6 +3,7 @@ namespace Controllers;
 
 use Core\Catalogue;
 use Core\Controller;
+use Core\DeadlineReminders;
 use Core\Mailer;
 use Core\MailRetry;
 use Core\ReportDocument;
@@ -140,6 +141,27 @@ class NotifyController extends Controller
             if ($hasIt !== null && !isset($hasIt[(string) $member['public_id']])) { $withoutIt++; continue; }
             $recipients[$email] = (string) ($member['name'] ?? '');
         }
+        /* A reminder goes to whoever the DATABASE says is assigned, not whoever the browser does (P-22, 24 Nov 2026). A
+           browser raises it from its own saved copy within a moment of opening, before it has asked for today's
+           assignments: it went to the person the step had been taken from, and the new one got none. 409 says the
+           stored workspace does not bear the reminder out: the browser is behind, or its own change is still on its way
+           here, so it asks again rather than counting it as sent. */
+        $reminder = null;
+        if ($kind === 'deadline-reminder') {
+            $about = DeadlineReminders::about($subject);
+            if ($about === null || $about['step'] !== $stepId) {
+                Response::validationError(['subject' => ['A reminder names its step and the date it is due.']]);
+            }
+            $reminder = $about + DeadlineReminders::now((int) $org['id'], $program, $about['step'], $about['date']);
+            if (!$reminder['current']) {
+                Response::error('This reminder does not apply to the workspace as it is stored.', 409, ['reason' => 'not-current']);
+            }
+            if ($reminder['reminded']) {   /* raised already: this browser has not heard */
+                Response::success(['accepted' => true, 'kind' => $kind, 'stepId' => $stepId, 'queued' => 0, 'sent' => 0, 'failed' => 0, 'duplicates' => count($reminder['to']),
+                    'configured' => Mailer::configured(), 'pdfPending' => false, 'attached' => '']);
+            }
+            $recipients = array_column($reminder['to'], 'name', 'email');
+        }
         if ($recipients === [] && $withoutIt > 0) {
             /* Members, every one, but none with this program: nothing to send, and nothing wrong. */
             Response::success(['accepted' => true, 'kind' => $kind, 'stepId' => $stepId, 'queued' => 0, 'sent' => 0, 'failed' => 0, 'duplicates' => 0,
@@ -166,7 +188,7 @@ class NotifyController extends Controller
 
         $outbox   = new MailOutbox();
         $mailer   = new Mailer();
-        $mailKind = mb_substr('notify-' . $kind . ($wantsPdf ? ($attachments === [] ? '-pdf_failed' : '-pdf') : ''), 0, 40);
+        $mailKind = $reminder !== null ? DeadlineReminders::kind($reminder['module']) : mb_substr('notify-' . $kind . ($wantsPdf ? ($attachments === [] ? '-pdf_failed' : '-pdf') : ''), 0, 40);
 
         /* Asked once, not per recipient: with no transport every row is left
            `queued` and readable in the outbox rather than marked failed —
@@ -223,6 +245,10 @@ class NotifyController extends Controller
             if ($locked) {
                 try { $outbox->unlock($lockName); } catch (\Throwable $e) { }
             }
+        }
+
+        if ($reminder !== null && $queued + $duplicates > 0) {
+            DeadlineReminders::mark((int) $org['id'], $reminder['module'], $reminder['schema'], $reminder['step'], $reminder['date']);
         }
 
         foreach ($toSend as [$id, $email, $name]) {

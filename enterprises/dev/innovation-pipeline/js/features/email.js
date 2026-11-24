@@ -127,19 +127,30 @@ function notifyStepComplete(id) {
 /* A reminder counts as sent when the server has it (P-21, 24 Nov 2026). It used to count the moment it was tried, so
    one raised while this browser was offline was lost for good. Not marked, it is tried again, by this browser after
    five minutes or by anybody else's; a refusal (4xx) would be refused again, so it is marked. This page never has
-   two of the same on their way: the sweep runs with every render. */
-var _remindTried = {};
+   two of the same on their way: the sweep runs with every render.
+   409 (P-22) is the server saying its stored workspace does not bear it out: this copy is behind, or a date or an
+   assignment made here is still on its way there. Not marked, and asked again in a moment, less and less often. */
+var _remindTried = {}, _remindEarly = {};
 function notifySettled(n, status) {
   if (!n || n.kind !== 'deadline-reminder' || !n.dueFor) return;
   var key = n.stepId + '|' + n.dueFor;
+  if (status === 409) {
+    var wait = [3000, 15000][_remindEarly[key] || 0] || 300000;
+    _remindEarly[key] = (_remindEarly[key] || 0) + 1;
+    _remindTried[key] = Date.now() - 300000 + wait;
+    data.notifications = (data.notifications || []).filter(function (x) { return x !== n });   /* it was not one */
+    setTimeout(notifySweepDeadlines, wait + 50);
+    return;
+  }
   if ((status >= 200 && status < 300) || (status >= 400 && status < 500 && status !== 401 && status !== 408 && status !== 429)) {
     if (!data.remind7) data.remind7 = {};
     if ((data.stepDue || {})[n.stepId] === n.dueFor) { data.remind7[n.stepId] = n.dueFor; Store.commit('remind7'); }
-    delete _remindTried[key];
+    delete _remindTried[key]; delete _remindEarly[key];
   } else _remindTried[key] = Date.now();
 }
 function notifySweepDeadlines() {
   try {
+    if (!currentUserId) return;   /* nobody is signed in here: what is on this device is the last person's copy */
     var due = data.stepDue || {}, assigns = data.assigns || {}, co = data.completedSteps || {};
     if (!data.remind7) data.remind7 = {};
     var today = new Date(); today.setHours(0, 0, 0, 0);
