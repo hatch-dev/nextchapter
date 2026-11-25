@@ -503,3 +503,214 @@ svg [stroke="#B8B0A5"] {stroke:var(--stone)
    away: below 960px it is the 60px strip and the page leaves room for it (styles.css), so hiding it left an empty
    column down the left of every page on a phone. Take it out again if this file is regenerated.
    The 960px .sidebar shadow is likewise kept to the open menu (:not(.mini)), as in styles.css. */
+
+/* ── By hand, 25 Nov 2026: Architecture pages on a phone ───────
+   This program's screens set their widths inline, for a desktop. Here their rows wrap, their columns stack and
+   their wide tables scroll inside their own card, so nothing runs past the right edge. Selected by the inline
+   style rather than by new classes so that js/modules/ai-architecture/program.js, which is ported, stays as it
+   is. Screen only: the printed documents keep their own layout. */
+@media screen and (max-width:880px) {
+  /* Track Program: the step's name, then its state and its owners under it */
+  .content-inner [style*="minmax(160px,1fr) 300px 240px"] {display:flex!important;flex-wrap:wrap;gap:8px 10px!important
+  }
+  .content-inner [style*="minmax(160px,1fr) 300px 240px"]>:first-child {flex:1 1 100%
+  }
+  .content-inner [style*="minmax(160px,1fr) 300px 240px"]>:last-child {margin-left:auto
+  }
+  /* the report builder's two panels */
+  .content-inner [style*="grid-template-columns:minmax(0,1fr) 400px"] {grid-template-columns:minmax(0,1fr)!important
+  }
+  #app .content-inner [style*="grid-template-columns:repeat(4,1fr);gap:1px;background:rgba(var(--fg-rgb),.08)"] {grid-template-columns:repeat(2,minmax(0,1fr))!important
+  }
+  /* the Review Board chart's matrix */
+  .content-inner [style="overflow-x:visible"] {overflow-x:auto!important
+  }
+  .content-inner input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),.content-inner select,.content-inner textarea {max-width:100%;box-sizing:border-box
+  }
+}
+@media screen and (max-width:760px) {
+  .content-inner .btn {max-width:100%;white-space:normal!important
+  }
+  .content-inner [style*="display:grid"]>* {min-width:0
+  }
+  /* rows that hold a heading and buttons, or tabs: the step footer, the report headers, the map buttons */
+  .content-inner [style*="display:flex;justify-content:space-between;margin-top:40px"],
+  .content-inner [style*="display:flex;justify-content:space-between;align-items:center"],
+  .content-inner [style*="display:flex;justify-content:space-between;align-items:baseline"],
+  .content-inner [style*="display:flex;gap:8px;margin:0 0 16px"],
+  .content-inner [style*="display:flex;gap:8px;margin-bottom:16px"],
+  .content-inner [style*="display:flex;gap:8px;margin:0 0 14px"],
+  .content-inner [style*="display:flex;gap:14px;align-items:center;padding:10px 14px"],
+  .content-inner [style*="display:flex;align-items:center;gap:12px;padding:9px 0"],
+  .content-inner [style*="display:flex;align-items:center;gap:12px;padding:10px 16px"],
+  .content-inner [style*="display:flex;align-items:center;gap:12px;padding:12px 16px"],
+  .content-inner [style*="display:flex;align-items:center;gap:10px;padding:10px 14px"],
+  .content-inner [style*="display:flex;align-items:center;gap:10px;margin-bottom:10px"],
+  .content-inner [style*="display:flex;align-items:center;gap:8px;padding:5px 0"],
+  .content-inner [style*="display:flex;justify-content:space-between;align-items:flex-start"],
+  .content-inner [style="display:flex;align-items:center;gap:8px"],
+  .content-inner .diag-full-bleed>[style*="display:flex;align-items:center;gap:8px"] {flex-wrap:wrap
+  }
+  .content-inner [style*="display:flex;justify-content:space-between;margin-top:40px"],
+  .content-inner [style*="display:flex;justify-content:space-between;align-items:center"] {gap:10px
+  }
+  .content-inner .map-focus-box {flex:1 1 100%!important;flex-wrap:wrap!important;margin-left:0!important
+  }
+  .content-inner [style*="display:flex;gap:8px;margin-top:8px"]>input {min-width:0
+  }
+  .content-inner [style*="display:flex;gap:8px;margin-top:8px"]>.btn {flex-shrink:0
+  }
+  /* a name that shares its row keeps enough of it to be read; what follows goes under it */
+  .content-inner [style*="display:flex"]:not([style*="flex-direction:column"]):has(>[style*="flex:1;min-width:0"]) {flex-wrap:wrap
+  }
+  .content-inner [style*="display:flex"]:not([style*="flex-direction:column"])>[style*="flex:1;min-width:0"] {flex:1 1 110px!important
+  }
+  .content-inner [style*="display:flex"]:not([style*="flex-direction:column"]):has(>[style*="flex:1;min-width:0"])>:last-child {margin-left:auto
+  }
+  .content-inner [style*="display:flex;align-items:center;gap:10px;padding:10px 14px"]>[style*="flex:1"] {flex:1 1 130px!important
+  }
+  .content-inner .sov-strip>* {padding:12px 4px!important;overflow-wrap:anywhere
+  }
+  #app .content-inner [style$="grid-template-columns:repeat(4,1fr);gap:1px;background:rgba(var(--fg-rgb),.08)"] {grid-template-columns:minmax(0,1fr)!important
+  }
+  .content-inner label>[style*="margin-left:auto;display:flex"] {flex-wrap:wrap
+  }
+  .content-inner [style*="grid-template-columns:auto 1fr auto auto"] {display:flex!important;flex-wrap:wrap
+  }
+  .content-inner [style*="grid-template-columns:1fr 150px"] {grid-template-columns:minmax(0,1fr)!important;gap:6px!important
+  }
+  /* 1 to 5 scales: the two ends above the buttons */
+  .content-inner .lk-block>.flx-center {flex-wrap:wrap
+  }
+  .content-inner .lk-block .lk-cap {order:-1;flex:1 1 calc(50% - 8px);width:auto;min-width:0
+  }
+  .content-inner .lk-block .lk-cap {font-size:12px;overflow-wrap:anywhere
+  }
+  .content-inner .lk-block .lk-btn {flex:0 1 auto
+  }
+  /* figure strips */
+  .content-inner [style*="display:flex;gap:1px;background:var(--rule)"] {flex-wrap:wrap
+  }
+  .content-inner [style*="display:flex;gap:1px;background:var(--rule)"]>* {flex:1 1 calc(50% - 1px)!important;min-width:0;padding:14px 6px!important;overflow-wrap:anywhere
+  }
+  .content-inner [style*="repeat(5,1fr);gap:1px;background:var(--rule)"] {grid-template-columns:repeat(2,minmax(0,1fr))!important
+  }
+  .content-inner [style*="repeat(5,1fr);gap:1px;background:var(--rule)"]>* {padding:14px 6px!important;overflow-wrap:anywhere
+  }
+  .content-inner [style*="repeat(5,1fr);gap:1px;background:var(--rule)"]>:last-child {grid-column:1/-1
+  }
+  /* report tables with more columns than fit */
+  .content-inner table[style*="margin:0 0 14px;font-size:13px"] {display:block;overflow-x:auto
+  }
+  .content-inner table[style*="margin:0 0 14px;font-size:13px"] td {min-width:110px
+  }
+  /* Sovereignty Baseline: a condition, then its answer and who is responsible */
+  .content-inner [style*="display:flex;align-items:baseline;gap:14px;padding:9px 0"] {flex-wrap:wrap;gap:4px 12px!important
+  }
+  .content-inner [style*="display:flex;align-items:baseline;gap:14px;padding:9px 0"]>:first-child {order:-2;flex:1 1 calc(100% - 40px)!important
+  }
+  .content-inner [style*="display:flex;align-items:baseline;gap:14px;padding:9px 0"]>[style*="min-width:180px"] {min-width:0!important;text-align:left!important;white-space:normal!important
+  }
+  .content-inner [style*="display:flex;align-items:baseline;gap:14px;padding:9px 0"]>:last-child {order:-1
+  }
+  /* a name, a bar and a figure: the bar goes under the two */
+  .content-inner [style*="flex:1;min-width:280px"] {flex:1 1 100%!important;min-width:0!important
+  }
+  .content-inner [style*="grid-template-columns:130px 1fr 1"] {grid-template-columns:minmax(0,1fr) auto!important;gap:6px 14px!important
+  }
+  .content-inner [style*="grid-template-columns:130px 1fr 1"]>:nth-child(2) {grid-row:2;grid-column:1/-1
+  }
+  .content-inner .owner-row {grid-template-columns:28px minmax(0,1.4fr) minmax(0,1fr) 24px;gap:8px
+  }
+  /* dashboard */
+  .content-inner [style*="padding:22px 24px 24px"] {padding:16px 14px!important
+  }
+  .glance-title {font-size:28px
+  }
+  .glance-grid>*,.glance-grid-32>* {min-width:0
+  }
+  .glance-sub {padding:14px
+  }
+  .glance-key {flex-wrap:wrap;gap:8px 14px
+  }
+  .content-inner [style*="justify-content:space-around;gap:10px;height:210px"] {justify-content:flex-start!important;gap:4px!important;padding:0!important;overflow-x:auto
+  }
+  .content-inner [style*="justify-content:space-around;gap:10px;height:210px"]>* {flex:0 0 66px!important
+  }
+  /* Sovereignty Center and Analytics */
+  .content-inner [style*="grid-template-columns:minmax(200px,2fr) 3fr"],
+  .content-inner [style*="grid-template-columns:1fr 1fr;gap:14px"],
+  .content-inner [style*="grid-template-columns:minmax(220px,280px) 1fr"],
+  .content-inner [style*="grid-template-columns:minmax(200px,260px) 1fr"],
+  .content-inner [style*="grid-template-columns:minmax(150px,190px) 5fr 3fr"],
+  .content-inner [style*="grid-template-columns:minmax(170px,220px) minmax(170px,220px) 1fr"] {grid-template-columns:minmax(0,1fr)!important
+  }
+  .content-inner [style*="grid-template-columns:118px 40px 1fr 44px 56px"] {grid-template-columns:34px minmax(0,1fr) 40px 52px!important
+  }
+  .content-inner [style*="grid-template-columns:118px 40px 1fr 44px 56px"]>:first-child {grid-column:1/-1
+  }
+  .content-inner .an-flow-grid {overflow-x:auto
+  }
+  .content-inner [style*="grid-template-columns:160px repeat("] {overflow-x:auto;justify-content:start!important
+  }
+  .content-inner [style*="grid-template-columns:110px 1fr 1fr"] {grid-template-columns:minmax(0,.8fr) minmax(0,1fr) minmax(0,1fr)!important;font-size:10px!important
+  }
+  .content-inner [style*="grid-template-columns:110px 1fr 1fr"] * {font-size:10px!important;letter-spacing:0!important
+  }
+  .content-inner [style*="grid-template-columns:110px 1fr 1fr"]>* {padding:8px 3px!important;overflow-wrap:anywhere
+  }
+  /* drawings of a set width */
+  .glance-sub svg,.content-inner .cd svg {max-width:100%
+  }
+  .content-inner [style*="width:50%;min-width:280px"] {width:100%!important;min-width:0!important;min-height:260px
+  }
+  /* the assignment picker opens inward from the right edge */
+  .content-inner .assign-wrap {margin-left:auto
+  }
+  .content-inner .assign-pop {left:auto;right:0;width:min(240px,calc(100vw - 112px))
+  }
+  /* Review Board members: the column names cannot sit over fields that wrap */
+  .content-inner [aria-hidden="true"][style*="padding:6px 0 4px"] {display:none!important
+  }
+  /* starting a rescore, and the fields of a mapped workflow */
+  .content-inner [style*="grid-template-columns:190px 1fr auto auto"] {grid-template-columns:minmax(0,1fr)!important
+  }
+  .content-inner [style*="flex-wrap:wrap;align-items:flex-end"]>* {max-width:100%
+  }
+  .content-inner [style*="min-width:200px"],.content-inner [style*="min-width:220px"],.content-inner [style*="min-width:240px"],.content-inner [style*="min-width:260px"] {min-width:min(200px,100%)!important
+  }
+  .content-inner .btn-ghost {flex-shrink:0;max-width:100%
+  }
+  .content-inner [style*="grid-template-columns:minmax(200px,2fr) 3fr"]>:first-child {border-right:0!important
+  }
+  .content-inner [style*="padding:10px 0 14px 22px"],.content-inner [style*="padding:14px 0 10px 22px"] {padding-left:0!important
+  }
+  .content-inner [style*="grid-template-columns:1fr auto auto;gap:10px"] {grid-template-columns:minmax(0,1fr) auto!important
+  }
+  .content-inner [style*="grid-template-columns:1fr auto auto;gap:10px"]>:first-child {grid-column:1/-1
+  }
+  /* Track Program's workload: the bar under the name and the count */
+  .content-inner [style*="display:flex;align-items:center;gap:10px;padding:5px 0"] {flex-wrap:wrap
+  }
+  .content-inner [style*="display:flex;align-items:center;gap:10px;padding:5px 0"]>[style*="width:140px"] {width:auto!important;flex:1 1 50px;min-width:0
+  }
+  .content-inner [style*="display:flex;align-items:center;gap:10px;padding:5px 0"]>[style*="width:130px"] {width:auto!important
+  }
+  .content-inner [style*="display:flex;align-items:center;gap:10px;padding:5px 0"]>[style*="flex:1;height:12px"] {order:9;flex:1 1 100%!important
+  }
+  .content-inner [style="display:flex;align-items:center;gap:8px"]>input:not([type="checkbox"]):not([type="radio"]) {min-width:0!important;flex-shrink:1
+  }
+  .content-inner .dashboard-print-row {flex-wrap:wrap
+  }
+  .content-inner .dashboard-title-rule {display:none
+  }
+  .content-inner .dashboard-print-row .btn {margin-left:auto;white-space:nowrap!important
+  }
+}
+@media screen and (max-width:600px) {
+  .content-inner [style*="repeat(auto-fill,minmax(2"] {grid-template-columns:minmax(0,1fr)!important
+  }
+  /* the sovereignty journey wraps here, and its joining lines would run off the left of the second row */
+  .content-inner [style*="position:absolute;left:calc(-50% + 16px)"] {display:none
+  }
+}
