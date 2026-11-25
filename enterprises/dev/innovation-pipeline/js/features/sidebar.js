@@ -130,7 +130,7 @@ function renderSidebar() {
   var h = '<div class="sidebar-inner">';
   h += headerHtml;
   h += '<div class="sidebar-scroll">';
-  h += '<div class="sidebar-home' + (currentPage === 'pipeline' ? ' active' : '') + '" onclick="go(\'pipeline\')">Overview</div>';
+  h += '<div class="sidebar-home' + (currentPage === 'pipeline' ? ' active' : '') + '" onclick="foldNavAfterPick();go(\'pipeline\')">Overview</div>';
   for (var i = 0; i < PH.length; i++) {
     var ph = PH[i];
     var isPhaseActive = (currentPage === 'phase' && currentStep === String(ph.id));
@@ -153,7 +153,7 @@ function renderSidebar() {
         var isActive = (currentPage === 'step' && currentStep === s.id) || (s.id === '5.1' && currentPage === 'phase5');
         var isDone = isStepDone(s.id);
         var cls = 'sidebar-step' + (isActive ? ' active' : isDone ? ' done' : '');
-        return '<div class="' + cls + '" onclick="go(\'step\',\'' + s.id + '\')">' + (isDone && !isActive ? '' : (icon || s.icon) + ' ') + s.id + ' ' + s.name + '</div>';
+        return '<div class="' + cls + '" onclick="foldNavAfterPick();go(\'step\',\'' + s.id + '\')">' + (isDone && !isActive ? '' : (icon || s.icon) + ' ') + s.id + ' ' + s.name + '</div>';
       };
       for (var j = 0; j < strands.main.length; j++) h += stepRow(strands.main[j]);
       for (var g = 0; g < strands.strands.length; g++) {
@@ -174,7 +174,7 @@ function renderSidebar() {
           for (var k = 0; k < ph.outcomes.length; k++) {
             var o = ph.outcomes[k];
             var isOActive = (currentPage === 'outcome' && currentStep === o.id) || currentPage === o.id;
-            h += '<div class="sidebar-outcome' + (isOActive ? ' active' : '') + '" onclick="' + (o.id.indexOf('out-') === 0 ? 'go(\'outcome\',\'' + o.id + '\')' : 'go(\'' + o.id + '\')') + '">→ ' + o.name + '</div>';
+            h += '<div class="sidebar-outcome' + (isOActive ? ' active' : '') + '" onclick="foldNavAfterPick();' + (o.id.indexOf('out-') === 0 ? 'go(\'outcome\',\'' + o.id + '\')' : 'go(\'' + o.id + '\')') + '">→ ' + o.name + '</div>';
           }
         }
       }
@@ -272,6 +272,13 @@ function goPhase(id) {
     try { var h = window.Modules && Modules.hook && Modules.hook('phaseHeadTarget'); if (h) to = h(id); } catch (e) { to = null; }
     if (to && to.length) go.apply(null, to); else go('phase', String(id));
   }
+}
+
+/* Where the open menu floats over the page (960px and below), choosing a page in it folds it back to the icon
+   strip, so the page chosen is the page seen (25 Nov 2026). Phase headings do not call this: they open the steps
+   the reader is about to choose from. The stored choice is left alone, as in syncSidebarToViewport. */
+function foldNavAfterPick() {
+  if (window.matchMedia && window.matchMedia('(max-width:960px)').matches) sidebarMinimized = true;
 }
 
 function updateSidebarState() {
