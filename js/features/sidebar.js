@@ -233,7 +233,7 @@ function navOutputsOpen(ph) {
 // Chevron handler: open this phase (collapsing the others) or, if it's the
 // open one, collapse everything. Holds until the next navigation.
 /* One open phase at a time (17 Nov 2026). A program whose catalogue entry sets
-   "sidebarOnePhase": true (Responsible AI Governance) gets an accordion: opening a
+   "sidebarOnePhase": true (Responsible AI Governance, and the Pipeline since 25 Nov 2026) gets an accordion: opening a
    phase — by navigating into it, by its heading or by its chevron — closes the
    others. Every other program keeps the multi-open sidebar unchanged. */
 function navOnePhase() {

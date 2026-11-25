@@ -103,6 +103,7 @@
             "sideAccent": "Pipeline"
           },
           "title": "90-Day AI Innovation Pipeline — Faisal Hoque",
+          "sidebarOnePhase": true,
           "tabs": {
             "home": "Home",
             "learn": "Learn",
