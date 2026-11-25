@@ -104,7 +104,7 @@ svg [stroke="#B8B0A5"] {stroke:var(--stone)
 .btn.bg2 {white-space:nowrap;padding:7px 14px;border-radius:6px;align-self:flex-start;height:fit-content
 }
 @media (max-width:960px) {
-  .sidebar:not(.collapsed) {transform:translateX(0);box-shadow:0 8px 40px rgba(0,0,0,.4)
+  .sidebar:not(.collapsed):not(.mini) {transform:translateX(0);box-shadow:0 8px 40px rgba(0,0,0,.4)
   }
 }
 .lk-cap:not(.lk-cap-r) {width:150px;min-width:150px;flex-shrink:0;line-height:1.3
@@ -222,8 +222,6 @@ svg [stroke="#B8B0A5"] {stroke:var(--stone)
   .coach-panel {width:calc(100vw - 32px);right:16px
   }
   .notes-panel {width:calc(100vw - 32px);right:16px
-  }
-  .sidebar {display:none!important
   }
   .main-content.with-sidebar {margin-left:0!important
   }
@@ -499,3 +497,9 @@ svg [stroke="#B8B0A5"] {stroke:var(--stone)
   .nav-tab {padding-left:8px;padding-right:8px
   }
 }
+
+/* ── By hand, 25 Nov 2026 ──────────────────────────────────────
+   Removed from the 900px block above: the reference's .sidebar display:none. The shell never takes its side menu
+   away: below 960px it is the 60px strip and the page leaves room for it (styles.css), so hiding it left an empty
+   column down the left of every page on a phone. Take it out again if this file is regenerated.
+   The 960px .sidebar shadow is likewise kept to the open menu (:not(.mini)), as in styles.css. */
