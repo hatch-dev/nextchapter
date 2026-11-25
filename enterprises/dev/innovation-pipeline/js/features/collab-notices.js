@@ -116,6 +116,7 @@ function collabValueText(v) {
     if (typeof v === 'boolean') return v ? 'Yes' : 'No';
     if (typeof v === 'number') return String(v);
     if (typeof v === 'string') return v.length > 220 ? v.slice(0, 220) + '…' : v;
+    if (Array.isArray(v) && v.length && v.every(function (x) { return typeof x === 'string' || typeof x === 'number'; })) { var one = v.join(', '); return one.length > 220 ? one.slice(0, 220) + '…' : one; }
     if (Array.isArray(v)) return v.length + (v.length === 1 ? ' row' : ' rows');
     if (typeof v === 'object') { var n = Object.keys(v).length; return n + (n === 1 ? ' field' : ' fields'); }
     return String(v);
@@ -203,6 +204,7 @@ function collabReportRestore(idx) {
     if (typeof lockBlocked === 'function' && lockBlocked(String(row.keys[0]))) return;
     if (!collabWriteAt(row.keys, row.restore)) return;
     row.done = true;
+    if (row.kind === 'held') { try { Store.unkeep(currentOrgId, row.path); } catch (e) { } }
     if (typeof saveData === 'function') saveData();
     if (typeof render === 'function') render();
     renderCollabReport();
@@ -256,7 +258,7 @@ function collabReportRefresh() {
     var el = document.getElementById('collabSyncReport');
     if (!el) return;
     _collabReportRows.forEach(function (r, i) {
-      if (r.kind !== 'replaced') return;
+      if (r.kind !== 'replaced' && r.kind !== 'held') return;
       var t = el.querySelector('.collab-report-vv[data-t="' + i + '"]');
       if (t) t.textContent = collabValueText(collabStoredNow(r));
     });
@@ -422,6 +424,7 @@ function collabWriteAt(keys, value) {
 }
 
 function closeCollabReport() {
+  try { if (_collabReportRows.some(function (r) { return r.kind === 'held'; })) Store.unkeep(currentOrgId); } catch (e) { }
   _collabReportRows = [];
   try { applyFieldNotes(); } catch (e) { }   // the notes are this panel's news too
   try {
@@ -451,9 +454,12 @@ function renderCollabReport() {
     var by = '';
     var whos = reps.map(function (r) { return r.who || ''; }).filter(Boolean);
     if (whos.length && whos.every(function (n) { return n === whos[0]; })) by = ' by ' + whos[0];
-    var head = nRep === _collabReportRows.length
+    var nHeld = _collabReportRows.filter(function (r) { return r.kind === 'held'; }).length;
+    var head = nHeld === _collabReportRows.length
+      ? 'Saved by a colleague before your ' + (nHeld === 1 ? 'change' : 'changes') + ' could be'
+      : nRep === _collabReportRows.length
       ? 'Your saved ' + (nRep === 1 ? 'change was' : 'changes were') + ' replaced' + by
-      : (nRep ? 'Edits crossed over' : 'You overwrote someone’s work');
+      : (nRep || nHeld ? 'Edits crossed over' : 'You overwrote someone’s work');
 
     var h = '<div class="collab-report-head">'
       + '<span class="collab-report-title"></span>'
@@ -465,8 +471,9 @@ function renderCollabReport() {
          the same line in the two cases: on a conflict the value that went is
          THEIRS, on a replacement it is OURS. Marking the second line either way
          would have told the reader the surviving value was the lost one. */
-      var replaced = r.kind === 'replaced';
-      var mineLbl = replaced ? 'Yours, gone' : 'Yours, kept';
+      var held = r.kind === 'held';                             // ours waited, and what was saved meanwhile stands (P-29)
+      var replaced = r.kind === 'replaced' || held;
+      var mineLbl = held ? 'Yours, not saved' : replaced ? 'Yours, gone' : 'Yours, kept';
       var theirsLbl = replaced ? 'Now stored' : 'Theirs, gone';
       var lost = ' collab-report-val--lost';
       h += '<div class="collab-report-row' + (r.done ? ' is-done' : '') + '">'
@@ -490,10 +497,11 @@ function renderCollabReport() {
            won a collision and this adopts the colleague's instead — and it
            takes nothing away from anybody. */
         + (r.kind !== 'replaced' && r.keys && r.keys.length && !(r.keys[r.keys.length - 1] && typeof r.keys[r.keys.length - 1] === 'object')
+          && !(held && Array.isArray(r.mine) && r.mine.some(function (x) { return x && typeof x === 'object'; }))   /* a whole list of records: not one press */
           ? (r.done
-            ? '<div class="collab-report-done">✓ Restored</div>'
+            ? '<div class="collab-report-done">✓ ' + (held ? 'Yours is back' : 'Restored') + '</div>'
             : '<button type="button" class="collab-report-btn" onclick="collabReportRestore(' + i + ')">'
-            + 'Use theirs instead</button>')
+            + (held ? 'Use mine instead' : 'Use theirs instead') + '</button>')
           : '')
         + '</div>';
     });
@@ -521,7 +529,7 @@ function renderCollabReport() {
          line is the other person's value, which is precisely what is NOT
          stored. */
       var t = el.querySelector('.collab-report-vv[data-t="' + i + '"]');
-      if (t) t.textContent = collabValueText(r.kind === 'replaced' ? collabStoredNow(r) : r.theirs);
+      if (t) t.textContent = collabValueText(r.kind === 'replaced' || r.kind === 'held' ? collabStoredNow(r) : r.theirs);
     });
   } catch (e) { }
 }

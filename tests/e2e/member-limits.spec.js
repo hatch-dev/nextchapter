@@ -262,3 +262,36 @@ test('a reminder goes to whoever the server has assigned, whatever the browser a
   await save({ stepDue: { 1.1: '2099-03-06' }, completedSteps: { 1.1: true } });
   expect(await ask('2099-03-06', [memberEmail])).toMatchObject({ status: 409 });                                // complete
 });
+
+/* P-30 (25 Nov 2026): what was typed as a session ended was dropped at the next sign-in, for everybody but an administrator. */
+test('what a member types as their session ends is there when they sign in again', async ({ account, playwright, baseURL, browser }) => {
+  test.setTimeout(90_000);
+  const t = await ownerAndMember(account, playwright, baseURL);
+  expect((await t.owner.post('api/assignments', { data: { org: t.org, module: MODULE, actor_id: t.ownerId, step: '1.1', user: t.memberId, assigned: true } })).ok()).toBe(true);
+  const context = await browser.newContext({ baseURL }), page = await context.newPage();
+  const signIn = async () => { await page.locator('#loginUser').fill(t.who.username); await page.locator('#loginPassword').fill(t.who.password); await page.locator('[data-submit]').click(); };
+  await page.goto('login'); await signIn(); await acceptTermsIfShown(page);
+  await expect(page.locator('.nav-tab[data-tab="home"]')).toBeVisible({ timeout: 20_000 });
+  await page.evaluate(() => go('step', '1.1'));
+  await expect(page.locator('#p_values')).toBeEditable({ timeout: 15_000 });
+  await page.locator('#p_values').click();
+  await context.clearCookies();                                           // the session is over; the page has not heard
+  await page.keyboard.type('Typed as it ended', { delay: 15 });
+  await expect(page.locator('#loginUser')).toBeVisible({ timeout: 25_000 });
+  await signIn();
+  await expect(page.locator('.nav-tab[data-tab="home"]')).toBeVisible({ timeout: 25_000 });
+  await expect.poll(async () => ((await t.doc()).doc.purpose || {}).values, { timeout: 20_000 }).toBe('Typed as it ended');
+  expect((await t.doc()).doc.purpose.mission).toBe('Everybody’s work');
+  await context.close();
+});
+
+/* P-32 gave a save a second shape; the rules above hold for it too. */
+test('a member’s save of single values keeps to the same limits', async ({ account, playwright, baseURL }) => {
+  const t = await ownerAndMember(account, playwright, baseURL);
+  const before = (await t.doc()).doc;
+  expect((await t.patch({ sections: {}, records: { completedSteps: { paths: [{ at: ['1.1'], v: true }] }, enterprise: { paths: [{ at: ['name'], v: 'Taken' }] }, settings: { paths: [{ at: ['voice'], v: false }] }, purpose: { paths: [{ at: ['values'], v: 'by the member' }] } } })).ok()).toBe(true);
+  const now = (await t.doc()).doc;
+  expect((now.completedSteps || {})['1.1']).toBeUndefined();
+  expect(now.enterprise).toEqual(before.enterprise); expect(now.settings).toEqual(before.settings);
+  expect(now.purpose).toEqual({ ...before.purpose, values: 'by the member' });
+});

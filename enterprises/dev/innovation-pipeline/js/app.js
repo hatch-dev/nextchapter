@@ -352,6 +352,10 @@ var Store = (function () {
     if (!inMine && inTheirs) {
       if (!inBase) return tv;                                    // they added it
       if (deepEq(bv, tv)) return DROP;                           // I deleted what they hadn't touched
+      if (out.storedWins) {                                      // late (see mergeDocs): what they have since written stays
+        out.conflicts.push({ path: path, keys: null, kind: 'both-edited', won: 'theirs', mine: undefined, theirs: tv });
+        return tv;
+      }
       out.conflicts.push({ path: path, keys: kp, kind: 'deleted-locally' });
       return DROP;                                               // my delete stands; they are told
     }
@@ -387,6 +391,24 @@ var Store = (function () {
       return mergeRows(Array.isArray(base) ? base : [], mine, theirs, path, out, kp);
     }
 
+    /* The record of who accepted the Terms: everybody's line, whichever side it came from. */
+    if (path === '.termsLog' && Array.isArray(mine) && Array.isArray(theirs)) return theirs.concat(mine.filter(function (r) { return !theirs.some(function (x) { return deepEq(x, r); }); }));
+
+    if (out.storedWins) {
+      /* A list whose rows have no id (idea cards): nobody has taken a row away, so the rows both sides had are merged
+         one by one, and what each side added is kept, theirs first. */
+      var was = base === undefined ? [] : base;
+      if (plainRows(mine) && plainRows(theirs) && plainRows(was) && mine.length >= was.length && theirs.length >= was.length) {
+        var list = [], at, added = theirs.slice(was.length);
+        for (at = 0; at < was.length; at++) list.push(merge3(was[at], mine[at], theirs[at], path + '.' + at, out, kp.concat(at)));
+        added.forEach(function (r) { list.push(r); });
+        mine.slice(was.length).forEach(function (r) { if (!added.some(function (x) { return deepEq(x, r); })) list.push(r); });
+        return list;
+      }
+      if (!BOOKKEEPING[kp[0]]) out.conflicts.push({ path: path, keys: kp, kind: 'both-edited', won: 'theirs', mine: mine, theirs: theirs });
+      return theirs;
+    }
+
     /* A leaf both sides changed to different things — one text field, one
        score, one list of selections. Nothing can merge that, so the local
        value stands (it is unsaved and on screen) and the collision is
@@ -415,10 +437,19 @@ var Store = (function () {
     return res;
   }
 
+  /* Sections the app keeps for itself: nobody wrote what is in them, so there is nothing to tell anybody (P-31). */
+  var BOOKKEEPING = { termsLog: 1, termsOrg: 1, notifications: 1, remind7: 1 };
+  function plainRows(a) { return Array.isArray(a) && a.every(isPlainObj); }
+
   /* Merge two whole workspace documents. Returns the merged document and every
-     collision found, for the app to tell the user about (onSyncConflict). */
-  function mergeDocs(base, mine, theirs) {
-    var out = { conflicts: [] };
+     collision found, for the app to tell the user about (onSyncConflict).
+
+     storedWins: what is unsent here has waited — through a closed page, a lost connection, a night asleep — so where the
+     same thing has been changed on both sides, what is stored is the team's and stays, and the person who was away is
+     shown theirs and may put it back (P-29, 25 Nov 2026). It used to go over the top of a colleague's newer work, and if
+     that colleague had left, nobody was ever told. */
+  function mergeDocs(base, mine, theirs, storedWins) {
+    var out = { conflicts: [], storedWins: !!storedWins };
     var merged = merge3(base || {}, mine || {}, theirs || {}, '', out, []);
     if (!isPlainObj(merged)) merged = cloneDoc(theirs) || {};
     merged.schemaVersion = SCHEMA_VERSION;
@@ -485,9 +516,11 @@ var Store = (function () {
       /* No baseline yet (the org had never been saved, or the boot fetch
          failed): treat everything local as unsent rather than assume it is
          already on the server. That errs towards keeping the user's work. */
-      var res = mergeDocs(getBase(id) || {}, mine, fresh);
+      var known = getBase(id);
+      var res = mergeDocs(known || {}, mine, fresh, !!(known && _late[id]));
       merged = res.doc; conflicts = res.conflicts;
     }
+    delete _late[id];
     /* Before the merged document goes anywhere: which of the edits this browser
        saved has it just taken back off us. Computed here because it needs both
        sides, and `mine` is about to become the same object as `merged`. */
@@ -523,10 +556,48 @@ var Store = (function () {
     return true;
   }
 
+  /* ── Work that waited ──────────────────────────────────────
+     _late[id]: something here has not reached the server in the ordinary time (a failed request, a sleep), so the next
+     thing to do is read what is stored, before any of it is sent. A patch is never refused as stale, so without this it
+     simply landed on top. */
+  var _late = {}, LATE_MS = 15000;
+  /* The wording that gave way, kept in this browser for the person who wrote it until they have dealt with it: the merge
+     often happens on the way to another page, and the notice went with the page it was drawn on. */
+  var KEPT_DAYS = 30;
+  function keptKey(id) { return 'pipeline-org-kept::' + id + moduleSuffix(id); }
+  function keptOf(id, who) {
+    var k = readJSON(keptKey(id), null);
+    if (!k || !Array.isArray(k.rows) || !k.rows.length) return [];
+    if (Date.now() - (k.at || 0) > KEPT_DAYS * 86400000) { rawDel(keptKey(id)); return []; }
+    return who && k.who === who ? k.rows : [];
+  }
+  function me() { try { return (typeof actorId === 'function' && actorId()) || ''; } catch (e) { return ''; } }
+  function kept(id) { return keptOf(id, me()); }
+  function keep(id, rows) {
+    var who = rawGet(whoKey(id)) || me();                      // whose edits the copy here holds; nobody need be signed in yet
+    if (!who || !rows.length) return;
+    var at = {}; rows.forEach(function (r) { at[r.path] = 1; });
+    writeJSON(keptKey(id), { who: who, at: Date.now(), rows: keptOf(id, who).filter(function (r) { return !at[r.path]; }).concat(rows).slice(-12) });
+  }
+  /* Dealt with: one of them, or all. Only by the person they belong to. */
+  function unkeep(id, path) {
+    var rows = kept(id); if (!rows.length) return;
+    rows = path == null ? [] : rows.filter(function (r) { return r.path !== path; });
+    if (rows.length) writeJSON(keptKey(id), { who: me(), at: Date.now(), rows: rows }); else rawDel(keptKey(id));
+  }
+
   /* Hand collisions to the app to explain (js/app.js onSyncConflict). Never
      throws into the sync path: a merge that landed must not be undone by a
      failure to describe it. */
   function reportConflicts(id, conflicts) {
+    var gave = conflicts.filter(function (c) { return c.won === 'theirs'; });
+    if (gave.length) {
+      try { keep(id, gave.map(function (c) { return { path: c.path, keys: c.keys, mine: c.mine, theirs: c.theirs }; })); } catch (e) { }
+      try { console.warn('Unsent edits gave way to newer ones:', gave.map(function (c) { return c.path; })); } catch (e) { }
+      conflicts = conflicts.filter(function (c) { return c.won !== 'theirs'; });
+      try { if (typeof showKeptConflicts === 'function') setTimeout(showKeptConflicts, 0); } catch (e) { }
+      if (!conflicts.length) return;
+    }
     try { console.warn('Sync conflicts kept locally:', conflicts.map(function (c) { return c.path + ' (' + c.kind + ')'; })); } catch (e) { }
     try { if (typeof onSyncConflict === 'function') onSyncConflict(conflicts, id); } catch (e) { }
   }
@@ -646,6 +717,10 @@ var Store = (function () {
      document before the merge, `merged` after it: our value must still be the
      one we sent (nobody has typed over it here since) and the merged value must
      differ, or there is nothing to report. */
+  function stillHolds(now, was) {
+    if (!isPlainObj(was) || !isPlainObj(now)) return deepEq(was, now);
+    return Object.keys(was).every(function (k) { return has(now, k) && stillHolds(now[k], was[k]); });
+  }
   function authoredOverwrites(mine, merged) {
     var out = [];
     try {
@@ -653,10 +728,12 @@ var Store = (function () {
       var paths = Object.keys(_authored);
       for (var i = 0; i < paths.length; i++) {
         var rec = _authored[paths[i]];
+        if (BOOKKEEPING[rec.keys[0]]) { delete _authored[paths[i]]; continue; }   // a line added to a log replaces nobody's work (P-31)
         var was = readAt(mine || {}, rec.keys);
         if (!deepEq(was, rec.v)) continue;             // we have moved on; not this
         var now = readAt(merged || {}, rec.keys);
         if (deepEq(was, now)) continue;                // untouched
+        if (stillHolds(now, was)) continue;            // a colleague has added to it; ours is all there (P-32)
         out.push({ path: paths[i], keys: rec.keys, lost: was, incoming: now, at: rec.at });
         delete _authored[paths[i]];                    // said once
       }
@@ -682,7 +759,7 @@ var Store = (function () {
     for (k in doc) {
       if (!has(doc, k) || MERGE_SKIP[k]) continue;
       if (!has(base, k) || !deepEq(base[k], doc[k])) {
-        var rd = has(base, k) ? (recordDelta(base[k], doc[k]) || fieldDelta(k, base[k], doc[k])) : null;
+        var rd = has(base, k) ? (recordDelta(base[k], doc[k]) || fieldDelta(k, base[k], doc[k]) || pathDelta(base[k], doc[k])) : pathDelta({}, doc[k]);
         if (rd) records[k] = rd; else sections[k] = doc[k];
         n++;
       }
@@ -757,11 +834,46 @@ var Store = (function () {
     for (k in b) { if (has(b, k) && !has(d, k)) { unset.push(k); n++; } }
     return n ? { fields: { set: set, unset: unset } } : null;
   }
+  /* ── Every other object section, as the values that changed (P-32, 25 Nov 2026) ──
+     A lock keeps two people out of one section, but two who start at the same moment are both let in, and each sent the
+     whole of it: one wrote what a step needs, the other why, and whoever saved second put the first one's field back as
+     it was. Now such a section goes as { paths: [{ at: [key, …], v } or { at, gone }] }, each laid over the section as
+     stored at the moment of writing, however deep it is. A list is one value. Nothing to send is null, and the section
+     goes whole: a new empty one, or one with a key the server would not take. */
+  var PATH_DEPTH = 8, PATH_MAX = 2000;
+  function pathDelta(b, d) {
+    if (!isPlainObj(b) || !isPlainObj(d)) return null;
+    var paths = [], fine = true;
+    (function walk(x, y, at) {
+      Object.keys(y).forEach(function (k) {
+        if (k === '' || k === '__proto__') { fine = false; return; }
+        var was = has(x, k) ? x[k] : undefined, now = y[k], here = at.concat(k);
+        if (has(x, k) && deepEq(was, now)) return;
+        if (now === undefined) { if (has(x, k)) paths.push({ at: here, gone: 1 }); return; }   // JSON carries no undefined
+        if (isPlainObj(now) && Object.keys(now).length && here.length < PATH_DEPTH && (isPlainObj(was) || was === undefined)) { walk(was || {}, now, here); return; }
+        paths.push({ at: here, v: now });
+      });
+      Object.keys(x).forEach(function (k) { if (!has(y, k)) paths.push({ at: at.concat(k), gone: 1 }); });
+    })(b, d, []);
+    return fine && paths.length && paths.length <= PATH_MAX ? { paths: paths } : null;
+  }
   /* What the server makes of a row delta (WorkspaceController::withRecords), so the
      baseline can say what the server holds after one. Keep the two the same: a
      patch lands field by field on the row as stored, and a patch for a row that
      is no longer there (someone removed it) is dropped, never a half row. */
   function applyRecordDelta(stored, delta) {
+    if (delta && delta.paths) {   /* an object section's values (pathDelta) */
+      var sec = isPlainObj(stored) ? (cloneDoc(stored) || {}) : {};
+      delta.paths.forEach(function (p) {
+        var cur = sec, n = p.at.length - 1, i;
+        for (i = 0; i < n; i++) {
+          if (!has(cur, p.at[i]) || !isPlainObj(cur[p.at[i]])) { if (p.gone) return; cur[p.at[i]] = {}; }
+          cur = cur[p.at[i]];
+        }
+        if (p.gone) delete cur[p.at[n]]; else cur[p.at[n]] = cloneDoc(p.v);
+      });
+      return sec;
+    }
     if (delta && delta.fields) {   /* an object section's fields (fieldDelta) */
       var obj = isPlainObj(stored) ? (cloneDoc(stored) || {}) : {}, fs = delta.fields, fk;
       for (fk in (fs.set || {})) { if (has(fs.set, fk)) obj[fk] = cloneDoc(fs.set[fk]); }
@@ -853,6 +965,24 @@ var Store = (function () {
           server.revs[id] = w.rev || 0;   // confirmed: no workspace yet, so ours is the first
         }
         flushOrg(id, cb);                 // now on a known footing
+      });
+      return;
+    }
+
+    /* What is here has waited (see _late): read what is stored and merge into it first. */
+    if (confirmedNow && _late[id]) {
+      if (_recovering[id]) { done(false); return; }
+      _recovering[id] = true;
+      getJSON('/workspace?org=' + encodeURIComponent(id) + modQ(id), function (w, st) {
+        delete _recovering[id];
+        if (!w) {
+          if (!refused(st)) { setOnline(false); pendingOrgs[id] = true; setTimeout(function () { scheduleFlush(id); }, RETRY_DELAY_MS); }
+          done(false);
+          return;
+        }
+        setOnline(true);
+        if (w.doc) adoptDoc(id, w.doc, w.rev, w.updated_by); else delete _late[id];
+        flushOrg(id, cb);
       });
       return;
     }
@@ -1014,6 +1144,7 @@ var Store = (function () {
       .catch(function () {
         // Network failure: the edit is safe in the local mirror. Warn, retry.
         setOnline(false);
+        _late[id] = true;
         pendingOrgs[id] = true;
         setTimeout(function () { scheduleFlush(id); }, RETRY_DELAY_MS);
         done(false);
@@ -1029,8 +1160,10 @@ var Store = (function () {
     try { return typeof appIsTyping === 'function' && !!appIsTyping(); } catch (e) { return false; }
   }
   function runFlush() {
+    var overdue = flushAt && nowMs() - flushAt > LATE_MS;   // the computer slept, or the tab was put to sleep
     flushTimer = null; flushAt = 0; flushCeiling = 0;
     var ids = Object.keys(pendingOrgs);
+    if (overdue) ids.forEach(function (i) { _late[i] = true; });
     pendingOrgs = {};
     ids.forEach(function (i) { flushOrg(i); });
   }
@@ -1183,7 +1316,7 @@ var Store = (function () {
   } catch (e) { }
 
   function removeOrg(id) {
-    rawDel(orgKey(id)); rawDel(revKey(id)); rawDel(baseKey(id)); rawDel(whoKey(id));
+    rawDel(orgKey(id)); rawDel(revKey(id)); rawDel(baseKey(id)); rawDel(whoKey(id)); rawDel(keptKey(id));
     delete server.docs[id]; delete server.revs[id]; delete server.base[id];
   }
 
@@ -1501,7 +1634,7 @@ var Store = (function () {
           var mirrored = readJSON(orgKey(id), null);
           var confirmed = getBase(id);
           if (mirrored && confirmed && !sameContent(mirrored, confirmed)) {
-            var res = mergeDocs(confirmed, mirrored, w.doc);
+            var res = mergeDocs(confirmed, mirrored, w.doc, true);
             server.docs[id] = res.doc;
             setBase(id, w.doc);
             writeJSON(orgKey(id), res.doc);
@@ -1582,9 +1715,9 @@ var Store = (function () {
              signing in to the same organization on the same computer must not save it in their own name, and it is not
              theirs to see. */
           var mirrored = readJSON(orgKey(id), null), confirmed = readJSON(baseKey(id), null), who = '';
-          try { who = (typeof workspaceActorId === 'function') ? workspaceActorId(id) : ''; } catch (e) { }
+          try { who = (typeof signingInAs === 'function') ? signingInAs(id) : ''; } catch (e) { }
           if (mirrored && confirmed && who && who === rawGet(whoKey(id)) && !sameContent(mirrored, confirmed)) {
-            var res = mergeDocs(confirmed, mirrored, w.doc);
+            var res = mergeDocs(confirmed, mirrored, w.doc, true);
             server.docs[id] = res.doc; setBase(id, w.doc); writeJSON(orgKey(id), res.doc);
             if (!sameContent(res.doc, w.doc)) scheduleFlush(id);
             if (res.conflicts.length) reportConflicts(id, res.conflicts);
@@ -1612,6 +1745,7 @@ var Store = (function () {
     },
     orgKey: orgKey,
     readOrg: readOrg, orgRaw: orgRaw, writeOrg: writeOrg, removeOrg: removeOrg, commitSeed: commitSeed,
+    kept: kept, unkeep: unkeep, keptRaw: function (id) { return rawGet(keptKey(id)); },
     flushNow: flushNow, forgetSent: forgetSent, hasUnsent: hasUnsent, reopen: function () { _closed = false; },
     patch: patch, setPath: setPath, removeRec: removeRec, commit: commit, persistActive: persistActive,
     dirtyRecords: function () { return Object.keys(_dirty); }, clearDirty: function () { _dirty = {}; },
@@ -2075,6 +2209,15 @@ function knownOrgMemberId(orgId, candidate) {
   return '';
 }
 
+/* Who is signing in to this organization, as the server has just said: never the administrator workspaceActorId() falls
+   back to. Unsent work left in this browser is sent only in its own author's name (Store.loadOrg), and before the member
+   list has come that fallback made every plain member look like somebody else, so theirs was dropped (P-30, 25 Nov 2026). */
+function signingInAs(orgId) {
+  var me = actorId(); if (me) return me;
+  if (_verifiedActor && _verifiedActor.orgId === orgId) return _verifiedActor.userId || '';
+  return '';
+}
+
 function workspaceActorId(orgId) {
   var me = actorId();
   if (me) return me;
@@ -2153,6 +2296,23 @@ function onSyncConflict(conflicts) {
   } catch (e) { }
 }
 
+/* Work that was waiting here and gave way to what had been saved meanwhile (Store.mergeDocs, storedWins; P-29). Shown
+   once the program is on screen, and again on each load until it is dismissed or put back: the store keeps it. */
+var _keptShown = '';
+function showKeptConflicts() {
+  try {
+    if (!currentOrgId || !currentUserId || UI.entry || SAMPLE_MODE || !Store.keptRaw) return;
+    var raw = Store.keptRaw(currentOrgId), key = currentOrgId + '|' + raw;
+    if (!raw || key === _keptShown) return;
+    _keptShown = key;
+    var rows = Store.kept(currentOrgId);
+    if (!rows.length || typeof showSyncReport !== 'function') return;
+    showSyncReport(rows.map(function (c) {
+      return { kind: 'held', label: (typeof collabPathLabel === 'function') ? collabPathLabel(c.path) : String(c.path || ''), path: c.path, keys: c.keys || null, mine: c.mine, theirs: c.theirs, restore: c.mine };
+    }));
+  } catch (e) { }
+}
+
 /* The other half, and the one nobody was ever told about: a value THIS browser
    saved has been changed by somebody else who was holding an older copy. The
    merge is right to be silent — from its point of view only they moved it — so
@@ -2188,7 +2348,11 @@ function onRemoteOverwrite(items, orgId, by) {
        author (an older deployment). */
     var who = '';
     try { who = memberNameByServerId(by); } catch (e) { }
-    if (!who) {
+    /* The last save of the whole document can be our own; we did not replace ourselves (P-31). */
+    var ownSave = false;
+    try { ownSave = !!by && by === actorId(); } catch (e) { }
+    if (ownSave) who = '';
+    else if (!who) {
       try { var others = Collab.othersLocks(); if (others.length === 1) who = others[0].name || ''; } catch (e) { }
     }
     var rows = items.map(function (it) {
@@ -4149,6 +4313,7 @@ var _liveEdits = {};
    our own save was painted and then immediately covered over again by our
    copy. See the restore loop in repaintAfterSync(), which is the only reader. */
 var _bankedEdits = {};
+var commitOnLeave = null;   // set where the typing listeners are
 function ownKey(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
 var _lastInputAt = 0;
 var _liveCommitTimers = {};
@@ -4400,7 +4565,8 @@ if (typeof document !== 'undefined') {
      (Store.persistActive), and the next load sends what the mirror holds that
      the server does not. Only text typed since the last paint and not yet
      banked — anything else is already where it belongs. */
-  var commitOnLeave = function () {
+  commitOnLeave = function (stay) {
+    if (stay === true) { try { bankOpenPage(); } catch (x) { } }
     try {
       var a = document.activeElement;
       if (!a || !a.id || !isValueField(a) || a.disabled) return;
@@ -4544,6 +4710,7 @@ function deferRender() { renderAfterInteraction(false); }
    switching programs on a page of the same id still counts as arriving. */
 var _culLastPaint = '', _culRepaintSame = false;
 function render() {
+  try { if (currentOrgId && currentUserId) showKeptConflicts(); } catch (e) { }
   try { if (currentOrgId && currentUserId && window.chatWatch) chatWatch(); } catch (e) { }   /* Sweep 4R item 5: Team Chat listens from sign-in, so the badge can rise */
   /* Held: a live commit or a bank is running, and rebuilding the page from
      under a reader mid-sentence is exactly what this whole path exists to
@@ -7138,6 +7305,9 @@ function programAccessAnswer(status, body, path) {
 /* The server says this browser is not signed in (or not as this person): clear the
    local records and show sign-in, the way signing out does, without asking. */
 function sessionEnded() {
+  /* The box being typed in first, while this is still their page: it goes into this browser's copy, and that is sent when
+     they sign in again (P-30, 25 Nov 2026). It used to be committed as the page left, after the copy had been dropped. */
+  try { if (currentUserId && !isAppAdmin && typeof commitOnLeave === 'function') commitOnLeave(true); } catch (e) { }
   try { Collab.leave(); } catch (e) { }
   try { chatShutdown(); } catch (e) { }
   try { sealSession(); } catch (e) { }

@@ -343,6 +343,22 @@ class WorkspaceController extends Controller
                     ]];
                     continue;
                 }
+                /* Any other object section as the values that changed, however deep (js/app.js pathDelta, P-32):
+                   { paths: [{ at: [key, …], v: value } | { at: [key, …], gone: 1 }] }. */
+                if (isset($delta->paths) && is_array($delta->paths)) {
+                    $paths = [];
+                    foreach ($delta->paths as $p) {
+                        $at = is_object($p) && isset($p->at) && is_array($p->at) ? $p->at : [];
+                        $bad = array_filter($at, static fn($k): bool => !is_string($k) || $k === '' || $k[0] === "\0");
+                        if ($at === [] || count($at) > 12 || $bad !== [] || (empty($p->gone) && !property_exists($p, 'v'))) {
+                            /* Taking the rest would store half of what they wrote and say it was saved. */
+                            Response::validationError(['records' => ['A changed value could not be read.']]);
+                        }
+                        $paths[] = ['at' => array_values($at), 'gone' => !empty($p->gone), 'v' => $p->v ?? null];
+                    }
+                    $records[$key] = ['paths' => $paths];
+                    continue;
+                }
                 $upsert = [];
                 foreach ((isset($delta->upsert) && is_array($delta->upsert)) ? $delta->upsert : [] as $row) {
                     if (is_object($row) && isset($row->id) && is_scalar($row->id)) {
@@ -733,6 +749,25 @@ class WorkspaceController extends Controller
                 }
                 foreach ($delta['fields']['unset'] as $field) {
                     unset($obj->$field);
+                }
+                $out->$key = $obj;
+                continue;
+            }
+            /* An object section's values, each laid on it as stored now (P-32). The copy is deep: what is inside is written. */
+            if (isset($delta['paths'])) {
+                $obj = ($stored !== null && isset($stored->$key) && is_object($stored->$key)) ? json_decode((string) json_encode($stored->$key)) : new \stdClass();
+                foreach ($delta['paths'] as $p) {
+                    $last = array_pop($p['at']);
+                    $cur  = $obj;
+                    foreach ($p['at'] as $k) {
+                        if (!isset($cur->{$k}) || !is_object($cur->{$k})) {
+                            if ($p['gone']) { $cur = null; break; }
+                            $cur->{$k} = new \stdClass();
+                        }
+                        $cur = $cur->{$k};
+                    }
+                    if ($cur === null) { continue; }
+                    if ($p['gone']) { unset($cur->{$last}); } else { $cur->{$last} = $p['v']; }
                 }
                 $out->$key = $obj;
                 continue;

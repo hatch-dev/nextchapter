@@ -114,7 +114,10 @@ test.describe('AI Innovation Pipeline', () => {
 
     expect(uploads.length).toBeGreaterThan(0);
     expect(uploads.length).toBeLessThan(10);
-    for (const u of uploads) expect(Object.keys(u.body.sections || u.body.doc)).toEqual(['purpose']);
+    for (const u of uploads) {   // as the one value that changed (P-32)
+      expect(Object.keys({ ...(u.body.sections || u.body.doc), ...u.body.records })).toEqual(['purpose']);
+      expect(u.body.records.purpose.paths.map((p) => p.at.join('.'))).toEqual(['mission']);
+    }
   });
 
   test('[PL-03] a funding line\'s description is stored while it is being typed', async ({ page }) => {
