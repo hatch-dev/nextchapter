@@ -1341,8 +1341,8 @@ nav {
   top: 68px;
   right: 32px;
   z-index: 160;
-  width: 360px;
-  height: 520px;
+  width: 400px;
+  height: 560px;
   max-height: calc(100vh - 92px);
   background: var(--ink);
   border: 1px solid var(--rule);
@@ -1353,7 +1353,8 @@ nav {
   transform-origin: top right;
   opacity: 0;
   transition: transform .35s cubic-bezier(.16, 1, .3, 1), opacity .25s;
-  pointer-events: none
+  pointer-events: none;
+  box-shadow: var(--shadow-elev)
 }
 
 .notes-panel.open {
@@ -1362,83 +1363,204 @@ nav {
   pointer-events: auto
 }
 
-.notes-header {
+/* Team Chat and Notes share one head, close button and writing row (25 Nov 2026), after the AI Guide panel (.coach-*). */
+.pnl-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 18px 24px;
+  gap: 10px;
+  padding: 14px 16px 14px 20px;
   border-bottom: 1px solid var(--rule);
+  background: rgba(var(--gold-rgb), .06);
   flex-shrink: 0
 }
 
-.notes-header-title {
+.pnl-id {
+  flex: 1;
+  min-width: 0
+}
+
+.pnl-title {
   font-family: var(--mono);
   font-size: 14px;
+  line-height: 1.3;
   letter-spacing: .15em;
   color: var(--gold-text);
-  text-transform: uppercase
+  text-transform: uppercase;
+  white-space: nowrap
 }
 
-.notes-close {
-  background: none;
-  border: 1px solid var(--border-faint);
+.pnl-sub {
+  margin-top: 2px;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: .05em;
   color: var(--stone);
-  width: 28px;
-  height: 28px;
-  display: flex;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis
+}
+
+.pnl-x {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
+  border: 1px solid var(--border-faint);
+  background: none;
+  color: var(--stone);
+  font-size: 18px;
+  line-height: 1;
   cursor: pointer;
-  font-size: 14px;
-  transition: all .2s
+  transition: border-color .2s, color .2s
 }
 
-.notes-close:hover {
+.pnl-x:hover {
   border-color: var(--gold-text);
   color: var(--gold-text)
+}
+
+.pnl-x:focus-visible,
+.pnl-send:focus-visible,
+.gchat-who:focus-visible,
+.note-del:focus-visible {
+  outline: 2px solid var(--gold-text);
+  outline-offset: 2px
+}
+
+.pnl-compose {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--rule);
+  background: rgba(var(--bg-rgb), .5);
+  flex-shrink: 0
+}
+
+.pnl-compose textarea {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  max-height: 120px;
+  padding: 11px 13px;
+  box-sizing: border-box;
+  border: 1px solid rgba(var(--fg-rgb), .12);
+  border-radius: 4px;
+  background: rgba(var(--fg-rgb), .05);
+  color: var(--paper);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+  outline: none;
+  resize: none;
+  field-sizing: content;
+  transition: border-color .2s
+}
+
+.pnl-compose textarea:focus {
+  border-color: var(--gold-text)
+}
+
+.pnl-compose textarea::placeholder {
+  color: var(--text-fade)
+}
+
+.pnl-send {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 4px;
+  background: var(--gold);
+  color: #fff;
+  cursor: pointer;
+  transition: background .2s
+}
+
+.pnl-send:hover {
+  background: var(--gold-light)
+}
+
+.pnl-compose textarea:disabled,
+.pnl-send:disabled {
+  opacity: .5;
+  cursor: not-allowed
+}
+
+@media (max-width:360px) {
+  .pnl-head {
+    gap: 6px;
+    padding: 14px 10px 14px 14px
+  }
+
+  .pnl-title {
+    font-size: 13px;
+    letter-spacing: .06em
+  }
 }
 
 .notes-list {
   flex: 1;
   overflow-y: auto;
-  padding: 16px 24px;
+  padding: 16px 20px;
   display: flex;
   flex-direction: column;
-  gap: 10px
+  gap: 10px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-faint) transparent
 }
 
 .note-card {
-  background: rgba(var(--fg-rgb), .04);
-  border: 1px solid var(--border-soft);
-  padding: 12px 16px
+  flex-shrink: 0;
+  padding: 12px 8px 8px 14px;
+  border: 1px solid rgba(var(--fg-rgb), .08);
+  border-radius: 6px;
+  background: rgba(var(--fg-rgb), .06)
 }
 
 .note-text {
+  padding-right: 6px;
   font-size: 14px;
-  color: var(--paper);
   line-height: 1.6;
-  margin-bottom: 6px
+  color: var(--paper);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere
 }
 
 .note-meta {
   display: flex;
   justify-content: space-between;
-  align-items: center
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px
 }
 
 .note-date {
+  min-width: 0;
   font-family: var(--mono);
-  font-size: 13px;
-  color: var(--stone);
-  letter-spacing: .06em
+  font-size: 12px;
+  letter-spacing: .06em;
+  color: var(--stone)
 }
 
 .note-del {
-  background: none;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
+  background: none;
   color: var(--stone);
+  font-size: 17px;
+  line-height: 1;
   cursor: pointer;
-  font-size: 14px;
   transition: color .2s
 }
 
@@ -1446,53 +1568,16 @@ nav {
   color: var(--ph4-t)
 }
 
-.notes-input-row {
-  display: flex;
-  gap: 8px;
-  padding: 14px 24px;
-  border-top: 1px solid var(--rule);
-  flex-shrink: 0
-}
-
-.notes-input-row textarea {
-  flex: 1;
-  background: rgba(var(--fg-rgb), .05);
-  border: 1px solid var(--border-faint);
-  color: var(--paper);
-  font-family: var(--sans);
-  font-size: 14px;
-  padding: 10px 14px;
-  outline: none;
-  resize: none;
-  min-height: 40px;
-  max-height: 80px
-}
-
-.notes-input-row textarea:focus {
-  border-color: var(--gold-text)
-}
-
-.notes-input-row textarea::placeholder {
-  color: var(--text-fade)
-}
-
-.notes-send {
-  background: var(--gold);
-  border: none;
-  color: var(--on-accent);
-  padding: 10px 14px;
-  cursor: pointer;
-  font-size: 16px;
-  flex-shrink: 0
-}
-
 .notes-empty {
+  margin: auto;
+  max-width: 260px;
+  padding: 24px 0;
   font-family: var(--serif);
-  font-size: 16px;
-  color: var(--stone);
+  font-size: 17px;
+  line-height: 1.5;
   font-style: italic;
-  text-align: center;
-  padding: 40px 0
+  color: var(--stone);
+  text-align: center
 }
 
 /* ─── MARQUEE ───────────────────────────────────────────────── */
@@ -3136,44 +3221,57 @@ select option {
   pointer-events: auto
 }
 
-.gchat-header {
-  display: flex;
+.gchat-who {
+  flex-shrink: 0;
+  display: inline-flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 14px 20px;
-  border-bottom: 1px solid var(--rule);
-  background: rgba(var(--gold-rgb), .06);
-  flex-shrink: 0
+  gap: 8px;
+  height: 32px;
+  padding: 0 8px 0 4px;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--stone);
+  cursor: pointer;
+  transition: border-color .2s, color .2s
 }
 
-.gchat-header-title {
-  font-family: var(--mono);
-  font-size: 14px;
-  letter-spacing: .15em;
-  color: var(--gold-text);
-  text-transform: uppercase;
-  display: flex;
-  align-items: center;
-  gap: 10px
+.gchat-who:hover,
+.gchat-who[aria-expanded="true"] {
+  border-color: var(--border-faint);
+  color: var(--gold-text)
+}
+
+.gchat-who-mark {
+  width: 7px;
+  height: 7px;
+  border: solid currentColor;
+  border-width: 0 1.5px 1.5px 0;
+  transform: translateY(-2px) rotate(45deg);
+  transition: transform .2s
+}
+
+.gchat-who[aria-expanded="true"] .gchat-who-mark {
+  transform: translateY(2px) rotate(-135deg)
 }
 
 .gchat-avatars {
-  display: flex;
-  gap: 0
+  display: flex
 }
 
 .gchat-av {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
+  margin-left: -4px;
+  box-sizing: border-box;
+  border: 1.5px solid var(--ink);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-family: var(--mono);
-  font-size: 14px;
+  overflow: hidden;
+  font-family: var(--sans);
+  font-size: 9px;
   font-weight: 700;
-  border: 1.5px solid var(--ink);
-  margin-left: -6px;
   letter-spacing: 0
 }
 
@@ -3181,24 +3279,14 @@ select option {
   margin-left: 0
 }
 
-.gchat-close {
-  background: none;
-  border: 1px solid var(--border-faint);
-  color: var(--stone);
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: 14px;
-  transition: all .2s;
-  flex-shrink: 0
-}
-
-.gchat-close:hover {
-  border-color: var(--gold-text);
-  color: var(--gold-text)
+.gchat-av-more {
+  width: auto;
+  min-width: 24px;
+  padding: 0 4px;
+  border-radius: 12px;
+  background: var(--bg-card);
+  background: color-mix(in srgb, var(--paper) 18%, var(--ink));
+  color: var(--paper)
 }
 
 /* ─── PIPELINE MODULE RE-SKINNED CLASSES ────────────────────── */
@@ -5006,9 +5094,9 @@ select:focus {
     right: 12px;
     left: 12px;
     top: 64px;
-    bottom: auto;
+    bottom: 12px;
     height: auto;
-    max-height: calc(100vh - 84px)
+    max-height: 640px
   }
 
   .coach-fab,
@@ -7926,54 +8014,63 @@ select:focus {
    Sub-12px sizes bumped, placeholder contrast meets AA.
 */
 .gchat-members {
-  display: flex;
-  gap: 14px;
-  padding: 10px 20px;
-  border-bottom: 1px solid rgba(var(--fg-rgb), .05);
-  background: rgba(var(--fg-rgb), .02);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 14px;
+  max-height: 40%;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--rule);
+  background: rgba(var(--fg-rgb), .03);
   flex-shrink: 0;
-  overflow-x: auto
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-faint) transparent
+}
+
+.gchat-members[hidden] {
+  display: none
 }
 
 .gchat-member {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-family: var(--mono);
-  font-size: 12px;
-  letter-spacing: .05em;
-  color: var(--stone);
+  gap: 8px;
+  min-width: 0;
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--paper)
+}
+
+.gchat-member-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap
 }
 
 .gchat-member-av {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   flex-shrink: 0;
   letter-spacing: 0
 }
 
-.gchat-online {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #4caf78;
-  flex-shrink: 0
-}
-
 .gchat-msgs {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 16px 20px;
   display: flex;
   flex-direction: column;
-  gap: 14px
+  gap: 14px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-faint) transparent
 }
 
 .gchat-msg {
@@ -8025,7 +8122,9 @@ select:focus {
   line-height: 1.6;
   padding: 10px 14px;
   color: var(--paper);
-  border-radius: 6px
+  border-radius: 6px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere
 }
 
 .gchat-msg.them .gchat-msg-text {
@@ -8050,69 +8149,17 @@ select:focus {
 }
 
 .gchat-typing {
+  padding: 0 20px 8px;
   font-family: var(--mono);
   font-size: 12px;
-  color: var(--stone);
+  font-style: italic;
   letter-spacing: .06em;
-  padding: 0 20px 8px;
-  flex-shrink: 0;
-  min-height: 22px;
-  font-style: italic
+  color: var(--stone);
+  flex-shrink: 0
 }
 
-.gchat-input-row {
-  display: flex;
-  gap: 8px;
-  padding: 12px 16px;
-  border-top: 1px solid var(--rule);
-  background: rgba(var(--bg-rgb), .5);
-  flex-shrink: 0;
-  align-items: flex-end
-}
-
-.gchat-input-row textarea {
-  flex: 1;
-  background: rgba(var(--fg-rgb), .05);
-  border: 1px solid rgba(var(--fg-rgb), .12);
-  color: var(--paper);
-  font-family: var(--sans);
-  font-size: 14px;
-  padding: 10px 13px;
-  outline: none;
-  resize: none;
-  min-height: 40px;
-  max-height: 100px;
-  transition: border-color .2s;
-  line-height: 1.5;
-  border-radius: 4px
-}
-
-.gchat-input-row textarea:focus {
-  border-color: var(--gold-text)
-}
-
-.gchat-input-row textarea::placeholder {
-  color: var(--text-fade)
-}
-
-.gchat-send {
-  background: var(--gold);
-  border: none;
-  color: #fff;
-  padding: 9px 16px;
-  cursor: pointer;
-  font-family: var(--mono);
-  font-size: 15px;
-  font-weight: 600;
-  transition: background .2s;
-  flex-shrink: 0;
-  align-self: flex-end;
-  height: 40px;
-  border-radius: 4px
-}
-
-.gchat-send:hover {
-  background: var(--gold-light)
+.gchat-typing:empty {
+  display: none
 }
 
 

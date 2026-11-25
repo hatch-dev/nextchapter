@@ -209,7 +209,7 @@ function chatShutdown() {
   var box = document.getElementById('gchatInput'); if (box) box.value = '';   /* a half-typed message is not the next person's */
 }
 
-function gchatMembers() { return (data.roster || []).map(function (u, ix) { return { initials: u.initials, name: u.name, color: u.color, online: ix < 5 } }) }
+function gchatMembers() { return (data.roster || []).map(function (u) { return { initials: u.initials, name: u.name, color: u.color } }) }
 
 function gchatTxt(bg) { var h = String(bg || '#4866A0').replace('#', ''); if (h.length === 3) h = h.split('').map(function (c) { return c + c }).join(''); var r = parseInt(h.substr(0, 2), 16), g = parseInt(h.substr(2, 2), 16), b = parseInt(h.substr(4, 2), 16); return (0.299 * r + 0.587 * g + 0.114 * b) > 140 ? '#1A1612' : '#fff' }
 function gchatColor(who) { if (who === 'F') return '#B8892A'; var u = (data.roster || []).filter(function (x) { return x.initials === who })[0]; return u ? u.color : 'rgba(var(--faint-rgb),.7)' }
@@ -220,6 +220,19 @@ function anchorBelowNav() {
   var nav = document.querySelector('nav');
   var h = nav ? nav.getBoundingClientRect().height : 60;
   return (Math.round(h) + 10) + 'px';
+}
+
+/* The panels' send mark, shared with Notes (25 Nov 2026): the AI Guide's. */
+var PANEL_SEND_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>';
+
+/* The member list folds (25 Nov 2026): the header shows a few faces and how many more, and the names open on request.
+   The list is shown or hidden in place, so what is being typed and the place being read are not touched. */
+var gchatMembersOpen = false;
+function toggleGChatMembers() {
+  gchatMembersOpen = !gchatMembersOpen;
+  var list = document.getElementById('gchatMembersEl'), b = document.getElementById('gchatWho');
+  if (list) list.hidden = !gchatMembersOpen;
+  if (b) { b.setAttribute('aria-expanded', gchatMembersOpen ? 'true' : 'false'); b.title = gchatMembersOpen ? 'Hide the members' : 'Show the members'; }
 }
 
 function toggleGChat() {
@@ -254,18 +267,21 @@ function renderGChatPanel(toEnd) {
   if (was) draft = { v: was.value, focus: document.activeElement === was, s: was.selectionStart, e: was.selectionEnd, d: was.selectionDirection };
   if (list && !toEnd && list.clientHeight && list.scrollHeight - list.scrollTop - list.clientHeight > 40) stay = list.scrollTop;
   var _gm = gchatMembers();
-  var avHtml = '';
-  for (var i = 0; i < _gm.length; i++) {
-    avHtml += '<div class="gchat-av" style="background:' + _gm[i].color + ';color:' + gchatTxt(_gm[i].color) + '">' + _gm[i].initials + '</div>';
+  var FACES = 4, avHtml = '';
+  for (var i = 0; i < _gm.length && i < FACES; i++) {
+    avHtml += '<span class="gchat-av" style="background:' + _gm[i].color + ';color:' + gchatTxt(_gm[i].color) + '">' + esc(_gm[i].initials) + '</span>';
   }
+  if (_gm.length > FACES) avHtml += '<span class="gchat-av gchat-av-more">+' + (_gm.length - FACES) + '</span>';
   var memHtml = '';
   for (var i = 0; i < _gm.length; i++) {
     var m = _gm[i];
-    memHtml += '<div class="gchat-member"><div class="gchat-member-av" style="background:' + m.color + ';color:' + gchatTxt(m.color) + '">' + m.initials + '</div>' + m.name + (m.online ? '<div class="gchat-online"></div>' : '') + '</div>';
+    memHtml += '<div class="gchat-member"><span class="gchat-member-av" style="background:' + m.color + ';color:' + gchatTxt(m.color) + '">' + esc(m.initials) + '</span><span class="gchat-member-name">' + esc(m.name) + '</span></div>';
   }
   var me = chatIdentity();
-  var h = '<div class="gchat-header"><div class="gchat-header-title"><div class="gchat-avatars">' + avHtml + '</div> Team Room</div><button class="gchat-close" onclick="toggleGChat()">×</button></div>';
-  h += '<div class="gchat-members">' + memHtml + '</div>';
+  var h = '<div class="pnl-head gchat-header"><div class="pnl-id"><div class="pnl-title">Team Room</div><div class="pnl-sub">' + _gm.length + (_gm.length === 1 ? ' member' : ' members') + '</div></div>';
+  if (_gm.length) h += '<button class="gchat-who" id="gchatWho" onclick="toggleGChatMembers()" aria-controls="gchatMembersEl" aria-expanded="' + (gchatMembersOpen ? 'true' : 'false') + '" aria-label="Team members" title="' + (gchatMembersOpen ? 'Hide the members' : 'Show the members') + '"><span class="gchat-avatars">' + avHtml + '</span><span class="gchat-who-mark" aria-hidden="true"></span></button>';
+  h += '<button class="pnl-x gchat-close" onclick="toggleGChat()" title="Close" aria-label="Close Team Room">×</button></div>';
+  h += '<div class="gchat-members" id="gchatMembersEl"' + (gchatMembersOpen ? '' : ' hidden') + '>' + memHtml + '</div>';
   h += '<div class="gchat-msgs" id="gchatMsgsEl">';
   if (!me.org) { h += '<div class="notes-empty">Team chat needs the organization synced to the server. Sign in again to enable it.</div>'; }
   else if (!chatMessages.length) { h += '<div class="notes-empty">No messages yet – the team thread starts here.</div>'; }
@@ -296,7 +312,7 @@ function renderGChatPanel(toEnd) {
   h += '</div>';
   h += '<div class="gchat-typing" id="gchatTyping"></div>';
   var dis = me.org ? '' : ' disabled';
-  h += '<div class="gchat-input-row"><textarea id="gchatInput" placeholder="Message the team..."' + dis + ' onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();sendGChat()}"></textarea><button class="gchat-send" onclick="sendGChat()"' + dis + '>→</button></div>';
+  h += '<div class="pnl-compose gchat-input-row"><textarea id="gchatInput" rows="1" placeholder="Message the team..."' + dis + ' onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();sendGChat()}"></textarea><button class="pnl-send gchat-send" onclick="sendGChat()" title="Send" aria-label="Send"' + dis + '>' + PANEL_SEND_ICON + '</button></div>';
   panel.innerHTML = h;
   var msgs = document.getElementById('gchatMsgsEl');
   if (msgs) msgs.scrollTop = stay !== null ? stay : msgs.scrollHeight;

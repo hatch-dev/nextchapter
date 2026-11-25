@@ -96,21 +96,23 @@ function updateNotesCount() { var el = $('notesCount'); if (el) { var n = notesD
 function notesListHtml() {
   var h = '';
   if (!notesData.length) h += '<div class="notes-empty">Capture insights as you work through the pipeline.</div>';
-  else for (var i = 0; i < notesData.length; i++) { var n = notesData[i]; h += '<div class="note-card"><div class="note-text">' + esc(n.body) + '</div><div class="note-meta"><span class="note-date">' + (n.step ? esc(notesScopeLabel(n.step)) + ' · ' : '') + esc(notesDate(n.created_at)) + '</span><button class="note-del" onclick="deleteNote(\'' + n.id + '\')">×</button></div></div>'; }
+  else for (var i = 0; i < notesData.length; i++) { var n = notesData[i]; h += '<div class="note-card"><div class="note-text">' + esc(n.body) + '</div><div class="note-meta"><span class="note-date">' + (n.step ? esc(notesScopeLabel(n.step)) + ' · ' : '') + esc(notesDate(n.created_at)) + '</span><button class="note-del" onclick="deleteNote(\'' + n.id + '\')" title="Delete this note" aria-label="Delete this note">×</button></div></div>'; }
   return h;
 }
-/* The list alone: what is being typed below it, and the caret, are left as they are. */
+function notesSubHtml() { var n = notesData.length; return (n ? n + (n === 1 ? ' note' : ' notes') + ' \u00b7 ' : '') + 'Private to you'; }
+/* The list alone (and the count above it): what is being typed below it, and the caret, are left as they are. */
 function renderNotesList() {
   var panel = $('notesPanel'), list = panel && panel.querySelector('.notes-list');
   if (!list) { renderNotesPanel(); return; }
   list.innerHTML = notesListHtml();
+  var sub = panel.querySelector('.pnl-sub'); if (sub) sub.innerHTML = notesSubHtml();
 }
 
 function renderNotesPanel() {
   var panel = $('notesPanel'); if (!panel) return;
-  var h = '<div class="notes-header"><div class="notes-header-title">&#9998; Notes</div><button class="notes-close" onclick="toggleNotes()">×</button></div>';
+  var h = '<div class="pnl-head notes-header"><div class="pnl-id"><div class="pnl-title">Notes</div><div class="pnl-sub">' + notesSubHtml() + '</div></div><button class="pnl-x notes-close" onclick="toggleNotes()" title="Close" aria-label="Close Notes">×</button></div>';
   h += '<div class="notes-list">' + notesListHtml() + '</div>';
-  h += '<div class="notes-input-row"><textarea id="notesInput" placeholder="Write a note..." onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();addNote()}"></textarea><button class="notes-send" onclick="addNote()">&#9998;</button></div>';
+  h += '<div class="pnl-compose notes-input-row"><textarea id="notesInput" rows="1" placeholder="Write a note..." onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();addNote()}"></textarea><button class="pnl-send notes-send" onclick="addNote()" title="Save note" aria-label="Save note">' + PANEL_SEND_ICON + '</button></div>';
   panel.innerHTML = h;
 }
 
