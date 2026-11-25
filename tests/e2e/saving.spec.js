@@ -37,6 +37,17 @@ test.describe('Executive Readiness', () => {
     await expect(page.locator('#ap_mission')).toHaveValue('ANN-ER-04 mission');
   });
 
+  /* P-34 (25 Nov 2026): the assignments and the team arriving just after a page opened drew it again, without what was being typed. */
+  test('what is typed while a page is still starting stays, on a slow server', async ({ page }) => {
+    for (const g of ['assignments', 'organizations/members']) await page.route('**/api/' + g + '?**', async (r) => { await new Promise((x) => setTimeout(x, 900)); await r.continue(); });
+    await page.goto(ER + '/step/1.1');
+    await page.locator('#ap_mission').click();
+    await page.keyboard.type('Typed early');
+    await expect.poll(async () => serverValue(page, 'exec-readiness', 'assessments.purpose.mission'), SAVED).toBe('Typed early');
+    await expect(page.locator('#ap_mission')).toHaveValue('Typed early');
+    await expect(page.locator('#ap_mission')).toBeFocused();
+  });
+
   test('[ER-01] a 1–5 score is stored the moment it is pressed', async ({ page }) => {
     await erSection(page, 'B');
     await erScore(page, 'assessments.fluency.foundational', 4).click();

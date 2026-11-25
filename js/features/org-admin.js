@@ -1599,7 +1599,7 @@ function pullOrgMembers(cb, quiet) {
           try { Store.patchDbOrg(sid, { users: res.data.members }); } catch (e) { }
           read = true;
           changed = reconcileRosterFromServer(res.data.members);
-          if (changed && quiet) { try { repaintAfterSync(); } catch (e) { } }
+          if (changed && (quiet || currentModal !== 'org') && currentUserId) { try { repaintKeepingTyping(); } catch (e) { } }
           else if (changed) { try { render(); } catch (e) { } if (currentModal === 'org') renderOrgModal(); }
         }
         if (cb) cb(changed, read);

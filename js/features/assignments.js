@@ -293,10 +293,11 @@ function assignmentsFetch(org, cb, quiet) {
         if (lost && !quiet) { try { console.warn('assignments: ' + lost + ' row(s) name a member who is not on this device\'s roster; kept unresolved'); } catch (e) { } }
         /* A background check (quiet) changes nothing and repaints nothing when the list is as it was. */
         if (quiet && assignMapKey(map) === assignMapKey(data.assigns)) { if (cb) cb(); return; }
+        if (typeof currentUserId !== 'undefined' && currentUserId) { try { bankOpenPage(); } catch (e) { } }   /* before the document is written: what the page holds is part of it */
         data.assigns = map;
         saveData();
         if (typeof currentUserId !== 'undefined' && currentUserId) {
-          if (quiet && typeof repaintAfterSync === 'function') repaintAfterSync();   /* keeps what is being typed, and the caret */
+          if (typeof repaintKeepingTyping === 'function') repaintKeepingTyping();   /* keeps what is being typed, and the caret */
           else if (typeof render === 'function') render();
         }
       }

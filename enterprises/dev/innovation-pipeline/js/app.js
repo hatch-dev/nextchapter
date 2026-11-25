@@ -4602,6 +4602,14 @@ if (typeof document !== 'undefined') {
   window.addEventListener('pagehide', commitOnLeave);
   window.addEventListener('beforeunload', commitOnLeave);
 }
+/* A repaint that is not the reader's doing and brings no document with it: the assignments or the team have come. What the
+   page holds goes into the document first, then the page is drawn with the caret and the typing as they were (P-34, 25 Nov
+   2026). Executive Readiness keeps nothing as it is typed, so on a slow server the first words typed on a page that had
+   just opened were drawn away. */
+function repaintKeepingTyping() {
+  try { bankOpenPage(); } catch (e) { }
+  repaintAfterSync();
+}
 function repaintAfterSync() {
   var edits = _liveEdits, banked = _bankedEdits, f = null;
   try {
