@@ -7,7 +7,12 @@
  *
  * ONLY sections that belong to their steps alone are named. What several steps share, or a hub, a portfolio page or a
  * report edits as well (ideas, projects, capital, budgets, reviews...), is left to the screens: refusing here what a
- * screen allows would lose somebody's work. A program not listed is not judged. tests/e2e/member-limits.spec.js has a
+ * screen allows would lose somebody's work. A program not listed is not judged.
+ *
+ * '*' is the rule where a program's steps share their saving code and cannot be told apart: somebody with NO step of the
+ * program changes none of its work, by whatever request. The sections named there are the ones its hub pages, which are
+ * nobody's step, edit as well; they stay open. Somebody with a step is left to the screens.
+ * tests/e2e/member-limits.spec.js has a
  * member edit each of these from its step; add to both together.
  */
 return [
@@ -26,4 +31,9 @@ return [
         'governance'        => ['4.2'],
         'stress'            => ['4.3'],
     ],
+    'exec-readiness'  => ['*' => ['review', 'capital']],
+    'ai-governance'   => ['*' => ['review', 'capital', 'raciPeople', 'raciActs', 'raci', 'snapshots', 'nistSeeded']],
+    'ai-architecture' => ['*' => ['review', 'capital', 'archReviewLog', 'judgmentPractices', 'dataGovernance', 'identityPlan', 'computePlan', 'reviewBoard', 'rbOrg', 'rbRaci',
+        'skillsInventory', 'printOpts']],
+    'ai-culture'      => ['*' => ['review', 'capital', 'pulseRounds']],
 ];

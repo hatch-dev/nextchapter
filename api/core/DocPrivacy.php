@@ -86,6 +86,7 @@ class DocPrivacy
         $this->refused = [];
         $mine = null;
         foreach ($this->editSteps as $key => $steps) {
+            if ($key === '*') { continue; }
             if (!property_exists($out, $key) && !($whole && isset($stored->$key))) { continue; }
             $had = property_exists($stored, $key);
             if (property_exists($out, $key) === $had && self::sameContent($out->$key ?? null, $stored->$key ?? null)) { continue; }
@@ -96,7 +97,26 @@ class DocPrivacy
             if ($had) { $out->$key = json_decode((string) json_encode($stored->$key)); } else { unset($out->$key); }
             $this->refused[] = $key;
         }
+        if (!isset($this->editSteps['*'])) { return; }
+        $mine = $mine ?? ($this->steps !== null ? ($this->steps)() : []);
+        if ($mine !== []) { return; }
+        $open = array_fill_keys(array_merge(self::NOBODYS_STEP, $this->byLeader, $this->editSteps['*'], self::ADMIN_ONLY, self::COMPLETION), true);
+        $keys = array_keys(get_object_vars($out));
+        if ($whole) { $keys = array_unique(array_merge($keys, array_keys(get_object_vars($stored)))); }
+        foreach ($keys as $key) {
+            $key = (string) $key;
+            if (isset($open[$key])) { continue; }
+            $had = property_exists($stored, $key);
+            if (property_exists($out, $key) === $had && self::sameContent($out->$key ?? null, $stored->$key ?? null)) { continue; }
+            if (!$had && self::isEmpty($out->$key)) { unset($out->$key); continue; }
+            if ($had) { $out->$key = json_decode((string) json_encode($stored->$key)); } else { unset($out->$key); }
+            $this->refused[] = $key;
+        }
     }
+
+    /** What a program keeps beside its steps: anybody's page writes it, and nobody's answers are in it. */
+    private const NOBODYS_STEP = ['rev', 'schemaVersion', 'roster', 'members', 'termsLog', 'termsOrg', 'assigns', 'notes', 'notifications', 'remind7', 'reportDefs', 'chatMsgs',
+        'orgSetup', 'stepDue', 'startDate', 'stepDoneBy', 'stepDoneById', 'lastActive', 'anSnapshots', 'resetAt', 'bf11', 'bf12', 'printOpts'];
 
     private static function isEmpty($v): bool
     {
@@ -255,6 +275,9 @@ class DocPrivacy
     /** Sweep 4R item 3: may this caller name these sections for deletion? (A patch's `removed` list.) */
     public function removable(array $keys): array
     {
+        if (!$this->mayEditAdminSections && isset($this->editSteps['*']) && ($this->steps === null || ($this->steps)() === [])) {
+            $keys = array_values(array_intersect($keys, $this->editSteps['*']));
+        }
         return $this->mayEditAdminSections ? $keys : array_values(array_diff($keys, self::ADMIN_ONLY, ['roster', 'termsLog', 'termsOrg'], self::COMPLETION, array_keys($this->editSteps)));
     }
 

@@ -719,6 +719,7 @@ var Store = (function () {
      document before the merge, `merged` after it: our value must still be the
      one we sent (nobody has typed over it here since) and the merged value must
      differ, or there is nothing to report. */
+  function blank(v) { return v == null || v === '' || v === false || (typeof v === 'object' && Object.keys(v).every(function (k) { return blank(v[k]); })); }
   function plainlyAdmin() { try { var u = getCurrentUser(); return !!(isAppAdmin || (u && u.admin)); } catch (e) { return true; } }
   function stillHolds(now, was) {
     if (plainRows(was) && plainRows(now) && was.length) return was.every(function (r) { return now.some(function (x) { return stillHolds(x, r); }); });
@@ -738,6 +739,7 @@ var Store = (function () {
         if (!deepEq(was, rec.v)) continue;             // we have moved on; not this
         var now = readAt(merged || {}, rec.keys);
         if (deepEq(was, now)) continue;                // untouched
+        if (now === undefined && blank(was)) { delete _authored[paths[i]]; continue; }   // an empty box the server did not keep
         if (stillHolds(now, was)) continue;            // a colleague has added to it; ours is all there (P-32)
         out.push({ path: paths[i], keys: rec.keys, lost: was, incoming: now, at: rec.at });
         delete _authored[paths[i]];                    // said once
@@ -1182,6 +1184,7 @@ var Store = (function () {
     getJSON('/workspace?org=' + encodeURIComponent(id) + modQ(id), function (w) {
       if (!w || !w.doc) return;
       var mine = localDoc(id), base = cloneDoc(getBase(id)) || {}, lost = [];
+      Object.keys(_authored).forEach(function (p) { if (sections.indexOf(_authored[p].keys[0]) >= 0) delete _authored[p]; });   /* it was never saved, so nobody has replaced it */
       sections.forEach(function (k) {
         try { leafDiff(w.doc[k] || {}, (mine || {})[k] || {}, [], [], 0).forEach(function (d) { if (typeof d.to === 'string' && d.to.trim()) lost.push({ path: '.' + k + String(d.path || ''), mine: d.to }); }); } catch (e) { }
         [mine, base].forEach(function (o) { if (!o) return; if (has(w.doc, k)) o[k] = cloneDoc(w.doc[k]); else delete o[k]; });

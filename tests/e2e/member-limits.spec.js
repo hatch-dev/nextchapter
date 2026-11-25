@@ -383,3 +383,24 @@ test('a member changes only the steps that are theirs, by whatever request', asy
   expect((await t.doc()).doc.projects).toEqual({ 0: { name: 'shared' } });
   expect((await put(t.member, t.memberId, { sections: { ownership: { a: 'changed' } } })).refused).toBeUndefined();   // the same content is no change
 });
+
+/* The other programs' steps share their saving code: there, somebody with no step changes nothing, and a hub's sections stay open. */
+for (const [program, section, hub] of [['exec-readiness', 'risks', 'review'], ['ai-governance', 'risks', 'raciPeople'], ['ai-architecture', 'vendors', 'rbOrg'], ['ai-culture', 'statements', 'pulseRounds']]) {
+  test(`a member with no step of a program changes none of its work: ${program}`, async ({ account, playwright, baseURL }) => {
+    const t = await ownerAndMember(account, playwright, baseURL);
+    expect((await t.owner.post('api/users/update', { data: { id: t.memberId, name: 'Plain Member', username: t.who.username, role: 'Tester', scope: 'All', email: t.who.username + '@example.test', department: 'QA', modules: [MODULE, program] } })).ok()).toBe(true);
+    const put = async (by, id, b) => (await (await by.post('api/workspace/patch', { data: { org: t.org, module: program, actor_id: id, schema_version: 1, sections: {}, ...b } })).json()).data;
+    const doc = async () => (await (await t.owner.get(`api/workspace?org=${t.org}&module=${program}&actor=${t.ownerId}`)).json()).data.doc;
+    await put(t.owner, t.ownerId, { sections: { [section]: { a: 'stored' }, [hub]: { a: 'stored' } } });
+    expect((await put(t.member, t.memberId, { sections: { [section]: { a: 'changed' } } })).refused).toEqual([section]);
+    expect((await put(t.member, t.memberId, { records: { [section]: { paths: [{ at: ['a'], v: 'changed' }] } } })).refused).toEqual([section]);
+    expect((await put(t.member, t.memberId, { sections: { brandNew: { a: 'x' } } })).refused).toEqual(['brandNew']);
+    await put(t.member, t.memberId, { removed: [section] });
+    expect((await doc())[section]).toEqual({ a: 'stored' });
+    expect((await put(t.member, t.memberId, { sections: { [hub]: { a: 'changed' }, reportDefs: [{ id: 'r' }] } })).refused).toBeUndefined();
+    expect((await doc())[hub]).toEqual({ a: 'changed' });
+    expect((await t.owner.post('api/assignments', { data: { org: t.org, module: program, actor_id: t.ownerId, step: '1.2', user: t.memberId, assigned: true } })).ok()).toBe(true);
+    expect((await put(t.member, t.memberId, { sections: { [section]: { a: 'changed' } } })).refused).toBeUndefined();
+    expect((await doc())[section]).toEqual({ a: 'changed' });
+  });
+}
