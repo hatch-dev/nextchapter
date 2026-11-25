@@ -134,3 +134,19 @@ test('a field typed on screen is sent as that field alone', async ({ page, accou
   for (const b of sent) { expect(b.sections.purpose).toBeUndefined(); expect(((b.records.purpose || {}).paths || []).map((p) => p.at.join('.')).filter((x) => x !== 'values')).toEqual([]); }
   expect(await mission(page)).toBe('First');
 });
+
+/* P-37 (25 Nov 2026): a list whose rows have no id (idea cards) went up whole; of two people saving cards at the same moment one was lost. */
+test('cards added and edited at the same moment all stay', async ({ page, account }) => {
+  await signIn(page, PROGRAM, account);
+  const me = (await (await page.request.get('api/session')).json()).data;
+  const send = (rows) => page.request.post('api/workspace/patch', { data: { org: me.organization.id, module: MODULE, actor_id: me.user.id, schema_version: 1, sections: {}, records: { ideas: { rows } } } });
+  expect((await send({ set: [], add: [{ name: 'one', desc: '' }, { name: 'two', desc: '' }] })).ok()).toBe(true);
+  await Promise.all([send({ set: [{ i: 0, paths: [{ at: ['desc'], v: 'A' }] }], add: [] }), send({ set: [{ i: 0, paths: [{ at: ['cost'], v: 'B' }] }], add: [] }), send({ set: [{ i: 1, paths: [{ at: ['desc'], v: 'C' }] }], add: [{ name: 'three' }] }), send({ set: [], add: [{ name: 'four' }] })]);
+  const ideas = await serverValue(page, MODULE, 'ideas');
+  expect(ideas.slice(0, 2)).toEqual([{ name: 'one', desc: 'A', cost: 'B' }, { name: 'two', desc: 'C' }]);
+  expect(ideas.slice(2).map((r) => r.name).sort()).toEqual(['four', 'three']);
+  expect((await send({ set: [{ i: 'x', paths: [] }], add: [] })).status()).toBe(422);
+  expect((await send({ set: [], add: ['text'] })).status()).toBe(422);
+  const merged = await page.evaluate(() => Store.mergeDocs({ ideas: [{ n: 1 }] }, { ideas: [{ n: 1 }, { n: 'mine' }] }, { ideas: [{ n: 1, t: 't' }, { n: 'theirs' }] }).doc.ideas);
+  expect(merged).toEqual([{ n: 1, t: 't' }, { n: 'theirs' }, { n: 'mine' }]);
+});

@@ -275,6 +275,7 @@ test('what a member types as their session ends is there when they sign in again
   await page.evaluate(() => go('step', '1.1'));
   await expect(page.locator('#p_values')).toBeEditable({ timeout: 15_000 });
   await page.locator('#p_values').click();
+  await page.waitForTimeout(1_500);                                       // its lock and the first look have been answered
   await context.clearCookies();                                           // the session is over; the page has not heard
   await page.keyboard.type('Typed as it ended', { delay: 15 });
   await expect(page.locator('#loginUser')).toBeVisible({ timeout: 25_000 });
@@ -294,4 +295,33 @@ test('a member’s save of single values keeps to the same limits', async ({ acc
   expect((now.completedSteps || {})['1.1']).toBeUndefined();
   expect(now.enterprise).toEqual(before.enterprise); expect(now.settings).toEqual(before.settings);
   expect(now.purpose).toEqual({ ...before.purpose, values: 'by the member' });
+});
+
+/* P-35 and P-36 (25 Nov 2026): a message arriving wiped the one being typed, and a reload called everything read. */
+test('team chat: a half-typed message survives one arriving, and what is unread survives a reload', async ({ account, playwright, baseURL, browser }) => {
+  test.setTimeout(90_000);
+  const t = await ownerAndMember(account, playwright, baseURL);
+  const say = (body) => t.owner.post('api/messages', { data: { org: t.org, module: MODULE, actor_id: t.ownerId, body } });
+  const context = await browser.newContext({ baseURL }), page = await context.newPage();
+  await page.goto('login');
+  await page.locator('#loginUser').fill(t.who.username); await page.locator('#loginPassword').fill(t.who.password); await page.locator('[data-submit]').click();
+  await acceptTermsIfShown(page);
+  await expect(page.locator('.nav-tab[data-tab="home"]')).toBeVisible({ timeout: 20_000 });
+  await page.waitForTimeout(2_000);                                       // the room has been read once
+  const badge = page.locator('#gchatUnread');
+  await say('one'); await say('two');
+  await expect(badge).toHaveText('2', { timeout: 15_000 });
+  await page.reload();
+  await expect(badge).toHaveText('2', { timeout: 15_000 });
+  await page.locator('#gchatNavBtn').click();
+  await expect(badge).toBeHidden();
+  await page.locator('#gchatInput').click(); await page.keyboard.type('half a mess');
+  await say('three');
+  await expect(page.locator('.gchat-msg-text', { hasText: 'three' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('#gchatInput')).toHaveValue('half a mess'); await expect(page.locator('#gchatInput')).toBeFocused();
+  await page.keyboard.type('age'); await page.keyboard.press('Enter');
+  await expect(page.locator('.gchat-msg-text', { hasText: 'half a message' })).toBeVisible(); await expect(page.locator('#gchatInput')).toHaveValue('');
+  await page.locator('.gchat-close').click(); await page.reload(); await page.waitForTimeout(6_000);
+  await expect(badge).toBeHidden();
+  await context.close();
 });

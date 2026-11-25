@@ -346,17 +346,23 @@ class WorkspaceController extends Controller
                 /* Any other object section as the values that changed, however deep (js/app.js pathDelta, P-32):
                    { paths: [{ at: [key, …], v: value } | { at: [key, …], gone: 1 }] }. */
                 if (isset($delta->paths) && is_array($delta->paths)) {
-                    $paths = [];
-                    foreach ($delta->paths as $p) {
-                        $at = is_object($p) && isset($p->at) && is_array($p->at) ? $p->at : [];
-                        $bad = array_filter($at, static fn($k): bool => !is_string($k) || $k === '' || $k[0] === "\0");
-                        if ($at === [] || count($at) > 12 || $bad !== [] || (empty($p->gone) && !property_exists($p, 'v'))) {
-                            /* Taking the rest would store half of what they wrote and say it was saved. */
-                            Response::validationError(['records' => ['A changed value could not be read.']]);
+                    $records[$key] = ['paths' => self::pathsFrom($delta->paths)];
+                    continue;
+                }
+                /* A list whose rows have no id, by place (js/app.js rowDelta, P-37): { rows: { set: [{ i, paths }], add: [row] } }. */
+                if (isset($delta->rows) && is_object($delta->rows)) {
+                    $set = [];
+                    foreach ((isset($delta->rows->set) && is_array($delta->rows->set)) ? $delta->rows->set : [] as $s) {
+                        if (!is_object($s) || !isset($s->i) || !is_int($s->i) || $s->i < 0 || !isset($s->paths) || !is_array($s->paths)) {
+                            Response::validationError(['records' => ['A changed row could not be read.']]);
                         }
-                        $paths[] = ['at' => array_values($at), 'gone' => !empty($p->gone), 'v' => $p->v ?? null];
+                        $set[] = ['i' => $s->i, 'paths' => self::pathsFrom($s->paths)];
                     }
-                    $records[$key] = ['paths' => $paths];
+                    $add = (isset($delta->rows->add) && is_array($delta->rows->add)) ? $delta->rows->add : [];
+                    if (array_filter($add, static fn($r): bool => !is_object($r)) !== []) {
+                        Response::validationError(['records' => ['An added row could not be read.']]);
+                    }
+                    $records[$key] = ['rows' => ['set' => $set, 'add' => $add]];
                     continue;
                 }
                 $upsert = [];
@@ -753,23 +759,20 @@ class WorkspaceController extends Controller
                 $out->$key = $obj;
                 continue;
             }
-            /* An object section's values, each laid on it as stored now (P-32). The copy is deep: what is inside is written. */
+            /* An object section's values, each laid on it as stored now (P-32). */
             if (isset($delta['paths'])) {
-                $obj = ($stored !== null && isset($stored->$key) && is_object($stored->$key)) ? json_decode((string) json_encode($stored->$key)) : new \stdClass();
-                foreach ($delta['paths'] as $p) {
-                    $last = array_pop($p['at']);
-                    $cur  = $obj;
-                    foreach ($p['at'] as $k) {
-                        if (!isset($cur->{$k}) || !is_object($cur->{$k})) {
-                            if ($p['gone']) { $cur = null; break; }
-                            $cur->{$k} = new \stdClass();
-                        }
-                        $cur = $cur->{$k};
+                $out->$key = self::withPaths(($stored !== null && isset($stored->$key) && is_object($stored->$key)) ? $stored->$key : new \stdClass(), $delta['paths']);
+                continue;
+            }
+            /* A list without ids: the rows named change where they stand, and the rest are added at the end (P-37). */
+            if (isset($delta['rows'])) {
+                $rows = ($stored !== null && isset($stored->$key) && is_array($stored->$key)) ? $stored->$key : [];
+                foreach ($delta['rows']['set'] as $s) {
+                    if (isset($rows[$s['i']]) && is_object($rows[$s['i']])) {
+                        $rows[$s['i']] = self::withPaths($rows[$s['i']], $s['paths']);
                     }
-                    if ($cur === null) { continue; }
-                    if ($p['gone']) { unset($cur->{$last}); } else { $cur->{$last} = $p['v']; }
                 }
-                $out->$key = $obj;
+                $out->$key = array_merge($rows, $delta['rows']['add']);
                 continue;
             }
             $list   = ($stored !== null && isset($stored->$key) && is_array($stored->$key)) ? $stored->$key : [];
@@ -817,6 +820,41 @@ class WorkspaceController extends Controller
             $out->$key = $merged;
         }
         return $out;
+    }
+
+    /** The changed values a request names, checked. Taking only the good ones would store half of what they wrote and say it was saved. */
+    private static function pathsFrom(array $sent): array
+    {
+        $paths = [];
+        foreach ($sent as $p) {
+            $at  = is_object($p) && isset($p->at) && is_array($p->at) ? $p->at : [];
+            $bad = array_filter($at, static fn($k): bool => !is_string($k) || $k === '' || $k[0] === "\0");
+            if ($at === [] || count($at) > 12 || $bad !== [] || (empty($p->gone) && !property_exists($p, 'v'))) {
+                Response::validationError(['records' => ['A changed value could not be read.']]);
+            }
+            $paths[] = ['at' => array_values($at), 'gone' => !empty($p->gone), 'v' => $p->v ?? null];
+        }
+        return $paths;
+    }
+
+    /** Values laid over an object as stored, however deep. The copy is deep: what is inside is written. */
+    private static function withPaths(object $stored, array $paths): object
+    {
+        $obj = json_decode((string) json_encode($stored));
+        foreach ($paths as $p) {
+            $last = array_pop($p['at']);
+            $cur  = $obj;
+            foreach ($p['at'] as $k) {
+                if (!isset($cur->{$k}) || !is_object($cur->{$k})) {
+                    if ($p['gone']) { $cur = null; break; }
+                    $cur->{$k} = new \stdClass();
+                }
+                $cur = $cur->{$k};
+            }
+            if ($cur === null) { continue; }
+            if ($p['gone']) { unset($cur->{$last}); } else { $cur->{$last} = $p['v']; }
+        }
+        return $obj;
     }
 
     private static function withAiDefaults(object $doc, string $module): object

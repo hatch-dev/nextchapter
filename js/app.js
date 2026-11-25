@@ -394,17 +394,19 @@ var Store = (function () {
     /* The record of who accepted the Terms: everybody's line, whichever side it came from. */
     if (path === '.termsLog' && Array.isArray(mine) && Array.isArray(theirs)) return theirs.concat(mine.filter(function (r) { return !theirs.some(function (x) { return deepEq(x, r); }); }));
 
+    /* A list whose rows have no id (idea cards): nobody has taken a row away, so the rows both sides had are merged one
+       by one, and what each side added is kept, theirs first (P-37, 25 Nov 2026). Kept whole, one side's list put the
+       other's card back as it was, or left it out. */
+    var was = base === undefined ? [] : base;
+    if (plainRows(mine) && plainRows(theirs) && plainRows(was) && (mine.length || theirs.length) && mine.length >= was.length && theirs.length >= was.length) {
+      var list = [], at, added = theirs.slice(was.length);
+      for (at = 0; at < was.length; at++) list.push(merge3(was[at], mine[at], theirs[at], path + '.' + at, out, kp.concat(at)));
+      added.forEach(function (r) { list.push(r); });
+      mine.slice(was.length).forEach(function (r) { if (!added.some(function (x) { return deepEq(x, r); })) list.push(r); });
+      return list;
+    }
+
     if (out.storedWins) {
-      /* A list whose rows have no id (idea cards): nobody has taken a row away, so the rows both sides had are merged
-         one by one, and what each side added is kept, theirs first. */
-      var was = base === undefined ? [] : base;
-      if (plainRows(mine) && plainRows(theirs) && plainRows(was) && mine.length >= was.length && theirs.length >= was.length) {
-        var list = [], at, added = theirs.slice(was.length);
-        for (at = 0; at < was.length; at++) list.push(merge3(was[at], mine[at], theirs[at], path + '.' + at, out, kp.concat(at)));
-        added.forEach(function (r) { list.push(r); });
-        mine.slice(was.length).forEach(function (r) { if (!added.some(function (x) { return deepEq(x, r); })) list.push(r); });
-        return list;
-      }
       if (!BOOKKEEPING[kp[0]]) out.conflicts.push({ path: path, keys: kp, kind: 'both-edited', won: 'theirs', mine: mine, theirs: theirs });
       return theirs;
     }
@@ -718,6 +720,7 @@ var Store = (function () {
      one we sent (nobody has typed over it here since) and the merged value must
      differ, or there is nothing to report. */
   function stillHolds(now, was) {
+    if (plainRows(was) && plainRows(now) && was.length) return was.every(function (r) { return now.some(function (x) { return stillHolds(x, r); }); });
     if (!isPlainObj(was) || !isPlainObj(now)) return deepEq(was, now);
     return Object.keys(was).every(function (k) { return has(now, k) && stillHolds(now[k], was[k]); });
   }
@@ -759,7 +762,7 @@ var Store = (function () {
     for (k in doc) {
       if (!has(doc, k) || MERGE_SKIP[k]) continue;
       if (!has(base, k) || !deepEq(base[k], doc[k])) {
-        var rd = has(base, k) ? (recordDelta(base[k], doc[k]) || fieldDelta(k, base[k], doc[k]) || pathDelta(base[k], doc[k])) : pathDelta({}, doc[k]);
+        var rd = has(base, k) ? (recordDelta(base[k], doc[k]) || fieldDelta(k, base[k], doc[k]) || pathDelta(base[k], doc[k]) || rowDelta(base[k], doc[k])) : (pathDelta({}, doc[k]) || rowDelta([], doc[k]));
         if (rd) records[k] = rd; else sections[k] = doc[k];
         n++;
       }
@@ -857,11 +860,29 @@ var Store = (function () {
     })(b, d, []);
     return fine && paths.length && paths.length <= PATH_MAX ? { paths: paths } : null;
   }
+  /* A list whose rows have no id, as the rows that changed by their place and the rows added at the end (P-37). Only
+     while nothing has been taken out; a list that got shorter goes whole. */
+  function rowDelta(b, d) {
+    if (!plainRows(b) || !plainRows(d) || d.length < b.length || !d.length || d.some(function (r) { return r.id != null; })) return null;
+    var set = [];
+    for (var i = 0; i < b.length; i++) {
+      if (deepEq(b[i], d[i])) continue;
+      var p = pathDelta(b[i], d[i]);
+      if (!p) return null;
+      set.push({ i: i, paths: p.paths });
+    }
+    return set.length || d.length > b.length ? { rows: { set: set, add: d.slice(b.length) } } : null;
+  }
   /* What the server makes of a row delta (WorkspaceController::withRecords), so the
      baseline can say what the server holds after one. Keep the two the same: a
      patch lands field by field on the row as stored, and a patch for a row that
      is no longer there (someone removed it) is dropped, never a half row. */
   function applyRecordDelta(stored, delta) {
+    if (delta && delta.rows) {   /* a list without ids (rowDelta) */
+      var rowsNow = Array.isArray(stored) ? (cloneDoc(stored) || []) : [];
+      delta.rows.set.forEach(function (s) { if (isPlainObj(rowsNow[s.i])) rowsNow[s.i] = applyRecordDelta(rowsNow[s.i], { paths: s.paths }); });
+      return rowsNow.concat(cloneDoc(delta.rows.add) || []);
+    }
     if (delta && delta.paths) {   /* an object section's values (pathDelta) */
       var sec = isPlainObj(stored) ? (cloneDoc(stored) || {}) : {};
       delta.paths.forEach(function (p) {
@@ -2622,7 +2643,9 @@ var Collab = (function () {
     post('/workspace/locks/claim', { sections: [rk] }).then(function (d) {
       if (!d || !d.locks || !d.locks.length) return;
       var got = d.locks[0];
-      if (got.mine) return;                                  // confirmed
+      /* Ours: and what is stored is read now, not at the next five-second look. Whoever had it a moment ago may have saved
+         since the last one, and typing on from the older text put theirs back (P-38, 25 Nov 2026). */
+      if (got.mine) { try { Store.checkRemote(); } catch (e) { } return; }
       _cache[rk] = { id: got.user, sid: 'other:' + (got.user || '') + ':' + (got.tab || ''), name: got.name || 'Someone', at: Date.now() };   /* Sweep 4R item 4: possibly this person's other tab */
       try {
         if (typeof applyLockUI === 'function') applyLockUI(true);
@@ -7308,6 +7331,7 @@ function sessionEnded() {
   /* The box being typed in first, while this is still their page: it goes into this browser's copy, and that is sent when
      they sign in again (P-30, 25 Nov 2026). It used to be committed as the page left, after the copy had been dropped. */
   try { if (currentUserId && !isAppAdmin && typeof commitOnLeave === 'function') commitOnLeave(true); } catch (e) { }
+  try { if (document.activeElement && document.activeElement.blur) document.activeElement.blur(); } catch (e) { }   /* nothing more goes into a page that is leaving */
   try { Collab.leave(); } catch (e) { }
   try { chatShutdown(); } catch (e) { }
   try { sealSession(); } catch (e) { }

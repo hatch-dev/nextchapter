@@ -13,14 +13,29 @@ var gchatOpen = false;
 var gchatUnreadCount = 0;
 /* ── Sweep 4R item 5 (addendum 5 Oct 2026): the unread badge COUNTS ─────────────────────────────────
    Colleagues' messages newer than the last one this session saw; one's own never count (the server records each
-   message's author as the sender's session, user_public_id). Opening the panel sees them all; the seal (chatShutdown)
-   starts over at zero. It used to add 1 per batch of new messages, counted one's own, and only began listening once
+   message's author as the sender's session, user_public_id). Opening the panel sees them all. Where this person got to
+   is kept in this browser, per program (P-36, 25 Nov 2026): it was per session, so a reload, or coming back the next
+   day, called everything read. A browser that has not been used for it starts from now. It used to add 1 per batch of new messages, counted one's own, and only began listening once
    the panel had been opened. */
-var gchatSeenId = null;   /* the newest message id this session has seen; null until the room is first read */
+var gchatSeenId = null;   /* the newest message id this person has seen; null until the room is first read */
+function gchatSeenKey() { try { var id = chatIdentity(); return id.org && id.actor ? 'gchat-seen::' + id.org + '::' + chatModule() + '::' + id.actor : ''; } catch (e) { return ''; } }
+function gchatSeenStored() { try { var v = parseInt(Store.raw.get(gchatSeenKey()), 10); return isNaN(v) ? null : v; } catch (e) { return null; } }
+function gchatSeen(id) {
+  gchatSeenId = id;
+  try { var k = gchatSeenKey(); if (k && id > (gchatSeenStored() || 0)) Store.raw.set(k, String(id)); else if (k && gchatSeenStored() === null) Store.raw.set(k, String(id)); } catch (e) { }
+}
+/* Read in another tab: read here too. */
+try {
+  window.addEventListener('storage', function (ev) {
+    var k = gchatSeenKey(); if (!ev || !ev.key || !k || ev.key.slice(-k.length) !== k || gchatSeenId == null) return;
+    var v = gchatSeenStored(); if (v !== null && v > gchatSeenId) { gchatSeenId = v; gchatRecount(); }
+  });
+} catch (e) { }
 var chatWatching = false;
 function gchatMine(m) { var a = ''; try { a = actorId(); } catch (e) { } return !!(m && m.user_public_id && a && m.user_public_id === a); }
 function gchatRecount() {
-  if (gchatSeenId == null || gchatOpen) { gchatSeenId = chatLastId; gchatUnreadCount = 0; }
+  if (gchatSeenId == null && !gchatOpen) { var kept = gchatSeenStored(); if (kept !== null) gchatSeenId = kept; }
+  if (gchatSeenId == null || gchatOpen) { gchatSeen(chatLastId); gchatUnreadCount = 0; }
   else { var n = 0; chatMessages.forEach(function (m) { if (m && m.id > gchatSeenId && !gchatMine(m)) n++; }); gchatUnreadCount = n; }
   var u = document.getElementById('gchatUnread'); if (u) { u.style.display = gchatUnreadCount > 0 ? '' : 'none'; u.textContent = String(gchatUnreadCount); }
 }
@@ -30,7 +45,7 @@ function chatWatch() {
   if (chatWatching || window.SAMPLE_MODE) return;
   var id = chatIdentity(); if (!id.org || !id.actor) return;
   chatWatching = true;
-  chatLoadHistory(function () { gchatRecount(); chatConnect(); chatStartPolling(); });
+  chatLoadHistory(function (read) { if (read) gchatRecount(); chatConnect(); chatStartPolling(); });   /* a room that could not be read is not a room with nothing in it */
 }
 
 /* ── Real-time team chat (MySQL-backed + WebSocket) ─────────────────────
@@ -130,7 +145,7 @@ function chatLoadHistory(cb) {
   var id = chatIdentity(); if (!id.org) { if (cb) cb(false); return; }
   fetch(API_BASE + '/messages?org=' + encodeURIComponent(id.org) + chatScopeQuery())
     .then(function (r) { return r.json(); })
-    .then(function (res) { if (res && res.success && res.data) { chatMessages = []; chatLastId = 0; chatIngest(res.data.messages); } if (cb) cb(true); })
+    .then(function (res) { if (res && res.success && res.data) { chatMessages = []; chatLastId = 0; chatIngest(res.data.messages); if (cb) cb(true); return; } if (cb) cb(false); })
     .catch(function () { if (cb) cb(false); });
 }
 function chatConnect() {
@@ -183,19 +198,20 @@ function chatStartPolling() {
   chatPollTimer = setInterval(chatFetchNew, 4000);
 }
 function chatOnNew() {
-  if (gchatOpen) { renderGChatPanel(); gchatSeenId = chatLastId; }
+  if (gchatOpen) { renderGChatPanel(); gchatSeen(chatLastId); }
   else gchatRecount();   /* Sweep 4R item 5: colleagues' messages since last seen, not +1 per batch */
 }
 function chatShutdown() {
   if (chatPollTimer) { clearInterval(chatPollTimer); chatPollTimer = null; }
   try { if (chatSocket) chatSocket.close(); } catch (e) { }
   chatSocket = null; chatMessages = []; chatLastId = 0; chatOrgSid = null; chatTicketPending = null; gchatUnreadCount = 0;
-  gchatSeenId = null; chatWatching = false;   /* Sweep 4R item 5: the next session starts at zero */
+  gchatSeenId = null; chatWatching = false;
+  var box = document.getElementById('gchatInput'); if (box) box.value = '';   /* a half-typed message is not the next person's */
 }
 
 function gchatMembers() { return (data.roster || []).map(function (u, ix) { return { initials: u.initials, name: u.name, color: u.color, online: ix < 5 } }) }
 
-function gchatTxt(bg) { var h = bg.replace('#', ''); if (h.length === 3) h = h.split('').map(function (c) { return c + c }).join(''); var r = parseInt(h.substr(0, 2), 16), g = parseInt(h.substr(2, 2), 16), b = parseInt(h.substr(4, 2), 16); return (0.299 * r + 0.587 * g + 0.114 * b) > 140 ? '#1A1612' : '#fff' }
+function gchatTxt(bg) { var h = String(bg || '#4866A0').replace('#', ''); if (h.length === 3) h = h.split('').map(function (c) { return c + c }).join(''); var r = parseInt(h.substr(0, 2), 16), g = parseInt(h.substr(2, 2), 16), b = parseInt(h.substr(4, 2), 16); return (0.299 * r + 0.587 * g + 0.114 * b) > 140 ? '#1A1612' : '#fff' }
 function gchatColor(who) { if (who === 'F') return '#B8892A'; var u = (data.roster || []).filter(function (x) { return x.initials === who })[0]; return u ? u.color : 'rgba(var(--faint-rgb),.7)' }
 
 // Anchor the top-right slide-out panels just below the nav, which may be
@@ -223,15 +239,20 @@ function toggleGChat() {
     var u = document.getElementById('gchatUnread');
     if (u) { u.style.display = 'none'; u.textContent = '0'; }
     chatConnect(); chatStartPolling();
-    renderGChatPanel();                                  // show what we already have
-    gchatSeenId = chatLastId;   /* Sweep 4R item 5: opening sees everything */
-    chatLoadHistory(function () { renderGChatPanel(); if (gchatOpen) gchatSeenId = chatLastId; }); // then refresh from the DB
+    renderGChatPanel(true);                              // show what we already have
+    if (chatLastId) gchatSeen(chatLastId);   /* Sweep 4R item 5: opening sees everything */
+    chatLoadHistory(function (read) { renderGChatPanel(); if (gchatOpen && read) gchatSeen(chatLastId); }); // then refresh from the DB
   }
 }
 
-function renderGChatPanel() {
+/* toEnd: go to the newest message whatever is being read (one's own has just been sent, or the panel has just opened). */
+function renderGChatPanel(toEnd) {
   var panel = document.getElementById('gchatPanel');
   if (!panel) return;
+  /* A message that arrives redraws the panel; what is being typed, the cursor and the place being read stay (P-35, 25 Nov 2026). */
+  var was = document.getElementById('gchatInput'), list = document.getElementById('gchatMsgsEl'), draft = null, stay = null;
+  if (was) draft = { v: was.value, focus: document.activeElement === was, s: was.selectionStart, e: was.selectionEnd, d: was.selectionDirection };
+  if (list && !toEnd && list.clientHeight && list.scrollHeight - list.scrollTop - list.clientHeight > 40) stay = list.scrollTop;
   var _gm = gchatMembers();
   var avHtml = '';
   for (var i = 0; i < _gm.length; i++) {
@@ -278,7 +299,9 @@ function renderGChatPanel() {
   h += '<div class="gchat-input-row"><textarea id="gchatInput" placeholder="Message the team..."' + dis + ' onkeydown="if(event.key===\'Enter\'&&!event.shiftKey){event.preventDefault();sendGChat()}"></textarea><button class="gchat-send" onclick="sendGChat()"' + dis + '>→</button></div>';
   panel.innerHTML = h;
   var msgs = document.getElementById('gchatMsgsEl');
-  if (msgs) msgs.scrollTop = msgs.scrollHeight;
+  if (msgs) msgs.scrollTop = stay !== null ? stay : msgs.scrollHeight;
+  var box = document.getElementById('gchatInput');
+  if (box && draft) { box.value = draft.v; if (draft.focus) { try { box.focus({ preventScroll: true }); box.setSelectionRange(draft.s, draft.e, draft.d || 'none'); } catch (e) { } } }
 }
 
 function sendGChat() {
@@ -291,7 +314,7 @@ function sendGChat() {
     function (res) {
       var saved = res && res.data && res.data.message;
       if (saved) {
-        if (chatIngest([saved])) renderGChatPanel();
+        if (chatIngest([saved])) renderGChatPanel(true);
         // Fan out live to the other members in this org room.
         try { if (chatSocket && chatSocket.readyState === 1) chatSocket.send('new');   /* the signal only: receivers read the message from the API */ } catch (e) { }
       }
