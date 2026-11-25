@@ -455,7 +455,9 @@ function renderCollabReport() {
     var whos = reps.map(function (r) { return r.who || ''; }).filter(Boolean);
     if (whos.length && whos.every(function (n) { return n === whos[0]; })) by = ' by ' + whos[0];
     var nHeld = _collabReportRows.filter(function (r) { return r.kind === 'held'; }).length;
-    var head = nHeld === _collabReportRows.length
+    var head = _collabReportRows.every(function (r) { return r.kind === 'refused'; })
+      ? 'Not saved: this step is not assigned to you'
+      : nHeld === _collabReportRows.length
       ? 'Saved by a colleague before your ' + (nHeld === 1 ? 'change' : 'changes') + ' could be'
       : nRep === _collabReportRows.length
       ? 'Your saved ' + (nRep === 1 ? 'change was' : 'changes were') + ' replaced' + by
@@ -473,7 +475,8 @@ function renderCollabReport() {
          would have told the reader the surviving value was the lost one. */
       var held = r.kind === 'held';                             // ours waited, and what was saved meanwhile stands (P-29)
       var replaced = r.kind === 'replaced' || held;
-      var mineLbl = held ? 'Yours, not saved' : replaced ? 'Yours, gone' : 'Yours, kept';
+      var refused = r.kind === 'refused';                        // the step is not theirs (P-17): only their words to show
+      var mineLbl = refused ? 'Not saved: this step is not assigned to you' : held ? 'Yours, not saved' : replaced ? 'Yours, gone' : 'Yours, kept';
       var theirsLbl = replaced ? 'Now stored' : 'Theirs, gone';
       var lost = ' collab-report-val--lost';
       h += '<div class="collab-report-row' + (r.done ? ' is-done' : '') + '">'
@@ -481,7 +484,7 @@ function renderCollabReport() {
         + '<span class="collab-report-again" data-n="' + i + '"></span></div>'
         + '<div class="collab-report-vals">'
         + '<div class="collab-report-val' + (replaced ? lost : '') + '"><span class="collab-report-vk">' + mineLbl + '</span><span class="collab-report-vv" data-m="' + i + '"></span></div>'
-        + '<div class="collab-report-val' + (replaced ? '' : lost) + '"><span class="collab-report-vk">' + theirsLbl + '</span><span class="collab-report-vv" data-t="' + i + '"></span></div>'
+        + (refused ? '' : '<div class="collab-report-val' + (replaced ? '' : lost) + '"><span class="collab-report-vk">' + theirsLbl + '</span><span class="collab-report-vv" data-t="' + i + '"></span></div>')
         + '</div>'
         /* No button on a REPLACED row. It offered to put our older text back
            over the newer text that replaced it — which is the overwrite this

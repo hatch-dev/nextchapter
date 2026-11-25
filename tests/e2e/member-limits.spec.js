@@ -78,10 +78,10 @@ test('a member’s save cannot change the team, but keeps their own Terms accept
   await t.patch({ sections: {}, removed: ['roster'] });
   expect(Object.keys(await roster()).length).toBe(2);
   const now = await t.doc();
-  const whole = await t.member.post('api/workspace', { data: { org: t.org, module: MODULE, actor_id: t.memberId, base_rev: now.rev, schema_version: 1, doc: { ...now.doc, roster: [], purpose: { mission: 'A member’s edit' } } } });
+  const whole = await t.member.post('api/workspace', { data: { org: t.org, module: MODULE, actor_id: t.memberId, base_rev: now.rev, schema_version: 1, doc: { ...now.doc, roster: [], projects: { 0: { name: 'A member’s edit' } } } } });
   expect(whole.ok(), await whole.text()).toBe(true);
   expect(Object.keys(await roster()).length).toBe(2);
-  expect((await t.doc()).doc.purpose.mission).toBe('A member’s edit');   // ordinary work still saves
+  expect((await t.doc()).doc.projects[0].name).toBe('A member’s edit');   // ordinary work still saves
 });
 
 test('Seed and Import are offered to administrators only', async ({ page, account, playwright, baseURL }) => {
@@ -192,8 +192,8 @@ test('a member completes only the steps that are theirs, and puts none back', as
   expect((await done()).steps).toEqual({ '1.1': true, '1.3': true });
 
   /* ordinary work in the same save is untouched */
-  await t.patch({ sections: { completedSteps: { '4.4': true }, purpose: { mission: 'A member’s edit' } } });
-  expect((await t.doc()).doc.purpose.mission).toBe('A member’s edit');
+  await t.patch({ sections: { completedSteps: { '4.4': true }, projects: { 0: { name: 'A member’s edit' } } } });
+  expect((await t.doc()).doc.projects[0].name).toBe('A member’s edit');
   expect((await done()).steps['4.4']).toBeUndefined();
 });
 
@@ -290,11 +290,11 @@ test('what a member types as their session ends is there when they sign in again
 test('a member’s save of single values keeps to the same limits', async ({ account, playwright, baseURL }) => {
   const t = await ownerAndMember(account, playwright, baseURL);
   const before = (await t.doc()).doc;
-  expect((await t.patch({ sections: {}, records: { completedSteps: { paths: [{ at: ['1.1'], v: true }] }, enterprise: { paths: [{ at: ['name'], v: 'Taken' }] }, settings: { paths: [{ at: ['voice'], v: false }] }, purpose: { paths: [{ at: ['values'], v: 'by the member' }] } } })).ok()).toBe(true);
+  expect((await t.patch({ sections: {}, records: { completedSteps: { paths: [{ at: ['1.1'], v: true }] }, enterprise: { paths: [{ at: ['name'], v: 'Taken' }] }, settings: { paths: [{ at: ['voice'], v: false }] }, tracking: { paths: [{ at: ['0', 'note'], v: 'by the member' }] } } })).ok()).toBe(true);
   const now = (await t.doc()).doc;
   expect((now.completedSteps || {})['1.1']).toBeUndefined();
   expect(now.enterprise).toEqual(before.enterprise); expect(now.settings).toEqual(before.settings);
-  expect(now.purpose).toEqual({ ...before.purpose, values: 'by the member' });
+  expect(now.tracking).toEqual({ ...before.tracking, 0: { note: 'by the member' } });
 });
 
 /* P-35 and P-36 (25 Nov 2026): a message arriving wiped the one being typed, and a reload called everything read. */
@@ -357,4 +357,29 @@ test('an open page learns of team changes, and leaves what is being typed alone'
   await page.waitForTimeout(12_000);
   expect(asked).toBe(0);                                                  // nothing has changed: the members are not read
   await context.close();
+});
+
+/* P-17 part 2 (25 Nov 2026): who may edit a step was only the screens' rule. api/config/edit-steps.php names what the server judges. */
+test('a member changes only the steps that are theirs, by whatever request', async ({ account, playwright, baseURL }) => {
+  const t = await ownerAndMember(account, playwright, baseURL);
+  const SECTIONS = { purpose: '1.1', knowledge: '1.1', culture: '1.1', decisions: '1.1', audit: '1.1', completedSections: '1.1', assessments: '1.3', ownership: '2.1', raci: '2.1', incentives: '2.2', rhythm: '2.3', governance: '4.2', stress: '4.3' };
+  const assign = async (step, assigned) => expect((await t.owner.post('api/assignments', { data: { org: t.org, module: MODULE, actor_id: t.ownerId, step, user: t.memberId, assigned } })).ok()).toBe(true);
+  const put = async (by, id, b) => (await (await by.post('api/workspace/patch', { data: { org: t.org, module: MODULE, actor_id: id, schema_version: 1, sections: {}, ...b } })).json()).data;
+  const start = {}; for (const k of Object.keys(SECTIONS)) start[k] = k === 'audit' ? [{ a: 'stored' }] : { a: 'stored' };
+  await put(t.owner, t.ownerId, { sections: start });
+  for (const [k, step] of Object.entries(SECTIONS)) {
+    const changed = k === 'audit' ? [{ a: 'changed' }] : { a: 'changed' };
+    expect((await put(t.member, t.memberId, { sections: { [k]: changed } })).refused, k).toEqual([k]);
+    if (k !== 'audit') expect((await put(t.member, t.memberId, { records: { [k]: { paths: [{ at: ['a'], v: 'changed' }] } } })).refused, k).toEqual([k]);
+    await put(t.member, t.memberId, { removed: [k] });
+    expect((await t.doc()).doc[k], k).toEqual(start[k]);
+    await assign(step, true);
+    expect((await put(t.member, t.memberId, { sections: { [k]: changed } })).refused, k).toBeUndefined();
+    expect((await t.doc()).doc[k], k).toEqual(changed);
+    await assign(step, false);
+  }
+  const mixed = await put(t.member, t.memberId, { sections: { ownership: { a: 'again' }, projects: { 0: { name: 'shared' } } } });
+  expect(mixed.refused).toEqual(['ownership']);
+  expect((await t.doc()).doc.projects).toEqual({ 0: { name: 'shared' } });
+  expect((await put(t.member, t.memberId, { sections: { ownership: { a: 'changed' } } })).refused).toBeUndefined();   // the same content is no change
 });

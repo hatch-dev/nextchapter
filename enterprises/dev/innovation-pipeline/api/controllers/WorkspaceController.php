@@ -441,7 +441,8 @@ class WorkspaceController extends Controller
         }
 
         $this->projectAnswers($org, $module, $result['doc']);
-        Response::success(['rev' => $result['rev'], 'module' => $module]);
+        $refused = $privacy->refused();
+        Response::success(['rev' => $result['rev'], 'module' => $module] + ($refused !== [] ? ['refused' => $refused] : []));
     }
 
     /**

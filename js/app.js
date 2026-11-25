@@ -719,6 +719,7 @@ var Store = (function () {
      document before the merge, `merged` after it: our value must still be the
      one we sent (nobody has typed over it here since) and the merged value must
      differ, or there is nothing to report. */
+  function plainlyAdmin() { try { var u = getCurrentUser(); return !!(isAppAdmin || (u && u.admin)); } catch (e) { return true; } }
   function stillHolds(now, was) {
     if (plainRows(was) && plainRows(now) && was.length) return was.every(function (r) { return now.some(function (x) { return stillHolds(x, r); }); });
     if (!isPlainObj(was) || !isPlainObj(now)) return deepEq(was, now);
@@ -731,7 +732,8 @@ var Store = (function () {
       var paths = Object.keys(_authored);
       for (var i = 0; i < paths.length; i++) {
         var rec = _authored[paths[i]];
-        if (BOOKKEEPING[rec.keys[0]]) { delete _authored[paths[i]]; continue; }   // a line added to a log replaces nobody's work (P-31)
+        /* Nor is the team a plain member's: what their page sends of it, the server decides. */
+        if (BOOKKEEPING[rec.keys[0]] || (rec.keys[0] === 'roster' && !plainlyAdmin())) { delete _authored[paths[i]]; continue; }   // a line added to a log replaces nobody's work (P-31)
         var was = readAt(mine || {}, rec.keys);
         if (!deepEq(was, rec.v)) continue;             // we have moved on; not this
         var now = readAt(merged || {}, rec.keys);
@@ -1136,6 +1138,7 @@ var Store = (function () {
             noteAuthored(confirmedNow, sent);
             setBase(id, sent, true);   // the server now holds exactly this
           }
+          if (Array.isArray(res.body.data.refused) && res.body.data.refused.length) notMine(id, res.body.data.refused);
           _dirty = {};
           /* Anything typed while the request was in flight is, by definition,
              not in what we sent. Queue it rather than wait for the next edit to
@@ -1170,6 +1173,23 @@ var Store = (function () {
         setTimeout(function () { scheduleFlush(id); }, RETRY_DELAY_MS);
         done(false);
       });
+  }
+
+  /* The server kept these sections as they were: they belong to steps this person is not assigned to (P-17 part 2). The
+     usual way here is an assignment that has just moved on. What is stored replaces what is here, so the page stops saying
+     it was saved, and their own words are shown to them, to copy. */
+  function notMine(id, sections) {
+    getJSON('/workspace?org=' + encodeURIComponent(id) + modQ(id), function (w) {
+      if (!w || !w.doc) return;
+      var mine = localDoc(id), base = cloneDoc(getBase(id)) || {}, lost = [];
+      sections.forEach(function (k) {
+        try { leafDiff(w.doc[k] || {}, (mine || {})[k] || {}, [], [], 0).forEach(function (d) { if (typeof d.to === 'string' && d.to.trim()) lost.push({ path: '.' + k + String(d.path || ''), mine: d.to }); }); } catch (e) { }
+        [mine, base].forEach(function (o) { if (!o) return; if (has(w.doc, k)) o[k] = cloneDoc(w.doc[k]); else delete o[k]; });
+      });
+      setBase(id, base, true);
+      adoptDoc(id, w.doc, w.rev, w.updated_by);
+      try { if (typeof onNotMine === 'function') onNotMine(lost); } catch (e) { }
+    });
   }
 
   function nowMs() { try { return Date.now(); } catch (e) { return 0; } }
@@ -2320,6 +2340,16 @@ function onSyncConflict(conflicts) {
 
 /* Work that was waiting here and gave way to what had been saved meanwhile (Store.mergeDocs, storedWins; P-29). Shown
    once the program is on screen, and again on each load until it is dismissed or put back: the store keeps it. */
+/* Words the server did not take, because the step is not theirs (Store, notMine). Nothing to say when there were none: a
+   page tidying its own record is not somebody's work. */
+function onNotMine(lost) {
+  if (!lost || !lost.length) return;
+  try { repaintAfterSync(); } catch (e) { }
+  if (typeof showToast === 'function') showToast('Not saved: this step is not assigned to you. What you wrote is shown so you can copy it.', 'error');
+  if (typeof showSyncReport === 'function') showSyncReport(lost.slice(0, 12).map(function (c) {
+    return { kind: 'refused', label: (typeof collabPathLabel === 'function') ? collabPathLabel(c.path) : c.path, keys: null, mine: c.mine, theirs: undefined };
+  }));
+}
 var _keptShown = '';
 function showKeptConflicts() {
   try {

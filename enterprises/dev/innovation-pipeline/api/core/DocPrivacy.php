@@ -62,6 +62,57 @@ class DocPrivacy
             ? array_values(array_filter($rules['byLeader'], 'is_string'))
             : [];
         $this->actorPublicId = $actorPublicId;
+        $rules = config('edit-steps.' . $module);
+        $this->editSteps = is_array($rules) ? $rules : [];
+    }
+
+    /** Section => the steps it is edited from (api/config/edit-steps.php). */
+    private array $editSteps = [];
+    /** The sections the last write asked to change and may not (P-17 part 2). */
+    private array $refused = [];
+
+    /** @return string[] */
+    public function refused(): array
+    {
+        return $this->refused;
+    }
+
+    /**
+     * A section that belongs to steps this person is not assigned to stays as stored. Whoever wrote it is told
+     * (WorkspaceController::patch answers with refused()), so their screen does not go on saying it was saved.
+     */
+    private function keepOthersSteps(object $out, object $stored, bool $whole): void
+    {
+        $this->refused = [];
+        $mine = null;
+        foreach ($this->editSteps as $key => $steps) {
+            if (!property_exists($out, $key) && !($whole && isset($stored->$key))) { continue; }
+            $had = property_exists($stored, $key);
+            if (property_exists($out, $key) === $had && self::sameContent($out->$key ?? null, $stored->$key ?? null)) { continue; }
+            $mine = $mine ?? ($this->steps !== null ? ($this->steps)() : []);
+            if (array_intersect($steps, array_map('strval', $mine)) !== []) { continue; }
+            /* An empty section the program starts with says nothing; it is left out without a word. */
+            if (!$had && self::isEmpty($out->$key)) { unset($out->$key); continue; }
+            if ($had) { $out->$key = json_decode((string) json_encode($stored->$key)); } else { unset($out->$key); }
+            $this->refused[] = $key;
+        }
+    }
+
+    private static function isEmpty($v): bool
+    {
+        if (is_object($v)) { foreach (get_object_vars($v) as $x) { if (!self::isEmpty($x)) { return false; } } return true; }
+        if (is_array($v)) { foreach ($v as $x) { if (!self::isEmpty($x)) { return false; } } return true; }
+        return $v === null || $v === '' || $v === false;
+    }
+
+    /** The same content, whatever order its keys are in. */
+    private static function sameContent($a, $b): bool
+    {
+        $sort = static function ($v) use (&$sort) {
+            if (is_object($v)) { $v = get_object_vars($v); ksort($v); return ['{' => array_map($sort, $v)]; }
+            return is_array($v) ? array_map($sort, $v) : $v;
+        };
+        return json_encode($sort($a)) === json_encode($sort($b));
     }
 
     /**
@@ -108,6 +159,7 @@ class DocPrivacy
      */
     public function forWrite(object $incoming, ?object $stored): object
     {
+        $this->refused = [];
         if ($stored === null) {
             // Nothing stored means nothing to protect, so the per-leader work is
             // taken as it came. PINs are the exception and have no exception:
@@ -140,6 +192,7 @@ class DocPrivacy
                 $kept = $this->memberCompletion($out->$key ?? null, $stored->$key ?? null);
                 if ($kept === null) { unset($out->$key); } else { $out->$key = $kept; }
             }
+            $this->keepOthersSteps($out, $stored, true);
         }
 
         self::stripRosterCredentials($out);
@@ -162,6 +215,7 @@ class DocPrivacy
      */
     public function forPatch(object $sections, ?object $stored): object
     {
+        $this->refused = [];
         if ($stored === null) {
             $first = self::copy($sections);
             self::stripRosterCredentials($first);
@@ -191,6 +245,7 @@ class DocPrivacy
                 $kept = $this->memberCompletion($out->$key, $stored->$key ?? null);
                 if ($kept === null) { unset($out->$key); } else { $out->$key = $kept; }
             }
+            $this->keepOthersSteps($out, $stored, false);
         }
 
         self::stripRosterCredentials($out);
@@ -200,7 +255,7 @@ class DocPrivacy
     /** Sweep 4R item 3: may this caller name these sections for deletion? (A patch's `removed` list.) */
     public function removable(array $keys): array
     {
-        return $this->mayEditAdminSections ? $keys : array_values(array_diff($keys, self::ADMIN_ONLY, ['roster', 'termsLog', 'termsOrg'], self::COMPLETION));
+        return $this->mayEditAdminSections ? $keys : array_values(array_diff($keys, self::ADMIN_ONLY, ['roster', 'termsLog', 'termsOrg'], self::COMPLETION, array_keys($this->editSteps)));
     }
 
     /** Which steps are complete, and when each was. */
