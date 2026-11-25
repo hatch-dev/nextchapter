@@ -35,13 +35,11 @@ class ReportMail
 {
     /* The light palette, as literals. Named here so the two renderers and the
        plain-text alternative cannot drift apart. */
-    private const GROUND = '#f6f4f0';
     private const CARD   = '#ffffff';
     private const BORDER = '#e6e2da';
-    private const RULE   = '#d9d5cd';
     private const INK    = '#1c1a17';
     private const BODY   = '#413d36';
-    private const FAINT  = '#8b8579';
+    private const FAINT  = MailLayout::FAINT;
     private const GOLD   = '#B8892A';
     private const TRACK  = '#efece5';
 
@@ -54,7 +52,7 @@ class ReportMail
     /**
      * The whole message.
      *
-     * @param array{eyebrow?:string,attachment?:string,note?:string,closing?:string} $opts
+     * @param array{eyebrow?:string,attachment?:string,note?:string,closing?:string,link?:array{url:string,label:string}} $opts
      *        `eyebrow` is the organization and program above the subject;
      *        `attachment` the PDF's file name, when one is going with it;
      *        `note` replaces the line about the attachment when it could not
@@ -67,13 +65,11 @@ class ReportMail
         $attachment = trim((string) ($opts['attachment'] ?? ''));
         $note       = trim((string) ($opts['note'] ?? ''));
 
-        $h = '<div style="margin:0;padding:28px 12px;background:' . self::GROUND . ';font-family:Helvetica,Arial,sans-serif">'
-           . '<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" width="' . self::WIDTH . '"'
-           . ' style="width:' . self::WIDTH . 'px;max-width:100%;margin:0 auto;background:' . self::CARD . ';'
-           . 'border:1px solid ' . self::RULE . ';border-radius:8px"><tr><td style="padding:32px 28px">';
+        $link = (array) ($opts['link'] ?? []);
 
+        $h = '';
         if ($eyebrow !== '') {
-            $h .= '<div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:' . self::GOLD . ';'
+            $h .= '<div style="font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:' . MailLayout::GOLD . ';'
                 . 'margin:0 0 10px">' . self::e($eyebrow) . '</div>';
         }
         if ($doc->subject() !== '') {
@@ -84,14 +80,16 @@ class ReportMail
             $h .= '<p style="margin:0 0 20px;font-size:14.5px;line-height:1.6;color:' . self::BODY . '">'
                 . self::e($doc->lead()) . '</p>';
         }
+        if (($link['url'] ?? '') !== '') {
+            $h .= MailLayout::button((string) $link['url'], (string) $link['label'], 22);
+        }
 
         $h .= self::attachmentNote($attachment, $note);
         $h .= self::report($doc);
 
-        return $h . '<p style="margin:26px 0 0;padding-top:16px;border-top:1px solid ' . self::BORDER . ';'
-            . 'font-size:12px;line-height:1.6;color:' . self::FAINT . '">'
+        return MailLayout::page($h . MailLayout::rule(16, self::BORDER) . '<p style="margin:0;font-size:12px;line-height:1.6;color:' . self::FAINT . '">'
             . self::e((string) ($opts['closing'] ?? self::CLOSING))
-            . '</p></td></tr></table></div>';
+            . '</p>', self::WIDTH);
     }
 
     /**
@@ -107,11 +105,11 @@ class ReportMail
             return '';
         }
 
-        $h = '<div style="border-top:1px solid ' . self::RULE . ';margin:0 0 22px"></div>';
+        $h = MailLayout::rule();
 
         if ($doc->badge() !== '') {
-            $h .= '<div style="margin:0 0 10px"><span style="display:inline-block;font-size:10.5px;'
-                . 'letter-spacing:.09em;text-transform:uppercase;font-weight:700;color:' . self::e($doc->badgeColor()) . ';'
+            $h .= '<div style="margin:0 0 10px"><span style="display:inline-block;font-size:11px;'
+                . 'letter-spacing:.09em;text-transform:uppercase;font-weight:700;color:' . self::e(MailLayout::legible($doc->badgeColor())) . ';'
                 . 'border:1px solid ' . self::e($doc->badgeColor()) . ';border-radius:3px;padding:3px 8px">'
                 . self::e($doc->badge()) . '</span></div>';
         }
@@ -145,6 +143,11 @@ class ReportMail
         }
         if ($doc->lead() !== '') {
             $out[] = $doc->lead();
+            $out[] = '';
+        }
+        if ((string) ($opts['link']['url'] ?? '') !== '') {
+            $out[] = $opts['link']['label'] . ':';
+            $out[] = '  ' . $opts['link']['url'];
             $out[] = '';
         }
         if ($attachment !== '') {
@@ -182,7 +185,7 @@ class ReportMail
                 case 'rows':    $h .= self::rows($b); break;
                 case 'heading': $h .= self::heading($b); break;
                 case 'para':    $h .= self::para($b); break;
-                case 'rule':    $h .= '<div style="border-top:1px solid ' . self::BORDER . ';margin:18px 0"></div>'; break;
+                case 'rule':    $h .= MailLayout::gap(18) . MailLayout::rule(18, self::BORDER); break;
             }
         }
         return $h;
@@ -191,14 +194,14 @@ class ReportMail
     private static function card(array $b): string
     {
         $h = '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"'
-           . ' style="width:100%;margin:0 0 16px;background:' . self::CARD . ';border:1px solid ' . self::BORDER . ';'
-           . 'border-radius:6px"><tr><td style="padding:18px 18px 16px">';
+           . ' style="width:100%;background:' . self::CARD . ';border:1px solid ' . self::BORDER . ';'
+           . 'border-radius:6px;border-collapse:separate"><tr><td align="left" style="padding:18px 18px 16px">';
 
         if (($b['heading'] ?? '') !== '') {
             $h .= '<h3 style="margin:0 0 8px;font-size:15px;line-height:1.35;font-weight:700;color:'
-                . self::e($b['color'] ?? self::INK) . '">' . self::e($b['heading']) . '</h3>';
+                . self::e(MailLayout::legible($b['color'] ?? self::INK)) . '">' . self::e($b['heading']) . '</h3>';
         }
-        return $h . self::blocks($b['blocks'] ?? []) . '</td></tr></table>';
+        return $h . self::blocks($b['blocks'] ?? []) . '</td></tr></table>' . MailLayout::gap(16);
     }
 
     /**
@@ -211,9 +214,9 @@ class ReportMail
         $big   = ($b['size'] ?? 'lg') === 'lg';
         $cells = '';
         foreach ($b['items'] as $item) {
-            $cells .= '<td align="center" valign="top" style="padding:6px 4px">'
+            $cells .= '<td align="center" valign="top" style="padding:6px 2px">'
                 . '<div style="font-size:' . ($big ? '23px' : '15px') . ';line-height:1.2;font-weight:700;color:'
-                . self::e($item['color'] ?? self::INK) . '">' . self::e($item['value']) . '</div>'
+                . self::e(MailLayout::legible($item['color'] ?? self::INK)) . '">' . self::e($item['value']) . '</div>'
                 . '<div style="margin-top:4px;font-size:11.5px;line-height:1.4;color:' . self::FAINT . '">'
                 . self::e($item['label']) . '</div></td>';
         }
@@ -273,20 +276,17 @@ class ReportMail
             . 'This chart is in the attached PDF.</p>';
     }
 
-    /** Workload rows: avatar, name, a two-tone bar, and the counts. */
+    /** Workload rows: avatar, name and the counts, and a two-tone bar under them, so a phone has room for it (P-28). */
     private static function bars(array $b): string
     {
         $rows = '';
         foreach ($b['rows'] as $r) {
             $rows .= '<tr>'
-                . '<td width="26" valign="middle" style="width:26px;padding:4px 8px 4px 0">'
+                . '<td width="32" valign="middle" style="width:32px;padding:4px 8px 4px 0">'
                 . self::avatar((string) $r['initials'], (string) ($r['avatar'] ?? self::FAINT)) . '</td>'
-                . '<td width="128" valign="middle" style="width:128px;padding:4px 8px 4px 0;font-size:12.5px;'
-                . 'color:' . self::INK . '">' . self::e($r['label']) . '</td>'
-                . '<td valign="middle" style="padding:4px 0">' . self::bar($r['segments']) . '</td>'
-                . '<td width="126" align="right" valign="middle" style="width:126px;padding:4px 0 4px 10px;'
-                . 'font-size:11.5px;color:' . self::FAINT . ';white-space:nowrap">' . self::e($r['value']) . '</td>'
-                . '</tr>';
+                . '<td align="left" valign="middle" style="padding:4px 8px 4px 0;font-size:12.5px;color:' . self::INK . '">' . self::e($r['label']) . '</td>'
+                . '<td align="right" valign="middle" style="padding:4px 0;font-size:11.5px;color:' . self::FAINT . '">' . self::e($r['value']) . '</td>'
+                . '</tr><tr><td colspan="3" style="padding:0 0 8px">' . self::bar($r['segments']) . '</td></tr>';
         }
         return '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"'
             . ' style="width:100%;margin:0 0 4px">' . $rows . '</table>';
@@ -298,7 +298,7 @@ class ReportMail
         foreach ($b['items'] as $r) {
             $rows .= '<tr style="border-top:1px solid ' . self::BORDER . '">'
                 . '<td valign="top" style="padding:7px 10px 7px 0;font-size:12.5px;color:'
-                . self::e($r['color'] ?? self::INK) . '">' . self::e($r['label']) . '</td>'
+                . self::e(MailLayout::legible($r['color'] ?? self::INK)) . '">' . self::e($r['label']) . '</td>'
                 . '<td align="right" valign="top" style="padding:7px 0;font-size:11.5px;color:' . self::FAINT . '">'
                 . self::e($r['value']) . '</td></tr>';
         }
@@ -309,7 +309,7 @@ class ReportMail
     private static function heading(array $b): string
     {
         return '<h3 style="margin:14px 0 6px;font-size:14.5px;font-weight:700;color:'
-            . self::e($b['color'] ?? self::INK) . '">' . self::e($b['text']) . '</h3>';
+            . self::e(MailLayout::legible($b['color'] ?? self::INK)) . '">' . self::e($b['text']) . '</h3>';
     }
 
     private static function para(array $b): string
@@ -317,7 +317,7 @@ class ReportMail
         $faint = (bool) ($b['faint'] ?? false);
         return '<p style="margin:0 0 10px;font-size:' . ($faint ? '12px' : '13.5px') . ';line-height:1.55;'
             . 'text-align:' . ((($b['align'] ?? 'left') === 'center') ? 'center' : 'left') . ';color:'
-            . self::e($b['color'] ?? ($faint ? self::FAINT : self::BODY)) . '">' . self::e($b['text']) . '</p>';
+            . self::e(MailLayout::legible($b['color'] ?? ($faint ? self::FAINT : self::BODY))) . '">' . self::e($b['text']) . '</p>';
     }
 
     /* ── Pieces ─────────────────────────────────────────────────── */
@@ -359,7 +359,7 @@ class ReportMail
         $bg = self::flatten($background, 1.0);
         return '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="24"'
             . ' style="width:24px;height:24px"><tr><td align="center" valign="middle" bgcolor="' . self::e($bg) . '"'
-            . ' style="width:24px;height:24px;border-radius:12px;font-size:9px;font-weight:700;color:'
+            . ' style="width:24px;height:24px;border-radius:12px;font-size:10px;font-weight:700;color:'
             . self::e(self::readable($bg)) . '">' . self::e(mb_substr($initials, 0, 2)) . '</td></tr></table>';
     }
 
@@ -393,10 +393,10 @@ class ReportMail
             : self::e($note);
 
         return '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"'
-            . ' style="width:100%;margin:0 0 22px"><tr>'
-            . '<td style="padding:12px 14px;background:#faf7f0;border:1px solid #ecdfc4;border-left:3px solid '
+            . ' style="width:100%"><tr>'
+            . '<td align="left" style="padding:12px 14px;background:#faf7f0;border:1px solid #ecdfc4;border-left:3px solid '
             . self::GOLD . ';border-radius:4px;font-size:12.5px;line-height:1.55;color:' . self::BODY . '">'
-            . $text . '</td></tr></table>';
+            . $text . '</td></tr></table>' . MailLayout::gap(22);
     }
 
     /* ── Small helpers ──────────────────────────────────────────── */
@@ -465,6 +465,12 @@ class ReportMail
         return htmlspecialchars($v, ENT_QUOTES, 'UTF-8');
     }
 
+    /** A column of the plain-text version: padded by characters, not bytes, and never run into the next (P-28). */
+    private static function column(string $value, int $width): string
+    {
+        return $value . str_repeat(' ', max(2, $width - mb_strlen($value)));
+    }
+
     /* ── The text alternative ───────────────────────────────────── */
 
     /**
@@ -485,13 +491,13 @@ class ReportMail
                     break;
                 case 'stats':
                     foreach ($b['items'] as $item) {
-                        $out[] = $pad . '  ' . str_pad($item['value'], 16) . $item['label'];
+                        $out[] = $pad . '  ' . self::column($item['value'], 16) . $item['label'];
                     }
                     $out[] = '';
                     break;
                 case 'chart':
                     foreach ($b['bars'] ?? [] as $bar) {
-                        $out[] = $pad . '  ' . str_pad($bar['label'], 10) . self::num((float) $bar['value']);
+                        $out[] = $pad . '  ' . self::column($bar['label'], 10) . self::num((float) $bar['value']);
                     }
                     if (empty($b['bars']) && !empty($b['progress'])) {
                         $out[] = $pad . '  ' . self::num((float) $b['progress']['done']) . ' of '
@@ -500,12 +506,12 @@ class ReportMail
                     break;
                 case 'bars':
                     foreach ($b['rows'] as $r) {
-                        $out[] = $pad . '  ' . str_pad($r['label'], 22) . $r['value'];
+                        $out[] = $pad . '  ' . self::column($r['label'], 22) . $r['value'];
                     }
                     break;
                 case 'rows':
                     foreach ($b['items'] as $r) {
-                        $out[] = $pad . '  ' . str_pad($r['label'], 26) . $r['value'];
+                        $out[] = $pad . '  ' . self::column($r['label'], 26) . $r['value'];
                     }
                     break;
                 case 'heading':

@@ -131,8 +131,7 @@ class MemberInvite
         foreach ($entries as $m) {
             $planned = ($m['status'] ?? '') !== 'live';
             $url     = self::moduleLoginUrl((string) $m['id']);
-            $rows .=
-                '<div style="border:1px solid #d9d5cd;border-radius:4px;padding:14px 16px;margin:0 0 10px">' .
+            $rows .= MailLayout::box(
                   '<a href="' . $e($url) . '" ' .
                      'style="color:#8a6414;font-size:16px;font-weight:600;text-decoration:none">' .
                      $e($m['name']) .
@@ -148,8 +147,7 @@ class MemberInvite
                   '<div style="margin-top:10px;padding-top:10px;border-top:1px solid #efece5">' .
                     '<a href="' . $e($url) . '" style="color:#8a6414;font-size:13px;' .
                        'text-decoration:none;word-break:break-all">' . $e($url) . '</a>' .
-                  '</div>' .
-                '</div>';
+                  '</div>', MailLayout::CARD, MailLayout::RULE, 10);
         }
         if ($rows === '') {
             /* Nothing granted yet. This is the one case that still needs a
@@ -170,8 +168,7 @@ class MemberInvite
         $none   = $entries === [];
 
         return
-        '<div style="font-family:Helvetica,Arial,sans-serif;background:#f6f4f0;padding:28px 16px">' .
-          '<div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #d9d5cd;border-radius:6px;padding:32px">' .
+        MailLayout::page(
 
             '<div style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#8a6414">' .
               $e(Catalogue::suiteName()) .
@@ -209,14 +206,13 @@ class MemberInvite
                reverse: there is no longer one of them, so a single field
                labelled "Sign-in page" would have been the wrong answer for two
                programs out of three. */
-            '<div style="background:#faf9f6;border:1px solid #e6e2da;border-radius:4px;padding:16px;margin:0 0 16px">' .
+            MailLayout::box(
               self::field('Username', '<code style="font-size:15px;color:#1c1a17">' . $e($member['username'] ?? '') . '</code>') .
               (self::temporaryShown($member)
                 ? self::field('Temporary password', '<code style="font-size:15px;color:#1c1a17">' . $e($member['temporary']) . '</code>')
                 : (!empty($member['temporary_withheld'])
                   ? self::field('Temporary password', '<span style="color:#6b6559">' . $e(self::WITHHELD) . '</span>')
-                  : '')) .
-            '</div>' .
+                  : '')), MailLayout::PANEL, MailLayout::BORDER, 16) .
             '<p style="font-size:13px;line-height:1.6;color:#6b6559;margin:0 0 24px">' .
               ((self::temporaryShown($member) || !empty($member['temporary_withheld']))
                 ? 'This password works only once: you choose your own the first time you sign in. ' .
@@ -224,15 +220,12 @@ class MemberInvite
                 : 'Your administrator will give you a temporary password. You choose your own the first time you sign in.') .
             '</p>' .
 
-            '<p style="font-size:12.5px;line-height:1.6;color:#8b8579;margin:26px 0 0;' .
-               'border-top:1px solid #e6e2da;padding-top:16px">' .
+            MailLayout::rule(16, MailLayout::BORDER) .
+            '<p style="font-size:12.5px;line-height:1.6;color:' . MailLayout::FAINT . ';margin:0">' .
               'You can only open the programs listed above. Each keeps its own separate workspace — ' .
               'work you do in one is never visible from another. If something here looks wrong, ' .
               'reply to whoever invited you rather than to this address.' .
-            '</p>' .
-
-          '</div>' .
-        '</div>';
+            '</p>', 560, '32px');
     }
 
     /** What the stored copy says in place of the password (it never holds the password itself). */
@@ -245,12 +238,7 @@ class MemberInvite
 
     private static function field(string $label, string $value): string
     {
-        return '<div style="margin:0 0 10px">' .
-            '<div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#8b8579;margin-bottom:2px">' .
-                htmlspecialchars($label, ENT_QUOTES, 'UTF-8') .
-            '</div>' .
-            '<div style="font-size:14px;color:#1c1a17">' . $value . '</div>' .
-        '</div>';
+        return MailLayout::field($label, $value);
     }
 
     /**

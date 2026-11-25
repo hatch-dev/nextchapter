@@ -30,7 +30,7 @@
 
 $root = dirname(__DIR__);
 require $root . '/api/helpers/functions.php';
-foreach (['Pdf', 'Catalogue', 'ReportDocument', 'ReportMail', 'ReportPdf', 'Mailer'] as $class) {
+foreach (['Pdf', 'Catalogue', 'ReportDocument', 'MailLayout', 'ReportMail', 'ReportPdf', 'Mailer'] as $class) {
     require $root . '/api/core/' . $class . '.php';
 }
 /* The endpoint itself, for the composition check at the end. Its base class is

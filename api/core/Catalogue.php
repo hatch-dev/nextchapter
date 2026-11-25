@@ -113,6 +113,18 @@ class Catalogue
     }
 
     /**
+     * The link to one step of a program, or '' when nothing says where the programs are: a scheduled job has no request
+     * to read the host from, so it needs APP_URL (P-28, 25 Nov 2026).
+     */
+    public static function stepUrl(string $id, string $step): string
+    {
+        if (self::module($id) === null || (trim((string) env('APP_URL', '')) === '' && ($_SERVER['HTTP_HOST'] ?? '') === '')) {
+            return '';
+        }
+        return rtrim(self::moduleUrl($id), '/') . (preg_match('/^[0-9]+\.[0-9]+$/', $step) ? '/step/' . $step : '');
+    }
+
+    /**
      * The absolute URL of a program's home screen.
      *
      * APP_URL in .env wins when set — behind a proxy or a CNAME the request's

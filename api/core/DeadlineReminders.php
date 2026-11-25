@@ -72,7 +72,7 @@ final class DeadlineReminders
                 $out['list'][] = $w['org_name'] . ' | ' . $subject . ' -> ' . implode(', ', array_column($to, 'name'));
                 if ($dryRun) continue;
 
-                [$queued, $sent] = self::send($w, $subject, $name, $date, $to);
+                [$queued, $sent] = self::send($w, $subject, $name, $id, $date, $to);
                 $out['queued'] += $queued;
                 $out['sent']   += $sent;
                 self::mark((int) $w['organization_id'], (string) $w['module'], (int) $w['schema_version'], $id, $date);
@@ -224,7 +224,7 @@ final class DeadlineReminders
     }
 
     /** @return array{0:int,1:int} queued, sent */
-    private static function send(array $w, string $subject, string $name, string $date, array $to): array
+    private static function send(array $w, string $subject, string $name, string $step, string $date, array $to): array
     {
         $e    = static fn(string $s): string => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
         $when = date('M j, Y', strtotime($date . ' 12:00'));
@@ -232,6 +232,7 @@ final class DeadlineReminders
         $opts = [
             'eyebrow'    => implode(' · ', array_filter([trim((string) $w['org_name']), Catalogue::name((string) $w['module'])])),
             'attachment' => '', 'note' => '',
+            'link'       => ['url' => Catalogue::stepUrl((string) $w['module'], $step), 'label' => 'Open this step'],
             'closing'    => 'Sent automatically one week before an assigned step falls due, to the step’s assignees and the organization’s administrators.',
         ];
         $html = $doc !== null ? ReportMail::html($doc, $opts) : '<p>' . $e($name) . ' is assigned and due on ' . $e($when) . '.</p>';

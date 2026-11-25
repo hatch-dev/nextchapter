@@ -6,7 +6,8 @@
  *   php tools/reminders.php --dry-run           say what would be sent; write and send nothing
  *   php tools/reminders.php --org=org_1234      one organization
  *
- * Schedule it once or twice a day (cron, or Windows Task Scheduler). Running it more often is harmless: a step is
+ * Schedule it once or twice a day (cron, or Windows Task Scheduler), as the web server's own user, never an
+ * administrator's: that user may change these files. Set APP_URL (https://host/apps) so the email can link to the step. Running it more often is harmless: a step is
  * reminded once for each due date. See api/core/DeadlineReminders.php.
  */
 declare(strict_types=1);

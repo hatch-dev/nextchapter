@@ -182,7 +182,7 @@ class NotifyController extends Controller
            Composed once for everyone: the report is identical for every
            recipient, and rendering a PDF per address would be the same few
            kilobytes drawn twenty times. */
-        $composed    = $this->compose($kind, $html, $wantsPdf, $org, $subject);
+        $composed    = $this->compose($kind, $html, $wantsPdf, $org, $subject, $stepId);
         $body        = $composed['html'];
         $attachments = $composed['attachments'];
 
@@ -378,7 +378,7 @@ class NotifyController extends Controller
      *
      * @return array{html:string,text:string,attachments:array,attachment:string}
      */
-    private function compose(string $kind, string $html, bool $wantsPdf, array $org, string $subject): array
+    private function compose(string $kind, string $html, bool $wantsPdf, array $org, string $subject, string $stepId = ''): array
     {
         $doc = ReportDocument::parse($html);
         if ($doc === null) {
@@ -423,7 +423,8 @@ class NotifyController extends Controller
             }
         }
 
-        $opts = ['eyebrow' => $eyebrow, 'attachment' => $file, 'note' => $note];
+        $opts = ['eyebrow' => $eyebrow, 'attachment' => $file, 'note' => $note,
+            'link' => ['url' => $program !== '' ? Catalogue::stepUrl($program, $stepId) : '', 'label' => 'Open this step']];
         if ($kind !== 'step-complete') {
             $opts['closing'] = 'Sent automatically one week before an assigned step falls due, '
                              . 'to the step’s assignees and the organization’s administrators.';

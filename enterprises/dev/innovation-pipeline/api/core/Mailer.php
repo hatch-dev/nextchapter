@@ -306,8 +306,8 @@ class Mailer
 
         $headers = [
             'Date: ' . date('r'),
-            'From: ' . $this->header(self::fromName()) . ' <' . self::fromAddress() . '>',
-            'To: ' . ($toName !== '' ? $this->header($toName) . ' ' : '') . '<' . $toEmail . '>',
+            'From: ' . $this->name(self::fromName()) . ' <' . self::fromAddress() . '>',
+            'To: ' . ($toName !== '' ? $this->name($toName) . ' ' : '') . '<' . $toEmail . '>',
             'Subject: ' . $this->header($subject),
             'Message-ID: <' . bin2hex(random_bytes(12)) . '@' . $this->domain() . '>',
             'MIME-Version: 1.0',
@@ -373,9 +373,30 @@ class Mailer
     private function header(string $value): string
     {
         $value = str_replace(["\r", "\n"], '', $value);
-        return preg_match('/[^\x20-\x7E]/', $value) === 1
-            ? '=?UTF-8?B?' . base64_encode($value) . '?='
-            : $value;
+        if (preg_match('/[^\x20-\x7E]/', $value) !== 1 && !str_contains($value, '=?')) {
+            return $value;
+        }
+        /* An encoded word is at most 75 characters (RFC 2047), and a character is never split between two. */
+        $words = [];
+        $part  = '';
+        foreach (mb_str_split(mb_scrub($value, 'UTF-8'), 1, 'UTF-8') as $char) {
+            if (strlen($part . $char) > 45) {
+                $words[] = $part;
+                $part = '';
+            }
+            $part .= $char;
+        }
+        $words[] = $part;
+        return implode(self::CRLF . ' ', array_map(static fn(string $w): string => '=?UTF-8?B?' . base64_encode($w) . '?=', $words));
+    }
+
+    /** A person's or a sender's name in an address header: quoted when it holds anything the header reads as its own. */
+    private function name(string $value): string
+    {
+        $encoded = $this->header($value);
+        return str_starts_with($encoded, '=?') || preg_match('/[()<>\[\]:;@\\\\,."]/', $encoded) !== 1
+            ? $encoded
+            : '"' . addcslashes($encoded, '"\\') . '"';
     }
 
     private function domain(): string

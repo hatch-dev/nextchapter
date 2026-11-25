@@ -11,7 +11,7 @@ declare(strict_types=1);
 
 $root = dirname(__DIR__);
 require $root . '/api/helpers/functions.php';
-foreach (['Pdf', 'Catalogue', 'ReportDocument', 'ReportMail', 'ReportPdf'] as $c) require $root . '/api/core/' . $c . '.php';
+foreach (['Pdf', 'Catalogue', 'ReportDocument', 'MailLayout', 'ReportMail', 'ReportPdf'] as $c) require $root . '/api/core/' . $c . '.php';
 
 $failed = 0;
 $check = static function (string $what, bool $ok) use (&$failed): void { echo ($ok ? 'ok    ' : 'FAIL  ') . $what . PHP_EOL; if (!$ok) $failed++; };

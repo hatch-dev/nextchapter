@@ -37,9 +37,8 @@ use Models\MailOutbox;
  * length-capped and escaped here, and the message degrades to "Step 1.1" when
  * it is missing — an older client, or a caller that does not send it.
  *
- * The HTML is inline-styled and table-free for the same reason MemberInvite's
- * is: it is one column of short blocks, which survives every mail client, and
- * the project's stylesheet is never loaded in an inbox.
+ * The HTML is one column of short blocks, inline-styled because the project's
+ * stylesheet is never loaded in an inbox, in the frame Core\MailLayout draws.
  */
 class AssignmentNotice
 {
@@ -224,8 +223,7 @@ class AssignmentNotice
         $greeting = $name !== '' ? 'Hello ' . $e(explode(' ', $name)[0]) . ',' : 'Hello,';
 
         return
-        '<div style="font-family:Helvetica,Arial,sans-serif;background:#f6f4f0;padding:28px 16px">' .
-          '<div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #d9d5cd;border-radius:6px;padding:32px">' .
+        MailLayout::page(
 
             '<div style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#8a6414">' .
               $e($programName) .
@@ -238,11 +236,11 @@ class AssignmentNotice
               (($org['name'] ?? '') !== '' ? ' at ' . $e($org['name']) : '') . '.' .
             '</p>' .
 
-            '<div style="background:#faf9f6;border:1px solid #e6e2da;border-radius:4px;padding:16px;margin:0 0 20px">' .
-              self::field('Program', $e($programName)) .
-              self::field('Section', $e($label)) .
-              ($assignedBy !== '' ? self::field('Assigned by', $e($assignedBy)) : '') .
-            '</div>' .
+            MailLayout::box(
+              MailLayout::field('Program', $e($programName)) .
+              MailLayout::field('Section', $e($label)) .
+              ($assignedBy !== '' ? MailLayout::field('Assigned by', $e($assignedBy)) : '')
+            ) .
 
             /* What being assigned actually MEANS here, because it is not
                decoration: an assigned section can only be marked complete by
@@ -252,28 +250,13 @@ class AssignmentNotice
               'names on it, only those members or an administrator can mark it done.' .
             '</p>' .
 
-            '<a href="' . $e($url) . '" style="display:inline-block;background:#B8892A;color:#fff;' .
-               'text-decoration:none;font-size:15px;font-weight:600;padding:13px 26px;border-radius:4px">' .
-               'Open this section &rarr;</a>' .
+            MailLayout::button($url, 'Open this section', 26) .
+            MailLayout::rule(16, MailLayout::BORDER) .
 
-            '<p style="font-size:12.5px;line-height:1.6;color:#8b8579;margin:26px 0 0;' .
-               'border-top:1px solid #e6e2da;padding-top:16px">' .
+            '<p style="font-size:12.5px;line-height:1.6;color:' . MailLayout::FAINT . ';margin:0">' .
               'You will need to sign in if you are not already. If you think this was sent ' .
               'in error, reply to whoever assigned it rather than to this address.' .
-            '</p>' .
-
-          '</div>' .
-        '</div>';
-    }
-
-    private static function field(string $label, string $value): string
-    {
-        return '<div style="margin:0 0 10px">' .
-            '<div style="font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#8b8579;margin-bottom:2px">' .
-                htmlspecialchars($label, ENT_QUOTES, 'UTF-8') .
-            '</div>' .
-            '<div style="font-size:14px;color:#1c1a17">' . $value . '</div>' .
-        '</div>';
+            '</p>', 560, '32px');
     }
 
     /**
