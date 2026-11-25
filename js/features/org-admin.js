@@ -1568,7 +1568,17 @@ function syncMemberToServer(u, cb, temporary) {
    24 Nov 2026): it put a removed person back, and stored them, and would have dropped one just added. Each change the
    server has taken counts here; a list that began before the latest one is thrown away and asked for again. */
 var _teamChanges = 0;
-function pullOrgMembers(cb) {
+/* The team as it stands on the server, as one value (P-33, 25 Nov 2026): a page left open learned of somebody added, renamed
+   or removed only from a reload. Not while Organization & Team is open: opening it reads the members anyway, and what is
+   being typed there is not to be drawn over; the next look after it closes does it. */
+var _teamMark = null, _teamPulling = false;
+function teamMarkSeen(mark) {
+  if (mark === _teamMark || _teamPulling || currentModal === 'org' || !currentUserId) return;
+  _teamPulling = true;
+  pullOrgMembers(function (changed, read) { _teamPulling = false; if (read) _teamMark = mark; }, true);
+}
+/* quiet: the page is brought up to date without taking what is being typed (repaintAfterSync). cb(changed, read). */
+function pullOrgMembers(cb, quiet) {
   var sid = orgServerId();
   if (!sid) { if (cb) cb(false); return; }
   var began = _teamChanges;
@@ -1576,8 +1586,8 @@ function pullOrgMembers(cb) {
     fetch(API_BASE + '/organizations/members?org=' + encodeURIComponent(sid))
       .then(function (r) { return r.json(); })
       .then(function (res) {
-        if (began !== _teamChanges) { pullOrgMembers(cb); return; }
-        var changed = false;
+        if (began !== _teamChanges) { pullOrgMembers(cb, quiet); return; }
+        var changed = false, read = false;
         if (res && res.success && res.data && Array.isArray(res.data.members)) {
           /* The organization's own entitlement comes back with the roster. It
              lives on the registry record, not the workspace, because it is
@@ -1587,10 +1597,12 @@ function pullOrgMembers(cb) {
           /* The same rows the registry carries: keep its copy, which says what each person may open, up to date
              (serverGrant in app.js, 23 Nov 2026). */
           try { Store.patchDbOrg(sid, { users: res.data.members }); } catch (e) { }
+          read = true;
           changed = reconcileRosterFromServer(res.data.members);
-          if (changed) { try { render(); } catch (e) { } if (currentModal === 'org') renderOrgModal(); }
+          if (changed && quiet) { try { repaintAfterSync(); } catch (e) { } }
+          else if (changed) { try { render(); } catch (e) { } if (currentModal === 'org') renderOrgModal(); }
         }
-        if (cb) cb(changed);
+        if (cb) cb(changed, read);
       })
       .catch(function () { if (cb) cb(false); });
   } catch (e) { if (cb) cb(false); }

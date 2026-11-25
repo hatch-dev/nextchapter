@@ -122,9 +122,10 @@ class WorkspaceController extends Controller
     {
         $org   = $this->requireOrg(isset($_GET['org']) ? (string) $_GET['org'] : '');
         $actor = $this->requireOrgMember($_GET, (int) $org['id']);
-        Response::success([
-            'rev' => (new Workspace())->revForOrg((int) $org['id'], $this->moduleFrom($_GET, $org, $actor)),
-        ]);
+        $rev  = (new Workspace())->revForOrg((int) $org['id'], $this->moduleFrom($_GET, $org, $actor));
+        $team = null;
+        try { $team = (new \Models\User())->teamMark((int) $org['id']); } catch (\Throwable $e) { error_log('team mark: ' . $e->getMessage()); }   /* never the reason a change is not seen */
+        Response::success(['rev' => $rev, 'team' => $team]);
     }
 
     public function save(): void

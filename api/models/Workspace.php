@@ -201,7 +201,9 @@ class Workspace extends Model
      */
     public function patch(int $orgId, object $sections, array $removed, ?string $updatedBy, int $schemaVersion, string $module, ?callable $sanitize = null): ?array
     {
-        for ($attempt = 0; $attempt < 3; $attempt++) {
+        /* Several people saving at the same instant each take a turn: a short, uneven pause, then read again. */
+        for ($attempt = 0; $attempt < 12; $attempt++) {
+            if ($attempt > 1) { usleep(random_int(2000, 8000) * min($attempt, 6)); }
             $existing = $this->findByOrg($orgId, $module);
 
             // Nothing stored yet: the patch IS the document.

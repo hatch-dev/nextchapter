@@ -1579,6 +1579,7 @@ var Store = (function () {
         getJSON('/workspace/rev?org=' + encodeURIComponent(id) + modQ(id), function (d, st) {
           if (!d) { if (!refused(st)) setOnline(false); done(false); return; }
           setOnline(true);
+          try { if (d.team && typeof teamMarkSeen === 'function') teamMarkSeen(d.team); } catch (e) { }
           if (d.rev <= (server.revs[id] || 0)) { done(false); return; }
           getJSON('/workspace?org=' + encodeURIComponent(id) + modQ(id), function (w) {
             if (w && w.doc) { adoptDoc(id, w.doc, w.rev, w.updated_by); done(true); return; }

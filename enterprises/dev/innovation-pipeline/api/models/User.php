@@ -266,6 +266,25 @@ class User extends Model
     }
 
     /** All members of an organization, newest first for admins after the owner. */
+    /**
+     * One short value that changes when the team does: somebody added, removed, renamed, or given or losing a right or a
+     * program. An open page asks for it with its five-second look and reads the members only when it has moved (P-33).
+     */
+    public function teamMark(int $organizationId): string
+    {
+        $row = $this->select(
+            "SELECT COUNT(*) AS n, COALESCE(SUM(CRC32(CONCAT_WS('|', u.public_id, u.name, u.username, COALESCE(u.role, ''), COALESCE(u.scope, ''), COALESCE(u.email, ''),
+                        COALESCE(u.department, ''), u.is_admin, COALESCE(g.mods, '')))), 0) AS mark
+               FROM users u
+               LEFT JOIN (SELECT m.user_public_id, GROUP_CONCAT(m.module ORDER BY m.module) AS mods
+                            FROM user_modules m JOIN users x ON x.public_id = m.user_public_id AND x.organization_id = :oid2
+                           GROUP BY m.user_public_id) g ON g.user_public_id = u.public_id
+              WHERE u.organization_id = :oid",
+            [':oid' => $organizationId, ':oid2' => $organizationId]
+        )[0] ?? ['n' => 0, 'mark' => 0];
+        return $row['n'] . '-' . $row['mark'];
+    }
+
     public function byOrganization(int $organizationId): array
     {
         return $this->select(

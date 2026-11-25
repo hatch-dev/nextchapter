@@ -325,3 +325,36 @@ test('team chat: a half-typed message survives one arriving, and what is unread 
   await expect(badge).toBeHidden();
   await context.close();
 });
+
+/* P-33 (25 Nov 2026): a page left open learned of somebody added, renamed or removed only from a reload. */
+test('an open page learns of team changes, and leaves what is being typed alone', async ({ account, playwright, baseURL, browser }) => {
+  test.setTimeout(120_000);
+  const t = await ownerAndMember(account, playwright, baseURL);
+  expect((await t.owner.post('api/assignments', { data: { org: t.org, module: MODULE, actor_id: t.ownerId, step: '1.1', user: t.memberId, assigned: true } })).ok()).toBe(true);
+  const context = await browser.newContext({ baseURL }), page = await context.newPage();
+  await page.goto('login');
+  await page.locator('#loginUser').fill(t.who.username); await page.locator('#loginPassword').fill(t.who.password); await page.locator('[data-submit]').click();
+  await acceptTermsIfShown(page);
+  await expect(page.locator('.nav-tab[data-tab="home"]')).toBeVisible({ timeout: 20_000 });
+  await page.evaluate(() => go('step', '1.1'));
+  await expect(page.locator('#p_values')).toBeEditable({ timeout: 15_000 });
+  await page.waitForTimeout(7_000);                                       // the first look
+  const names = () => page.evaluate(() => USERS.map((u) => u.name));
+  await page.locator('#p_values').click(); await page.keyboard.type('half a sen');
+  const u = t.who.username + 'n', person = (name) => ({ organization_id: t.org, name, username: u, role: 'Tester', scope: 'All', email: u + '@example.test', department: 'QA', modules: [MODULE] });
+  const added = await t.owner.post('api/users', { data: { ...person('Newly Added'), temporary: t.who.temporary } });
+  expect(added.status()).toBe(201);
+  const id = (await added.json()).data.id;
+  await expect.poll(names, { timeout: 15_000 }).toContain('Newly Added');
+  await page.keyboard.type('tence');
+  await expect(page.locator('#p_values')).toHaveValue('half a sentence'); await expect(page.locator('#p_values')).toBeFocused();
+  await t.owner.post('api/users/update', { data: { ...person('Renamed Since'), id } });
+  await expect.poll(names, { timeout: 15_000 }).toContain('Renamed Since');
+  await t.owner.post('api/users/delete', { data: { id } });
+  await expect.poll(names, { timeout: 15_000 }).not.toContain('Renamed Since');
+  await expect.poll(async () => ((await t.doc()).doc.purpose || {}).values, { timeout: 15_000 }).toBe('half a sentence');
+  let asked = 0; page.on('request', (r) => { if (r.url().includes('organizations/members')) asked++; });
+  await page.waitForTimeout(12_000);
+  expect(asked).toBe(0);                                                  // nothing has changed: the members are not read
+  await context.close();
+});
