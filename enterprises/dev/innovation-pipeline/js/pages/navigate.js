@@ -198,16 +198,16 @@ function renderCapAnalytics() {
   h += zoomCard('plateau', 'Sustainment Load by Year', 'Ongoing Sustainment costs build up as projects launch and keep running. Each bar is one year\u2019s Sustainment as a share of that year\u2019s budget; the tick marks the cap set at Plan Capacity (Step 3.2).', orgPlateauBars());
   var yt = orgYearTotals(); var scp = parseFloat((data.capital || {}).susCap);
   var c3 = '<h3 class="h-sub-md">Overviews by Year</h3>';
-  c3 += '<div style="display:grid;grid-template-columns:64px repeat(5,1fr);gap:3px 14px;align-items:baseline">';
-  c3 += ['YEAR', 'BUDGET', 'COMMITTED', 'HEADROOM*', 'INTAKE RESERVE', 'NET OF RESERVE'].map(function (hd) { return '<div class="t-faint-sm" style="font-size:10px;letter-spacing:.06em">' + hd + '</div>' }).join('');
+  c3 += '<div class="yr-grid">';
+  c3 += ['YEAR', 'BUDGET', 'COMMITTED', 'HEADROOM*', 'INTAKE RESERVE', 'NET OF RESERVE'].map(function (hd) { return '<div class="t-faint-sm yr-hd">' + hd + '</div>' }).join('');
   yt.forEach(function (r) {
     var spare = r.headroom - (r.reserve || 0);
-    c3 += '<div class="fs-14"><strong>Year ' + r.y + '</strong></div>';
-    c3 += '<div class="fs-14">' + (r.budgetSet ? (fmtMoney(r.budget) + (fundAddsYear(r.y) ? '<span class="t-faint-sm"> (incl. ' + fmtMoney(fundAddsYear(r.y)) + ' auth.)</span>' : '')) : '<span class="t-faint-sm">not set</span>') + '</div>';
-    c3 += '<div class="fs-14">' + fmtMoney(r.total) + '</div>';
-    c3 += '<div class="fs-14" style="color:' + (r.headroom < 0 ? '#C25B73' : 'var(--ph1-t)') + '">' + (r.budgetSet ? fmtMoney(r.headroom) : '\u2014') + '</div>';
-    c3 += '<div class="fs-14">' + (r.reserve ? fmtMoney(r.reserve) : '\u2014') + '</div>';
-    c3 += '<div class="fs-14">' + (r.reserve && r.budgetSet ? fmtMoney(spare) : '\u2014') + '</div>';
+    c3 += '<div class="fs-14 yr-name"><strong>Year ' + r.y + '</strong></div>';
+    c3 += '<div class="fs-14" data-l="BUDGET">' + (r.budgetSet ? (fmtMoney(r.budget) + (fundAddsYear(r.y) ? '<span class="t-faint-sm"> (incl. ' + fmtMoney(fundAddsYear(r.y)) + ' auth.)</span>' : '')) : '<span class="t-faint-sm">not set</span>') + '</div>';
+    c3 += '<div class="fs-14" data-l="COMMITTED">' + fmtMoney(r.total) + '</div>';
+    c3 += '<div class="fs-14" data-l="HEADROOM*" style="color:' + (r.headroom < 0 ? '#C25B73' : 'var(--ph1-t)') + '">' + (r.budgetSet ? fmtMoney(r.headroom) : '\u2014') + '</div>';
+    c3 += '<div class="fs-14" data-l="INTAKE RESERVE">' + (r.reserve ? fmtMoney(r.reserve) : '\u2014') + '</div>';
+    c3 += '<div class="fs-14" data-l="NET OF RESERVE">' + (r.reserve && r.budgetSet ? fmtMoney(spare) : '\u2014') + '</div>';
     c3 += '<div class="t-faint-sm" style="grid-column:1/-1;margin:-2px 0 8px">Committed = Development ' + fmtMoney(r.dev) + ' + Rollout ' + fmtMoney(r.roll) + ' + Sustainment ' + fmtMoney(r.sus) + (r.scpY > 0 && r.budgetSet && r.budget > 0 ? '. Sustainment takes ' + ((r.sus > 0 && Math.round(r.sus / r.budget * 100) < 1) ? '&lt;1' : Math.round(r.sus / r.budget * 100)) + '% of the year\u2019s budget \u2013 cap ' + r.scpY + '%' + (r.capPct > 1 ? ' <span style="color:var(--warn-text)">\u26a0 over the cap</span>' : '') + '.' : '') + '</div>'
   });
   c3 += '</div>';

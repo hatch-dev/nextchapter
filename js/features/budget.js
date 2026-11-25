@@ -146,23 +146,27 @@ function bpAmber(i) {
   return msgs.map(function (m) { return '<p class="fs-13" style="margin:6px 0 0;color:var(--warn-text)">\u26a0 ' + m + '</p>' }).join('')
 }
 function bpDescTa(id, val, onch, rows, ph) { return '<textarea id="' + id + '" rows="' + (rows || 1) + '" placeholder="' + esc(ph || 'Describe the step (optional)') + '" onfocus="this.rows=2" onblur="this.rows=1" onchange="' + onch + '" style="width:100%;background:rgba(var(--fg-rgb),.03);border:1px solid rgba(var(--fg-rgb),.08);border-radius:6px;color:inherit;padding:4px 8px;font-size:12px;margin:0 0 8px;font-family:inherit;resize:none">' + esc(val || '') + '</textarea>' }
+/* A label the phone layout shows above a box of a budget row, where the heading row above is hidden (.bp-row in styles.css). */
+function bpLab(cls, t) { return '<span class="bp-lab ' + cls + '">' + t + '</span>' }
 function bpStepRow(i, sec, r, H, noDesc, noDel) {
   var idb = 'bps_' + i + '_' + sec + '_' + r.id; var oc = function (f) { return "bpRowSave(" + i + ",'" + sec + "','" + r.id + "','" + f + "',this.value)" };
-  var h = '<div class="flx-g3" style="margin-bottom:2px;align-items:center">';
-  h += '<input id="' + idb + '_name" value="' + esc(r.name || '') + '" placeholder="Step name" onchange="' + oc('name') + '" class="row-input" style="flex:2"/>';
-  h += '<div style="display:flex;gap:4px;align-items:center;flex:0 0 136px">' + bpMonthSel(idb + '_from', r.from, 1, H, oc('from')) + '<span class="t-faint-sm">\u2013</span>' + bpMonthSel(idb + '_to', r.to, Math.max(1, parseInt(r.from, 10) || 1), H, oc('to')) + '</div>';
-  h += '<input id="' + idb + '_cost" value="' + esc(r.cost || '') + '" placeholder="$ \u2014" onchange="' + oc('cost') + '" class="row-input" style="flex:0 0 140px;width:140px;text-align:left"/>';
-  h += (noDel ? '' : '<button onclick="bpDelStep(' + i + ',\'' + sec + '\',\'' + r.id + '\')" class="btn-ghost pad-chip-sm" style="width:26px;padding:2px">\u2715</button>') + '</div>';
+  var h = '<div class="flx-g3 bp-row' + (noDel ? ' bp-row-nodel' : '') + '" style="margin-bottom:2px;align-items:center">';
+  h += bpLab('bp-l-name', sec === 'dev' ? 'Phase name' : 'Step name') + bpLab('bp-l-months', 'Months') + bpLab('bp-l-cost', sec === 'dev' ? 'Phase budget' : 'Cost (whole step)');
+  h += '<input id="' + idb + '_name" value="' + esc(r.name || '') + '" placeholder="Step name" onchange="' + oc('name') + '" class="row-input bp-name" style="flex:2"/>';
+  h += '<div class="bp-months" style="display:flex;gap:4px;align-items:center;flex:0 0 136px">' + bpMonthSel(idb + '_from', r.from, 1, H, oc('from')) + '<span class="t-faint-sm">\u2013</span>' + bpMonthSel(idb + '_to', r.to, Math.max(1, parseInt(r.from, 10) || 1), H, oc('to')) + '</div>';
+  h += '<input id="' + idb + '_cost" value="' + esc(r.cost || '') + '" placeholder="$ \u2014" onchange="' + oc('cost') + '" class="row-input bp-cost" style="flex:0 0 140px;width:140px;text-align:left"/>';
+  h += (noDel ? '' : '<button onclick="bpDelStep(' + i + ',\'' + sec + '\',\'' + r.id + '\')" class="btn-ghost pad-chip-sm bp-del" style="width:26px;padding:2px">\u2715</button>') + '</div>';
   if (!noDesc) h += bpDescTa(idb + '_desc', r.desc, oc('desc'));
   return h
 }
 function bpGhostRow(i, sec, g, gn, gc, H) {
   var idb = 'bpg_' + i + '_' + sec + '_' + g; var oc = function (f) { return "bpGhostSave(" + i + ",'" + sec + "','" + f + "',this.value)" };
-  var h = '<div class="flx-g3" style="margin-bottom:8px;align-items:center;opacity:.6">';
-  h += '<input id="' + idb + '_name" value="" placeholder="' + esc(gn) + '" onchange="' + oc('name') + '" class="row-input" style="flex:2"/>';
-  h += '<div style="display:flex;gap:4px;align-items:center;flex:0 0 136px">' + bpMonthSel(idb + '_from', '', 1, H, oc('from')) + '<span class="t-faint-sm">\u2013</span>' + bpMonthSel(idb + '_to', '', 1, H, oc('to')) + '</div>';
-  h += '<input id="' + idb + '_cost" value="" placeholder="' + esc(gc) + '" onchange="' + oc('cost') + '" class="row-input" style="flex:0 0 140px;width:140px;text-align:left"/>';
-  h += '<span style="width:26px"></span></div>';
+  var h = '<div class="flx-g3 bp-row bp-row-nodel" style="margin-bottom:8px;align-items:center;opacity:.6">';
+  h += bpLab('bp-l-name', sec === 'dev' ? 'Phase name' : 'Step name') + bpLab('bp-l-months', 'Months') + bpLab('bp-l-cost', sec === 'dev' ? 'Phase budget' : 'Cost (whole step)');
+  h += '<input id="' + idb + '_name" value="" placeholder="' + esc(gn) + '" onchange="' + oc('name') + '" class="row-input bp-name" style="flex:2"/>';
+  h += '<div class="bp-months" style="display:flex;gap:4px;align-items:center;flex:0 0 136px">' + bpMonthSel(idb + '_from', '', 1, H, oc('from')) + '<span class="t-faint-sm">\u2013</span>' + bpMonthSel(idb + '_to', '', 1, H, oc('to')) + '</div>';
+  h += '<input id="' + idb + '_cost" value="" placeholder="' + esc(gc) + '" onchange="' + oc('cost') + '" class="row-input bp-cost" style="flex:0 0 140px;width:140px;text-align:left"/>';
+  h += '<span class="bp-gap" style="width:26px"></span></div>';
   return h
 }
 function bpStepTable(i, sec, title, cap, gp, H, colLabel) {
@@ -177,23 +181,24 @@ function bpStepTable(i, sec, title, cap, gp, H, colLabel) {
 }
 function bpPhaseBlock(i, ph, H) {
   var idb = 'bps_' + i + '_sus_' + ph.id; var oc = function (f) { return "bpPhSave(" + i + ",'" + ph.id + "','" + f + "',this.value)" };
-  var h = '<div class="flx-g3" style="margin-bottom:2px;align-items:center">';
-  h += '<input id="' + idb + '_name" value="' + esc(ph.name || '') + '" placeholder="Phase name" onchange="' + oc('name') + '" class="row-input" style="flex:2"/>';
-  h += '<div style="display:flex;gap:4px;align-items:center;flex:0 0 136px">' + bpMonthSel(idb + '_from', ph.from, 1, H, oc('from')) + '<span class="t-faint-sm">\u2013</span>' + bpMonthSel(idb + '_to', ph.to, Math.max(1, parseInt(ph.from, 10) || 1), H, oc('to'), true) + '</div>';
-  h += '<span class="row-input" style="flex:0 0 140px;width:140px;text-align:left;background:rgba(var(--fg-rgb),.03);color:var(--paper)">' + (bpPhaseAnnual(ph) ? fmtMoney(bpPhaseAnnual(ph)) + '/yr' : '\u2014') + '</span>';
-  h += '<button onclick="bpDelPhase(' + i + ',\'' + ph.id + '\')" class="btn-ghost pad-chip-sm" style="width:26px;padding:2px">\u2715</button></div>';
+  var h = '<div class="flx-g3 bp-row" style="margin-bottom:2px;align-items:center">';
+  h += bpLab('bp-l-name', 'Phase name') + bpLab('bp-l-months', 'Months') + bpLab('bp-l-cost', 'Annual rate');
+  h += '<input id="' + idb + '_name" value="' + esc(ph.name || '') + '" placeholder="Phase name" onchange="' + oc('name') + '" class="row-input bp-name" style="flex:2"/>';
+  h += '<div class="bp-months" style="display:flex;gap:4px;align-items:center;flex:0 0 136px">' + bpMonthSel(idb + '_from', ph.from, 1, H, oc('from')) + '<span class="t-faint-sm">\u2013</span>' + bpMonthSel(idb + '_to', ph.to, Math.max(1, parseInt(ph.from, 10) || 1), H, oc('to'), true) + '</div>';
+  h += '<span class="row-input bp-cost" style="flex:0 0 140px;width:140px;text-align:left;background:rgba(var(--fg-rgb),.03);color:var(--paper)">' + (bpPhaseAnnual(ph) ? fmtMoney(bpPhaseAnnual(ph)) + '/yr' : '\u2014') + '</span>';
+  h += '<button onclick="bpDelPhase(' + i + ',\'' + ph.id + '\')" class="btn-ghost pad-chip-sm bp-del" style="width:26px;padding:2px">\u2715</button></div>';
   (ph.items || []).forEach(function (it) {
     if (!it) return; var ib = 'bps_' + i + '_susit_' + ph.id + '_' + it.id; var oi = function (f) { return "bpItemSave(" + i + ",'" + ph.id + "','" + it.id + "','" + f + "',this.value)" };
-    h += '<div class="flx-g3" style="margin-bottom:2px;padding-left:14px;align-items:center">';
+    h += '<div class="flx-g3 bp-item" style="margin-bottom:2px;padding-left:14px;align-items:center">';
     h += '<input id="' + ib + '_name" value="' + esc(it.name || '') + '" placeholder="e.g. Hosting & licenses" onchange="' + oi('name') + '" class="row-input" style="flex:2"/>';
     h += '<input id="' + ib + '_cost" value="' + esc(it.cost || '') + '" placeholder="$ \u2014 per year" onchange="' + oi('cost') + '" class="row-input" style="flex:0 0 140px;width:140px;text-align:left"/>';
-    h += '<button onclick="bpDelItem(' + i + ',\'' + ph.id + '\',\'' + it.id + '\')" class="btn-ghost pad-chip-sm" style="width:26px;padding:2px">\u2715</button></div>'
+    h += '<button onclick="bpDelItem(' + i + ',\'' + ph.id + '\',\'' + it.id + '\')" class="btn-ghost pad-chip-sm bp-del" style="width:26px;padding:2px">\u2715</button></div>'
   });
   var gb = 'bpg_' + i + '_susit_' + ph.id; var og = function (f) { return "bpGhostItem(" + i + ",'" + ph.id + "','" + f + "',this.value)" };
-  h += '<div class="flx-g3" style="margin-bottom:2px;padding-left:14px;align-items:center;opacity:.6">';
+  h += '<div class="flx-g3 bp-item" style="margin-bottom:2px;padding-left:14px;align-items:center;opacity:.6">';
   h += '<input id="' + gb + '_name" value="" placeholder="e.g. Hosting & licenses" onchange="' + og('name') + '" class="row-input" style="flex:2"/>';
   h += '<input id="' + gb + '_cost" value="" placeholder="e.g. $60K per year" onchange="' + og('cost') + '" class="row-input" style="flex:0 0 140px;width:140px;text-align:left"/>';
-  h += '<span style="width:26px"></span></div>';
+  h += '<span class="bp-gap" style="width:26px"></span></div>';
   return h
 }
 function bpSusTable(i, H) {
@@ -203,10 +208,10 @@ function bpSusTable(i, H) {
   phs.forEach(function (ph) { if (ph) h += bpPhaseBlock(i, ph, H) });
   if (!phs.length) {
     var gb = 'bpg_' + i + '_sus_0'; var og = function (f) { return "bpGhostPhase(" + i + ",'" + f + "',this.value)" };
-    h += '<div class="flx-g3" style="margin-bottom:8px;align-items:center;opacity:.6">';
-    h += '<input id="' + gb + '_name" value="" placeholder="e.g. Ongoing operation" onchange="' + og('name') + '" class="row-input" style="flex:2"/>';
+    h += '<div class="flx-g3 bp-row bp-row-ph" style="margin-bottom:8px;align-items:center;opacity:.6">';
+    h += '<input id="' + gb + '_name" value="" placeholder="e.g. Ongoing operation" onchange="' + og('name') + '" class="row-input bp-name" style="flex:2"/>';
     h += bpMonthSel(gb + '_from', '', 1, H, og('from')) + '<span class="t-faint-sm">\u2013</span>' + bpMonthSel(gb + '_to', 'ongoing', 1, H, og('to'), true);
-    h += '<span class="t-faint-sm" style="flex:1;text-align:right">\u2014</span><span style="width:26px"></span></div>'
+    h += '<span class="t-faint-sm bp-gap" style="flex:1;text-align:right">\u2014</span><span class="bp-gap" style="width:26px"></span></div>'
   }
   h += '<div style="margin:6px 0 18px">' + btn('+ Add phase', 'bpAddPhase(' + i + ')', 'bg2', 'font-size:11px;padding:3px 10px') + '</div>';
   h += '<div class="mb-4"><div style="font-size:14px;color:var(--text-faint);margin-bottom:6px">Notes</div><textarea id="bpn_' + i + '_sus" rows="2" class="ta-helper" onchange="fldSave(this.id,this.value)" oninput="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\';fldSave(this.id,this.value,true)" placeholder="What keeps this running \u2013 platforms, licenses, people, retraining">' + esc((p.notes || {}).sus || '') + '</textarea></div>';
