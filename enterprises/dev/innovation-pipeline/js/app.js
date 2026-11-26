@@ -2581,6 +2581,11 @@ var Collab = (function () {
     try { localStorage.setItem(lKey(), JSON.stringify(o)); } catch (e) { }
   }
   function me() { return currentUserId; }
+  /* What this tab has let go of and not taken again (A-05, 26 Nov 2026). A renewal or a "who holds what" answer that set
+     out before the release and landed after it made the lock this tab's again, on the server and here, and the 4-second
+     renewal then kept it for as long as the page stayed open: a colleague was locked out of a box nobody was in. An
+     answer about one of these is not believed; the release is sent again instead. Cleared when the record is taken. */
+  var _letGo = {};
   function sid() { return (typeof TAB_ID !== 'undefined' && TAB_ID) || 'tab'; }   /* Sweep 4R item 4: a lock belongs to this tab (session), not to the person */
 
   /* ── The wire ─────────────────────────────────────────────
@@ -2612,14 +2617,16 @@ var Collab = (function () {
      freshness, and the two machines' clocks are not the same one. */
   function adopt(locks) {
     if (!locks) return false;
-    var next = {}, now = Date.now(), changed = false;
+    var next = {}, now = Date.now(), changed = false, stale = [];
     for (var i = 0; i < locks.length; i++) {
       var l = locks[i];
       if (!l || !l.section) continue;
+      if (l.mine && _letGo[l.section]) { stale.push(l.section); continue; }   /* A-05: let go of here; the server is told again */
       next[l.section] = { id: l.mine ? me() : (l.user || l.section), sid: l.mine ? sid() : ('other:' + (l.user || '') + ':' + (l.tab || '')), name: l.name || 'Someone', at: now };   /* Sweep 4R item 4: `mine` is this tab's, as the server judged it */
     }
     changed = JSON.stringify(Object.keys(next).sort()) !== JSON.stringify(Object.keys(_cache).sort());
     _cache = next;
+    if (stale.length) post('/workspace/locks/release', { sections: stale });
     _serverMode = true;
     return changed;
   }
@@ -2704,6 +2711,7 @@ var Collab = (function () {
        the answer was "someone else has it" they were sent anyway, a second or two later, over what that person had
        written in the meantime: their text was replaced by a stranger's four letters. Put back, nothing is sent. */
     var before = null; try { before = Store.recordGet(rk); } catch (e) { }
+    delete _letGo[rk];
     L[rk] = { id: me(), sid: sid(), name: u.name || 'Someone', at: Date.now() };
     write(L);
     post('/workspace/locks/claim', { sections: [rk] }).then(function (d) {
@@ -2711,7 +2719,10 @@ var Collab = (function () {
       var got = d.locks[0];
       /* Ours: and what is stored is read now, not at the next five-second look. Whoever had it a moment ago may have saved
          since the last one, and typing on from the older text put theirs back (P-38, 25 Nov 2026). */
-      if (got.mine) { try { Store.checkRemote(); } catch (e) { } return; }
+      if (got.mine) {
+        if (_letGo[rk]) { post('/workspace/locks/release', { sections: [rk] }); return; }   /* A-05: let go of while the claim was on its way */
+        try { Store.checkRemote(); } catch (e) { } return;
+      }
       _cache[rk] = { id: got.user, sid: 'other:' + (got.user || '') + ':' + (got.tab || ''), name: got.name || 'Someone', at: Date.now() };   /* Sweep 4R item 4: possibly this person's other tab */
       var dropped = false;
       try { dropped = Store.recordPut(rk, before); } catch (e) { }
@@ -2730,7 +2741,7 @@ var Collab = (function () {
   function release(rk) {
     if (SAMPLE_MODE) return;
     var L = read();
-    if (rk && L[rk] && L[rk].sid === sid()) { delete L[rk]; write(L); post('/workspace/locks/release', { sections: [rk] }); }
+    if (rk && L[rk] && L[rk].sid === sid()) { delete L[rk]; write(L); _letGo[rk] = Date.now(); post('/workspace/locks/release', { sections: [rk] }); }
   }
   /* The heartbeat, on the app's existing 4-second tick. Re-claiming is what
      keeps a lock alive (beat_at), and the same request re-confirms the holder,
@@ -2739,7 +2750,7 @@ var Collab = (function () {
   function refreshMine() {
     if (SAMPLE_MODE || !currentOrgId || !me()) return;
     var L = read(), mineKeys = [], ch = false;
-    for (var k in L) { if (L.hasOwnProperty(k) && L[k].sid === sid()) { L[k].at = Date.now(); mineKeys.push(k); ch = true; } }
+    for (var k in L) { if (L.hasOwnProperty(k) && L[k].sid === sid()) { if (_letGo[k]) { delete L[k]; ch = true; continue; } L[k].at = Date.now(); mineKeys.push(k); ch = true; } }   /* A-05 */
     if (ch) write(L);
     if (!useServer()) return;
     if (mineKeys.length) post('/workspace/locks/claim', { sections: mineKeys });

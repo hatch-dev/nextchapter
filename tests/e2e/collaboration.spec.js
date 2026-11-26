@@ -157,3 +157,19 @@ test('what the second person typed before learning of the lock is not saved over
   await a.reload();
   await expect(a.locator('#p_mission')).toHaveValue('Written by A and more');
 });
+
+/* A-05 (26 Nov 2026): a renewal or a "who holds what" answer that set out before the holder left the box and landed
+   after it made the lock theirs again, and the 4-second renewal kept it for as long as the page stayed open. The
+   holder's answers are held up here so that one is on its way when they leave. */
+test('a lock is let go even when an answer about it arrives after leaving the box', async ({ page: a, otherDevice: b, account }) => {
+  await bothOn(a, b, account, '1.1');
+  await a.locator('#p_mission').click();
+  await a.keyboard.type('Then A leaves');
+  await expect(b.locator('#p_mission')).toBeDisabled(REMOTE);
+  await a.route(/workspace\/locks(\/claim)?\?|workspace\/locks\/claim$/, async (route) => { await new Promise((r) => setTimeout(r, 2500)); await route.continue().catch(() => { }); });
+  await a.waitForRequest((r) => /workspace\/locks/.test(r.url()) && !/release/.test(r.url()), { timeout: 10_000 });
+  await a.locator('#p_mission').blur();
+  await expect(b.locator('#p_mission')).toBeEditable({ timeout: 25_000 });
+  await b.waitForTimeout(9000);   // two more renewals: the box must stay free
+  await expect(b.locator('#p_mission')).toBeEditable();
+});
