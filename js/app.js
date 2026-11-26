@@ -1434,6 +1434,33 @@ var Store = (function () {
   /* A collection is a map (the Pipeline's records by key) or a list (every list in AI-Ready Culture: values,
      commitments, AI uses, the Power Map…). `delete list[id]` does nothing to a list, so Remove in Culture
      confirmed "This cannot be undone" and then left the record where it was (live test, 13 Nov 2026, F-10). */
+  /* One record as a lock names it ('section' or 'section::id'), for putting it back (A-10, 26 Nov 2026): see
+     Collab.acquire. A section is a map of records or a list of them (with ids); recordGet answers what is there now,
+     recordPut puts a recordGet answer back and says whether anything changed. */
+  function recPath(rk) { var s = String(rk), i = s.indexOf('::'); return i < 0 ? { c: s, id: null } : { c: s.slice(0, i), id: s.slice(i + 2) }; }
+  function recordGet(rk) {
+    var p = recPath(rk), c = (typeof data !== 'undefined' && data) ? data[p.c] : undefined;
+    if (p.id == null) return c === undefined ? { found: false } : { found: true, v: cloneDoc(c) };
+    if (Array.isArray(c)) { for (var i = 0; i < c.length; i++) { if (c[i] && c[i].id != null && String(c[i].id) === p.id) return { found: true, v: cloneDoc(c[i]) }; } return { found: false }; }
+    if (c && typeof c === 'object' && Object.prototype.hasOwnProperty.call(c, p.id)) return { found: true, v: cloneDoc(c[p.id]) };
+    return { found: false };
+  }
+  function recordPut(rk, snap) {
+    if (!snap || typeof data === 'undefined' || !data) return false;
+    var now = recordGet(rk);
+    if (now.found === snap.found && (!now.found || sameContent(now.v, snap.v))) return false;
+    var p = recPath(rk);
+    if (p.id == null) { if (snap.found) data[p.c] = cloneDoc(snap.v); else delete data[p.c]; }
+    else if (Array.isArray(data[p.c])) {
+      var c = data[p.c], at = -1;
+      for (var i = 0; i < c.length; i++) { if (c[i] && c[i].id != null && String(c[i].id) === p.id) { at = i; break; } }
+      if (snap.found) { if (at >= 0) c[at] = cloneDoc(snap.v); else c.push(cloneDoc(snap.v)); } else if (at >= 0) c.splice(at, 1);
+    } else {
+      if (snap.found) { if (!data[p.c] || typeof data[p.c] !== 'object') data[p.c] = {}; data[p.c][p.id] = cloneDoc(snap.v); }
+      else if (data[p.c] && typeof data[p.c] === 'object') delete data[p.c][p.id];
+    }
+    delete _dirty[rk]; persistActive(); return true;
+  }
   function removeRec(collection, id) {
     var c = data[collection];
     if (Array.isArray(c)) {
@@ -1792,7 +1819,7 @@ var Store = (function () {
     readOrg: readOrg, orgRaw: orgRaw, writeOrg: writeOrg, removeOrg: removeOrg, commitSeed: commitSeed,
     kept: kept, unkeep: unkeep, keptRaw: function (id) { return rawGet(keptKey(id)); },
     flushNow: flushNow, forgetSent: forgetSent, hasUnsent: hasUnsent, reopen: function () { _closed = false; },
-    patch: patch, setPath: setPath, removeRec: removeRec, commit: commit, persistActive: persistActive,
+    patch: patch, setPath: setPath, removeRec: removeRec, commit: commit, persistActive: persistActive, recordGet: recordGet, recordPut: recordPut,
     dirtyRecords: function () { return Object.keys(_dirty); }, clearDirty: function () { _dirty = {}; },
     refreshOrg: refreshOrg, orgRev: orgRev, checkRemote: checkRemote, startChangeSignal: startChangeSignal, ready: ready,
     /* Who changed what, and when — the server-side record. See
@@ -2672,6 +2699,11 @@ var Collab = (function () {
     if (SAMPLE_MODE || !currentOrgId || !me() || !rk) return true;
     var h = holder(rk); if (h && h.sid !== sid()) return false;
     var u = getCurrentUser() || {}, L = read();
+    /* The record as it stood before this person started on it (A-10, 26 Nov 2026). A box saves as it is typed in, so
+       the first characters typed in the moment before the server's answer arrives were saved here and queued, and when
+       the answer was "someone else has it" they were sent anyway, a second or two later, over what that person had
+       written in the meantime: their text was replaced by a stranger's four letters. Put back, nothing is sent. */
+    var before = null; try { before = Store.recordGet(rk); } catch (e) { }
     L[rk] = { id: me(), sid: sid(), name: u.name || 'Someone', at: Date.now() };
     write(L);
     post('/workspace/locks/claim', { sections: [rk] }).then(function (d) {
@@ -2681,9 +2713,16 @@ var Collab = (function () {
          since the last one, and typing on from the older text put theirs back (P-38, 25 Nov 2026). */
       if (got.mine) { try { Store.checkRemote(); } catch (e) { } return; }
       _cache[rk] = { id: got.user, sid: 'other:' + (got.user || '') + ':' + (got.tab || ''), name: got.name || 'Someone', at: Date.now() };   /* Sweep 4R item 4: possibly this person's other tab */
+      var dropped = false;
+      try { dropped = Store.recordPut(rk, before); } catch (e) { }
+      if (dropped) {
+        /* What is on screen goes back too: a typed box keeps its own value through a repaint (data-typed). */
+        try { var tb = document.querySelectorAll('[data-typed]'); for (var ti = 0; ti < tb.length; ti++) { if (idToRecordKey(tb[ti].id) === rk) tb[ti].removeAttribute('data-typed'); } } catch (e) { }
+        try { render(); } catch (e) { }
+      }
       try {
         if (typeof applyLockUI === 'function') applyLockUI(true);
-        if (typeof showToast === 'function') showToast((got.name || 'Another member') + ' is editing this section', 'error');
+        if (typeof showToast === 'function') showToast((got.name || 'Another member') + ' is editing this section' + (dropped ? '. What you typed there was not kept.' : ''), 'error');
       } catch (e) { }
     });
     return true;

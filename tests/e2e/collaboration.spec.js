@@ -137,3 +137,23 @@ test.describe('[LK-03] a lock whose holder has gone', () => {
     await expect(page.locator('#p_mission')).toHaveValue('Before the reload and after');
   });
 });
+
+/* A-10 (26 Nov 2026): the second person to click into a box can type a few characters before the server's "someone
+   else has it" reaches them, and a box saves as it is typed in. Those characters were then sent a second or two later
+   and replaced the first person's text. Now they are put back, and the second person is told. The claim's answer is
+   held back here to open that moment on purpose. */
+test('what the second person typed before learning of the lock is not saved over the first person\'s text', async ({ page: a, otherDevice: b, account }) => {
+  await bothOn(a, b, account, '1.1');
+  await a.locator('#p_mission').click();
+  await a.keyboard.type('Written by A');
+  await b.route('**/workspace/locks/claim', async (route) => { await new Promise((r) => setTimeout(r, 450)); await route.continue().catch(() => { }); });
+  await b.locator('#p_mission').click();
+  await b.keyboard.type('BB', { delay: 40 });
+  await expect(b.locator('#appToast')).toContainText('was not kept', REMOTE);
+  await a.keyboard.type(' and more');
+  await a.locator('#p_mission').blur();
+  await expect(b.locator('#p_mission')).toHaveValue('Written by A and more', REMOTE);
+  await b.waitForTimeout(4000);   // anything B still had queued would have gone by now
+  await a.reload();
+  await expect(a.locator('#p_mission')).toHaveValue('Written by A and more');
+});
