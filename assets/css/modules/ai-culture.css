@@ -3752,3 +3752,10 @@ button.cmap-wcard-t:hover {text-decoration:underline
   .cul-glbars .b {grid-column:1/-1;grid-row:2
   }
 }
+/* 27 Nov 2026: the home hero's top room follows the header's real height (--nav-h, set by syncNavHeight), as
+   in the shared sheet; the fixed 100px above left the eyebrow's first line under a header whose tabs wrap to a
+   second row on a phone. */
+@media(max-width:960px) {
+  .hero-left {padding-top:calc(var(--nav-h,116px) + 8px)
+  }
+}

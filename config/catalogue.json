@@ -211,6 +211,7 @@
             "sideAccent": "Culture"
           },
           "title": "90-Day AI-Ready Culture — NextChapter",
+          "sidebarOnePhase": true,
           "tabs": {
             "home": "Home",
             "learn": "Learn",
