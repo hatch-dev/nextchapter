@@ -3727,3 +3727,28 @@ button.cmap-wcard-t:hover {text-decoration:underline
 
 /* User testing (4 Nov 2026, Paul): the questionnaire grid's boxes in 1.2, 3.3 and the Pulse Round page are wide enough for their placeholders and for longer numbers. The general input rule (padding 12px) outranked .score-mini, leaving 54px for text. */
 #app input.score-mini{width:88px;padding:6px}
+
+/* Phone screens (27 Nov 2026, user testing): the Save as PDF bar wraps instead of spilling past the left edge
+   (justify-content:flex-end pushed DEPTH off-screen), a dimension's score line puts its value under the track
+   instead of past the card's right edge, the Culture at a Glance boxes and buttons fit the screen, and record cards (sessions, stories, people) take one full-width column
+   on every page, not only where the cmapwork container is. */
+.print-bar {flex-wrap:wrap;row-gap:8px
+}
+@media (max-width:640px) {
+  .cmap-score {flex-wrap:wrap;row-gap:2px;min-width:0
+  }
+  .cmap-score svg {flex-shrink:1;max-width:100%
+  }
+  .cmap-score .v {white-space:normal
+  }
+  .cmap-cards {grid-template-columns:minmax(0,1fr)
+  }
+  .glance-grid,.glance-grid-32 {grid-template-columns:minmax(0,1fr)
+  }
+  .cul-dash .btn {white-space:normal;max-width:100%
+  }
+  .cul-glbars .r {grid-template-columns:minmax(0,1fr) 28px;row-gap:4px
+  }
+  .cul-glbars .b {grid-column:1/-1;grid-row:2
+  }
+}
